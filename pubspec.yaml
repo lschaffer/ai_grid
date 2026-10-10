@@ -1,0 +1,26 @@
+name: ai_grid
+description: "An intelligent DataGrid for Flutter with native AI assistant and MCP skill control."
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  material_ui: ^1.4.0
+  intl: ^0.20.2
+  trina_grid:
+    path: ../trina_grid
+  dart_mcp_core:
+    path: ../mcp_playground/dart_mcp_core
+  draggable_overlay_window: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:

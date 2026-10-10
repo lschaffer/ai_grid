@@ -1,0 +1,26 @@
+name: ai_grid_example
+description: "Example application for ai_grid demonstrating intelligent AI DataGrid."
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ai_grid:
+    path: ..
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/superstore_sales_1000.json
+    - assets/sales_1000.json
+    - .env
