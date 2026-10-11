@@ -129,6 +129,31 @@ void main() {
       expect(controller.activeFilters['region']?['value'], 'East');
       expect(controller.activeFilters['category']?['value'], 'Tech');
     });
+
+    test('supports negative filter operators (not equals, does not contain)', () {
+      final controller = AiGridController();
+      final sample = [
+        {'orderId': 1, 'category': 'Furniture'},
+        {'orderId': 2, 'category': 'Office Supplies'},
+        {'orderId': 3, 'category': 'Technology'},
+      ];
+      final cols = [
+        const AiGridColumn(
+            field: 'orderId', title: 'Order ID', type: AiGridColumnType.number),
+        const AiGridColumn(
+            field: 'category', title: 'Category', type: AiGridColumnType.text),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      controller.attach(columns: cols, dataSource: ds);
+
+      controller.setFilter('category', operator: 'not equals', value: 'Furniture');
+      expect(controller.activeFilters['category']?['operator'], 'not equals');
+      expect(controller.activeFilters['category']?['value'], 'Furniture');
+
+      controller.setFilter('category', operator: 'does not contain', value: 'Supplies');
+      expect(controller.activeFilters['category']?['operator'], 'does not contain');
+      expect(controller.activeFilters['category']?['value'], 'Supplies');
+    });
   });
 
   group('AiGrid MCP Skill & Tools Tests', () {
@@ -202,10 +227,151 @@ void main() {
       expect(controller.activeGrouping.isEmpty, isTrue);
       expect(controller.activeSortColumn, isNull);
 
+      // Test export tool declaration
+      final exportTool = tools.firstWhere((t) => t.name == 'grid_export');
+      expect(exportTool.name, 'grid_export');
+      expect(exportTool.inputSchema['properties']?['format'], isNotNull);
+
+      // Test column enableEditingMode
+      final testCol = const AiGridColumn(
+        field: 'test',
+        title: 'Test',
+        enableEditingMode: false,
+      ).toTrinaColumn();
+      expect(testCol.enableEditingMode, isFalse);
+
       // Test state
       final stateRes = await stateTool.execute({});
       final stateJson = jsonDecode(stateRes.content.first.text ?? '{}');
       expect(stateJson['activeGrouping'], isEmpty);
+    });
+
+    test('AiGridController settings export and restore persists configuration', () async {
+      final cols = [
+        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'category', title: 'Category', type: AiGridColumnType.text),
+        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+      ];
+
+      final sample = [
+        {'id': 1, 'category': 'Office Supplies', 'sales': 100},
+        {'id': 2, 'category': 'Technology', 'sales': 500},
+      ];
+
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final controller = AiGridController();
+      controller.attach(columns: cols, dataSource: ds);
+
+      // Modify grid settings: grouping, sorting, filters, visibility
+      controller.setGrouping(['category']);
+      controller.setSorting('sales', descending: true);
+      controller.setFilter('sales', operator: 'greater than', value: 50);
+      controller.showOnlyColumns(['id', 'sales']);
+
+      // 1. Export settings
+      final exported = controller.exportSettings();
+      expect(exported['groupColumns'], ['category']);
+      expect(exported['sorts'], isNotEmpty);
+      expect((exported['sorts'] as List).first['field'], 'sales');
+      expect((exported['sorts'] as List).first['descending'], isTrue);
+      expect(exported['filters'], isNotEmpty);
+      expect(exported['filters']['sales']['operator'], 'greater than');
+      expect(exported['visibleColumns'], containsAll(['id', 'sales']));
+      expect(exported['hiddenColumns'], contains('category'));
+
+      // 2. Export to JSON string
+      final jsonStr = controller.exportSettingsJson();
+      expect(jsonStr, contains('groupColumns'));
+      expect(jsonStr, contains('category'));
+
+      // 3. Reset grid
+      controller.reset();
+      expect(controller.activeGrouping, isEmpty);
+      expect(controller.activeSortColumn, isNull);
+      expect(controller.activeFilters, isEmpty);
+      expect(controller.hiddenColumns, isEmpty);
+
+      // 4. Restore settings from Map
+      controller.restoreSettings(exported);
+      expect(controller.activeGrouping, ['category']);
+      expect(controller.activeSortColumn, 'sales');
+      expect(controller.isSortDescending, isTrue);
+      expect(controller.activeFilters.containsKey('sales'), isTrue);
+      expect(controller.hiddenColumns, contains('category'));
+
+      // 5. Test AiGridSettingsStorage cache
+      AiGridSettingsStorage.save('test_persistence_key', exported);
+      final loaded = AiGridSettingsStorage.load('test_persistence_key');
+      expect(loaded, isNotNull);
+      expect(loaded!['groupColumns'], ['category']);
+      AiGridSettingsStorage.clear('test_persistence_key');
+      expect(AiGridSettingsStorage.load('test_persistence_key'), isNull);
+
+      // 6. Test MCP Tools: GridExportSettingsTool & GridRestoreSettingsTool
+      final tools = AiGridSkill.createTools(controller);
+      final exportSettingsTool = tools.firstWhere((t) => t.name == 'grid_export_settings');
+      final restoreSettingsTool = tools.firstWhere((t) => t.name == 'grid_restore_settings');
+
+      final exportResult = await exportSettingsTool.execute({});
+      expect(exportResult.content.first.text, contains('"groupColumns"'));
+
+      controller.reset();
+      expect(controller.activeGrouping, isEmpty);
+
+      final restoreResult = await restoreSettingsTool.execute({
+        'settingsJson': exportResult.content.first.text,
+      });
+      expect(restoreResult.content.first.text, contains('restored successfully'));
+      expect(controller.activeGrouping, ['category']);
+    });
+
+    test('LazyAiGridDataSource & pagination tools work as expected', () async {
+      final cols = [
+        const AiGridColumn(
+            field: 'id', title: 'ID', type: AiGridColumnType.number),
+        const AiGridColumn(
+            field: 'name', title: 'Name', type: AiGridColumnType.text),
+      ];
+
+      final lazyDs = LazyAiGridDataSource(
+        columns: cols,
+        fetch: (request) async {
+          final page = request.page;
+          final pageSize = request.pageSize;
+          final rows = List.generate(
+            pageSize,
+            (i) => TrinaRow(
+              cells: {
+                'id': TrinaCell(value: (page - 1) * pageSize + i + 1),
+                'name': TrinaCell(value: 'Item ${(page - 1) * pageSize + i + 1}'),
+              },
+            ),
+          );
+          return TrinaLazyPaginationResponse(
+            totalPage: 10,
+            rows: rows,
+          );
+        },
+        totalRowCountGetter: () => 100,
+      );
+
+      expect(lazyDs.totalRowCount, 100);
+      final sample = await lazyDs.getSampleData(limit: 2);
+      expect(sample.length, 2);
+      expect(sample.first['id'], 1);
+
+      final controller = AiGridController();
+      controller.attach(columns: cols, dataSource: lazyDs);
+
+      final tools = AiGridSkill.createTools(controller);
+      final pageTool = tools.firstWhere((t) => t.name == 'grid_go_to_page');
+      final paginationStatusTool = tools.firstWhere((t) => t.name == 'grid_get_pagination_status');
+
+      final statusRes = await paginationStatusTool.execute({});
+      expect(statusRes.content.first.text?.contains('currentPage'), isTrue);
+
+      final pageRes = await pageTool.execute({'page': 2, 'pageSize': 20});
+      expect(pageRes.content.first.text?.contains('success'), isTrue);
     });
   });
 }

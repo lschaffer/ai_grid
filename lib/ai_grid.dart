@@ -1,3 +1,4 @@
+export 'package:trina_grid/trina_grid.dart';
 export 'src/models/ai_grid_column.dart';
 export 'src/models/ai_grid_data_source.dart';
 export 'src/controllers/ai_grid_controller.dart';
@@ -8,4 +9,7 @@ export 'src/widgets/ai_grid.dart';
 export 'src/widgets/ai_grid_toolbar.dart';
 export 'src/widgets/ai_grid_group_panel.dart';
 export 'src/widgets/ai_grid_assistant_panel.dart';
+export 'src/widgets/ai_grid_export_dialog.dart';
 export 'src/mcp/ai_grid_tools.dart';
+export 'src/config/ai_grid_settings_storage.dart';
+export 'package:file_saver/file_saver.dart';

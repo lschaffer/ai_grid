@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
@@ -13,12 +14,16 @@ class AiGridAssistantPanel extends StatefulWidget {
   final AiGridController controller;
   final AiGridConfig? aiConfig;
   final Future<void> Function(String prompt)? onSendPrompt;
+  final bool embeddedInWindow;
+  final bool isFullScreen;
 
   const AiGridAssistantPanel({
     super.key,
     required this.controller,
     this.aiConfig,
     this.onSendPrompt,
+    this.embeddedInWindow = false,
+    this.isFullScreen = false,
   });
 
   @override
@@ -27,8 +32,40 @@ class AiGridAssistantPanel extends StatefulWidget {
 
 class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
   final TextEditingController _textCtrl = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final List<_AssistantMessage> _messages = [];
   bool _isLoading = false;
+
+  void _copyToClipboard(BuildContext context, String text) {
+    if (text.trim().isEmpty) return;
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.check, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Text('Copied to clipboard'),
+          ],
+        ),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -55,6 +92,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _textCtrl.dispose();
     super.dispose();
   }
@@ -70,6 +108,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         ),
       );
     });
+    _scrollToBottom();
   }
 
   Future<void> _handleSend() async {
@@ -81,6 +120,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       _isLoading = true;
     });
     _textCtrl.clear();
+    _scrollToBottom();
 
     try {
       if (widget.onSendPrompt != null) {
@@ -151,6 +191,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             isUser: false,
           ));
         });
+        _scrollToBottom();
       },
       onAssistantResult: (p, response) {
         if (!mounted) return;
@@ -160,16 +201,22 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             isUser: false,
           ));
         });
+        _scrollToBottom();
       },
       onError: (err) {
         if (!mounted) return;
+        final errStr = err.toString();
+        final isCors = errStr.contains('Failed to fetch') || errStr.contains('XMLHttpRequest');
         setState(() {
           _messages.add(_AssistantMessage(
-            title: 'Agent Error',
-            description: err.toString(),
+            title: isCors ? 'Browser CORS Restriction' : 'Agent Error',
+            description: isCors
+                ? 'Direct browser call blocked by CORS.\nLaunch Chrome with --disable-web-security or configure a proxy.'
+                : errStr,
             isUser: false,
           ));
         });
+        _scrollToBottom();
       },
     );
   }
@@ -177,7 +224,19 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
   void _executeLocalHeuristic(String prompt) {
     final lower = prompt.toLowerCase();
 
-    // Check for calculate/average/sum/etc.
+    if (lower.contains('clear') || lower.contains('reset')) {
+      widget.controller.reset();
+      _messages.add(
+        _AssistantMessage(
+          title: 'Reset',
+          description: 'Grid state reset to defaults.',
+          isUser: false,
+        ),
+      );
+      _scrollToBottom();
+      return;
+    }
+
     if (lower.contains('calc') ||
         lower.contains('avg') ||
         lower.contains('average') ||
@@ -288,6 +347,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         ),
       );
     }
+    _scrollToBottom();
   }
 
   @override
@@ -299,6 +359,26 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     final panelBg = isDark ? colorScheme.surfaceContainerHigh : Colors.white;
     final panelBorder =
         isDark ? colorScheme.outlineVariant.withAlpha(90) : AiGridTheme.borderColor;
+
+    final content = Column(
+      children: [
+        if (!widget.embeddedInWindow) _buildHeader(context),
+        Expanded(child: _buildMessageList(context)),
+        _buildSuggestionChips(context),
+        _buildInputBox(context),
+      ],
+    );
+
+    if (widget.embeddedInWindow) {
+      return content;
+    }
+
+    if (widget.isFullScreen) {
+      return Container(
+        color: panelBg,
+        child: content,
+      );
+    }
 
     return Container(
       width: 390,
@@ -315,14 +395,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         ],
         border: Border.all(color: panelBorder, width: 1),
       ),
-      child: Column(
-        children: [
-          _buildHeader(context),
-          Expanded(child: _buildMessageList(context)),
-          _buildSuggestionChips(context),
-          _buildInputBox(context),
-        ],
-      ),
+      child: content,
     );
   }
 
@@ -336,10 +409,12 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         color: isDark
             ? colorScheme.surfaceContainerHighest
             : const Color(0xFFF8FAFC),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
-        ),
+        borderRadius: widget.isFullScreen
+            ? BorderRadius.zero
+            : const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
         border: Border(
           bottom: BorderSide(
             color: isDark
@@ -351,6 +426,17 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       ),
       child: Row(
         children: [
+          if (widget.isFullScreen) ...[
+            IconButton(
+              icon: const Icon(Icons.arrow_back, size: 18),
+              onPressed: () => widget.controller.setAiAssistantVisible(false),
+              tooltip: 'Back to Data Grid',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+          ],
           Icon(
             Icons.auto_awesome,
             size: 18,
@@ -385,16 +471,18 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     final colorScheme = theme.colorScheme;
 
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(12),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final msg = _messages[index];
         if (msg.isUser) {
+          final userText = msg.text ?? '';
           return Align(
             alignment: Alignment.centerRight,
             child: Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.only(left: 12, right: 6, top: 6, bottom: 6),
               decoration: BoxDecoration(
                 color: isDark
                     ? colorScheme.primaryContainer
@@ -406,18 +494,46 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                       : const Color(0xFFBFDBFE),
                 ),
               ),
-              child: Text(
-                msg.text ?? '',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark
-                      ? colorScheme.onPrimaryContainer
-                      : AiGridTheme.textColor,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      userText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? colorScheme.onPrimaryContainer
+                            : AiGridTheme.textColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: Icon(
+                      Icons.copy_outlined,
+                      size: 13,
+                      color: (isDark
+                              ? colorScheme.onPrimaryContainer
+                              : AiGridTheme.textColor)
+                          .withAlpha(150),
+                    ),
+                    tooltip: 'Copy prompt',
+                    onPressed: () => _copyToClipboard(context, userText),
+                    padding: const EdgeInsets.all(2),
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
               ),
             ),
           );
         }
+
+        final fullResponse = [
+          if (msg.title != null) msg.title!,
+          if (msg.description != null) msg.description!,
+        ].join('\n');
 
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 4),
@@ -468,6 +584,17 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                       ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.copy_outlined,
+                  size: 13,
+                  color: colorScheme.onSurfaceVariant.withAlpha(140),
+                ),
+                tooltip: 'Copy response',
+                onPressed: () => _copyToClipboard(context, fullResponse),
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(),
               ),
             ],
           ),
@@ -534,6 +661,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                 ),
               );
             });
+            _scrollToBottom();
           }),
           if (numCol != null)
             _buildChip(context, '📊 Avg ${numCol.title}', () {
@@ -551,6 +679,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                   ),
                 );
               });
+              _scrollToBottom();
             }),
           if (groupCol != null)
             _buildChip(context, '🧩 Group by ${groupCol.title}', () {

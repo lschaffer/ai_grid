@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:file_saver/file_saver.dart';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:trina_grid/trina_grid.dart';
@@ -15,6 +17,7 @@ class AiGridController extends ChangeNotifier {
   final Map<String, Map<String, dynamic>> _activeFilters = {};
   String? _activeSortColumn;
   bool _isSortDescending = false;
+  final Set<String> _hiddenFields = {};
   String _searchQuery = '';
   bool _showColumnFilterRow = true;
   bool _showGroupPanel = true;
@@ -50,6 +53,38 @@ class AiGridController extends ChangeNotifier {
 
   /// Whether the AI Assistant panel is visible.
   bool get showAiAssistant => _showAiAssistant;
+
+  /// Whether the controller is attached to an active grid StateManager.
+  bool get isAttached => _stateManager != null;
+
+
+  /// Current page number (1-based index).
+  int get page => _stateManager?.page ?? 1;
+
+  /// Total number of pages available.
+  int get totalPage => _stateManager?.totalPage ?? 1;
+
+  /// Number of rows per page.
+  int get pageSize => _stateManager?.pageSize ?? 40;
+
+  /// Whether pagination is currently active on the grid.
+  bool get isPaginated => _stateManager?.isPaginated ?? false;
+
+  /// Navigates to a specific page number.
+  void setPage(int page) {
+    if (_stateManager != null) {
+      _stateManager!.setPage(page);
+      notifyListeners();
+    }
+  }
+
+  /// Sets the number of rows displayed per page.
+  void setPageSize(int size) {
+    if (_stateManager != null) {
+      _stateManager!.setPageSize(size);
+      notifyListeners();
+    }
+  }
 
   /// Attaches the controller to the rendered grid state.
   void attach({
@@ -308,7 +343,9 @@ class AiGridController extends ChangeNotifier {
 
       if (_stateManager != null) {
         final rows = filteredOnly
-            ? _stateManager!.refRows
+            ? (_stateManager!.refRows.hasRange
+                ? _stateManager!.refRows.filterOrOriginalList
+                : _stateManager!.refRows)
             : _stateManager!.refRows.originalList;
         for (final row in rows) {
           if (row.type.isGroup) continue;
@@ -361,7 +398,9 @@ class AiGridController extends ChangeNotifier {
     final numbers = <num>[];
     if (_stateManager != null) {
       final rows = filteredOnly
-          ? _stateManager!.refRows
+          ? (_stateManager!.refRows.hasRange
+              ? _stateManager!.refRows.filterOrOriginalList
+              : _stateManager!.refRows)
           : _stateManager!.refRows.originalList;
       for (final row in rows) {
         if (row.type.isGroup) continue;
@@ -538,56 +577,117 @@ class AiGridController extends ChangeNotifier {
 
   /// Sets visibility of a specific column.
   void setColumnVisibility(String field, bool visible) {
+    final actual = _resolveField(field) ?? field;
+    if (visible) {
+      _hiddenFields.remove(actual);
+    } else {
+      _hiddenFields.add(actual);
+    }
+
     if (_stateManager != null) {
-      final actual = _resolveField(field) ?? field;
       final col = _stateManager!.refColumns.originalList
           .where((c) => c.field == actual)
           .firstOrNull;
       if (col != null) {
         _stateManager!.hideColumn(col, !visible);
-        notifyListeners();
       }
     }
+    notifyListeners();
+  }
+
+  /// Shows ONLY the specified columns and hides all other columns.
+  void showOnlyColumns(List<String> fields) {
+    final targetFields = fields.map((f) => _resolveField(f) ?? f).toSet();
+    _hiddenFields.clear();
+    _hiddenFields.addAll(_columns.map((c) => c.field).where((f) => !targetFields.contains(f)));
+
+    if (_stateManager != null) {
+      final toHide = <TrinaColumn>[];
+      final toShow = <TrinaColumn>[];
+
+      for (final col in _stateManager!.refColumns.originalList) {
+        if (targetFields.contains(col.field)) {
+          toShow.add(col);
+        } else {
+          toHide.add(col);
+        }
+      }
+
+      if (toHide.isNotEmpty) {
+        _stateManager!.hideColumns(toHide, true);
+      }
+      if (toShow.isNotEmpty) {
+        _stateManager!.hideColumns(toShow, false);
+      }
+    }
+    notifyListeners();
   }
 
   /// Sets visibility for multiple columns at once.
   void setColumnsVisibility(Map<String, bool> visibilityMap) {
+    for (final entry in visibilityMap.entries) {
+      final actual = _resolveField(entry.key) ?? entry.key;
+      if (entry.value) {
+        _hiddenFields.remove(actual);
+      } else {
+        _hiddenFields.add(actual);
+      }
+    }
+
     if (_stateManager != null) {
+      final toHide = <TrinaColumn>[];
+      final toShow = <TrinaColumn>[];
+
       for (final entry in visibilityMap.entries) {
         final actual = _resolveField(entry.key) ?? entry.key;
         final col = _stateManager!.refColumns.originalList
             .where((c) => c.field == actual)
             .firstOrNull;
         if (col != null) {
-          _stateManager!.hideColumn(col, !entry.value, notify: false);
+          if (entry.value) {
+            toShow.add(col);
+          } else {
+            toHide.add(col);
+          }
         }
       }
-      _stateManager!.notifyListeners(true, _stateManager!.hideColumn.hashCode);
-      notifyListeners();
+
+      if (toHide.isNotEmpty) {
+        _stateManager!.hideColumns(toHide, true);
+      }
+      if (toShow.isNotEmpty) {
+        _stateManager!.hideColumns(toShow, false);
+      }
     }
+    notifyListeners();
   }
 
   /// Restores visibility of all columns.
   void showAllColumns() {
+    _hiddenFields.clear();
     if (_stateManager != null) {
       _stateManager!.hideColumns(_stateManager!.refColumns.originalList, false);
-      notifyListeners();
     }
+    notifyListeners();
   }
 
   /// Returns the list of currently visible column fields.
   List<String> get visibleColumns {
-    if (_stateManager == null) return _columns.map((c) => c.field).toList();
-    return _stateManager!.columns.map((c) => c.field).toList();
+    if (_stateManager != null) {
+      return _stateManager!.columns.map((c) => c.field).toList();
+    }
+    return _columns.map((c) => c.field).where((f) => !_hiddenFields.contains(f)).toList();
   }
 
   /// Returns the list of currently hidden column fields.
   List<String> get hiddenColumns {
-    if (_stateManager == null) return [];
-    return _stateManager!.refColumns.originalList
-        .where((c) => c.hide)
-        .map((c) => c.field)
-        .toList();
+    if (_stateManager != null) {
+      return _stateManager!.refColumns.originalList
+          .where((c) => c.hide)
+          .map((c) => c.field)
+          .toList();
+    }
+    return _hiddenFields.toList();
   }
 
   /// Toggles visibility of the inline filter row.
@@ -627,6 +727,136 @@ class AiGridController extends ChangeNotifier {
     showAllColumns();
   }
 
+
+  /// Exports all current interactive grid settings to a Map.
+  ///
+  /// Persists:
+  /// - [visibleColumns]: ordered list of visible column field names
+  /// - [hiddenColumns]: list of hidden column field names
+  /// - [groupColumns]: hierarchical row group field names
+  /// - [sorts]: active sorting columns with directions and priority
+  /// - [filters]: active column filter criteria (field, operator, value)
+  /// - [showColumnFilterRow]: inline filter row toggle
+  Map<String, dynamic> exportSettings() {
+    return {
+      'version': '1.0',
+      'visibleColumns': visibleColumns,
+      'hiddenColumns': hiddenColumns,
+      'groupColumns': List<String>.from(activeGrouping),
+      'sorts': (_stateManager != null && sortedColumns.isNotEmpty)
+          ? sortedColumns
+              .map((c) => {
+                    'field': c.field,
+                    'descending': c.sort.isDescending,
+                    'priority': c.sortPriority,
+                  })
+              .toList()
+          : (_activeSortColumn != null
+              ? [
+                  {
+                    'field': _activeSortColumn,
+                    'descending': _isSortDescending,
+                    'priority': 0,
+                  }
+                ]
+              : <Map<String, dynamic>>[]),
+      'filters': Map<String, dynamic>.from(activeFilters),
+      'showColumnFilterRow': _showColumnFilterRow,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+  }
+
+  /// Exports all current settings serialized as a JSON string.
+  String exportSettingsJson({bool pretty = true}) {
+    final encoder =
+        pretty ? const JsonEncoder.withIndent('  ') : const JsonEncoder();
+    return encoder.convert(exportSettings());
+  }
+
+  /// Restores grid state from a saved settings Map.
+  void restoreSettings(Map<String, dynamic> settings) {
+
+    // 1. Column visibility
+    if (settings.containsKey('visibleColumns')) {
+      final list = (settings['visibleColumns'] as List?)
+          ?.map((e) => e.toString())
+          .toList();
+      if (list != null && list.isNotEmpty) {
+        showOnlyColumns(list);
+      }
+    } else if (settings.containsKey('hiddenColumns')) {
+      final hidden = (settings['hiddenColumns'] as List?)
+              ?.map((e) => e.toString())
+              .toSet() ??
+          {};
+      final map = <String, bool>{};
+      for (final col in _columns) {
+        map[col.field] = !hidden.contains(col.field);
+      }
+      setColumnsVisibility(map);
+    }
+
+    // 2. Group columns
+    if (settings.containsKey('groupColumns')) {
+      final groups = (settings['groupColumns'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
+      setGrouping(groups);
+    }
+
+    // 3. Filters
+    if (settings.containsKey('filters')) {
+      final filters = settings['filters'] as Map<String, dynamic>? ?? {};
+      clearAllFilters();
+      for (final entry in filters.entries) {
+        final valMap = entry.value as Map<String, dynamic>?;
+        if (valMap != null) {
+          setFilter(
+            entry.key,
+            operator: valMap['operator']?.toString() ?? 'contains',
+            value: valMap['value'],
+          );
+        }
+      }
+    }
+
+    // 4. Sorts
+    if (settings.containsKey('sorts')) {
+      final sorts =
+          (settings['sorts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (sorts.isNotEmpty) {
+        final first = sorts.first;
+        final field = first['field']?.toString();
+        if (field != null) {
+          setSorting(field, descending: first['descending'] == true);
+        }
+      } else {
+        clearSorting();
+      }
+    }
+
+    // 5. Column filter row
+    if (settings.containsKey('showColumnFilterRow')) {
+      _showColumnFilterRow = settings['showColumnFilterRow'] == true;
+      _stateManager?.setShowColumnFilter(_showColumnFilterRow);
+    }
+
+    notifyListeners();
+  }
+
+  /// Restores grid state from a JSON string.
+  void restoreSettingsJson(String jsonStr) {
+    try {
+      final decoded = jsonDecode(jsonStr);
+      if (decoded is Map<String, dynamic>) {
+        restoreSettings(decoded);
+      }
+    } catch (e) {
+      debugPrint('Error restoring grid settings from JSON: $e');
+    }
+  }
+
   /// Generates schema metadata for LLM prompt context.
   Map<String, dynamic> getSchemaSummary() {
     return {
@@ -643,7 +873,11 @@ class AiGridController extends ChangeNotifier {
       'activeSortColumn': _activeSortColumn,
       'isSortDescending': _isSortDescending,
       'searchQuery': _searchQuery,
-      'filteredRowCount': _stateManager?.refRows.length ?? 0,
+      'filteredRowCount': _stateManager != null
+          ? (_stateManager!.refRows.hasRange
+              ? _stateManager!.refRows.filterOrOriginalList.length
+              : _stateManager!.refRows.length)
+          : (_dataSource?.totalRowCount ?? 0),
       'visibleColumns': visibleColumns,
       'hiddenColumns': hiddenColumns,
       'sortedColumns': sortedColumns
@@ -662,4 +896,53 @@ class AiGridController extends ChangeNotifier {
     if (_dataSource == null) return [];
     return _dataSource!.getSampleData(limit: limit);
   }
+  /// Exports current grid data to CSV or JSON and saves it via FileSaver.
+  Future<String> exportGrid({
+    String format = 'csv',
+    List<String>? columns,
+    bool includeHeaders = true,
+    bool ignoreFixedRows = false,
+    String separator = ',',
+  }) async {
+    final sm = _stateManager;
+    if (sm == null) throw Exception('Grid is not attached yet');
+
+    final fileName = 'grid_export_${DateTime.now().millisecondsSinceEpoch}';
+    final fmt = format.toLowerCase().trim();
+
+    if (fmt == 'csv') {
+      final content = await TrinaGridExportCsv().export(
+        stateManager: sm,
+        columns: columns,
+        includeHeaders: includeHeaders,
+        separator: separator,
+        ignoreFixedRows: ignoreFixedRows,
+      );
+      final bytes = Uint8List.fromList(utf8.encode(content));
+      return await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: bytes,
+        fileExtension: 'csv',
+        mimeType: MimeType.csv,
+      );
+    } else if (fmt == 'json') {
+      final content = await TrinaGridExportJson().export(
+        stateManager: sm,
+        columns: columns,
+        includeHeaders: includeHeaders,
+        ignoreFixedRows: ignoreFixedRows,
+      );
+      final bytes = Uint8List.fromList(utf8.encode(content));
+      return await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: bytes,
+        fileExtension: 'json',
+        mimeType: MimeType.json,
+      );
+
+    } else {
+      throw Exception('Unsupported export format: $format');
+    }
+  }
+
 }

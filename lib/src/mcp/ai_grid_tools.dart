@@ -24,6 +24,11 @@ class AiGridSkill {
       GridGroupTool(controller),
       GridSetColumnVisibilityTool(controller),
       GridResetTool(controller),
+      GridExportTool(controller),
+      GridGoToPageTool(controller),
+      GridGetPaginationTool(controller),
+      GridExportSettingsTool(controller),
+      GridRestoreSettingsTool(controller),
     ];
   }
 
@@ -41,6 +46,15 @@ IMPORTANT RULES FOR FILTERS:
 
 IMPORTANT RULES FOR SORTING:
 • When the user asks to sort by multiple columns, use `grid_sort` with the `sorts` array parameter.
+
+IMPORTANT RULES FOR EXPORTING:
+• When the user asks to export or download the grid (e.g. "export to CSV", "download as JSON"), use the `grid_export` tool.
+
+IMPORTANT RULES FOR COLUMN VISIBILITY:
+• When the user says "show fields X, Y, Z" or "only show columns A, B" or "display columns A, B, C":
+  Use `grid_set_column_visibility` with `showOnly: ["X", "Y", "Z"]`. This will automatically HIDE all other columns and display only the requested ones!
+• When the user asks to hide specific columns (e.g. "hide column X"), use `hideColumns: ["X"]` or `column: "X", visible: false`.
+• When the user asks to restore or show all columns, use `grid_reset`.
 
 Confirm the actions and calculations clearly and concisely to the user.
 ''';
@@ -660,5 +674,296 @@ class GridResetTool extends McpLocalTool {
         MCPContent(type: 'text', text: 'Grid reset to initial default state.')
       ],
     );
+  }
+}
+
+/// MCP tool to export current grid data to CSV or JSON.
+
+class GridExportTool extends McpLocalTool {
+  final AiGridController controller;
+  GridExportTool(this.controller);
+
+  @override
+  String get name => 'grid_export';
+
+  @override
+  String get description =>
+      'Exports grid data to CSV or JSON and downloads/saves the file. Supports specifying custom format, column selection, and CSV separator.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'format': {
+            'type': 'string',
+            'description':
+                'Export file format: "csv" or "json". Defaults to "csv".',
+            'enum': ['csv', 'json'],
+          },
+          'columns': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                'Optional list of column titles or field names to include in export. If omitted, all visible columns are exported.',
+          },
+          'includeHeaders': {
+            'type': 'boolean',
+            'description':
+                'Whether to include column header row. Defaults to true.',
+          },
+          'separator': {
+            'type': 'string',
+            'description':
+                'Delimiter character for CSV format (e.g. ",", ";", "\t"). Defaults to ",".',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    try {
+      final format = (arguments['format'] as String?) ?? 'csv';
+      final columnsRaw = arguments['columns'] as List<dynamic>?;
+      final columns = columnsRaw?.map((e) => e.toString()).toList();
+      final includeHeaders = (arguments['includeHeaders'] as bool?) ?? true;
+      final separator = (arguments['separator'] as String?) ?? ',';
+
+      final savedPath = await controller.exportGrid(
+        format: format,
+        columns: columns,
+        includeHeaders: includeHeaders,
+        separator: separator,
+      );
+
+      return MCPToolResult(
+        content: [
+          MCPContent(
+            type: 'text',
+            text:
+                'Grid successfully exported as ${format.toUpperCase()}! File saved: $savedPath',
+          ),
+        ],
+      );
+    } catch (e) {
+      return MCPToolResult(
+        isError: true,
+        content: [
+          MCPContent(type: 'text', text: 'Failed to export grid: $e'),
+        ],
+      );
+    }
+  }
+}
+
+/// MCP Tool allowing the AI Assistant to navigate pages.
+class GridGoToPageTool extends McpLocalTool {
+  final AiGridController controller;
+  GridGoToPageTool(this.controller);
+
+  @override
+  String get name => 'grid_go_to_page';
+
+  @override
+  String get description =>
+      'Navigates pagination on the grid to a specific page number or relative direction ("next", "previous", "first", "last").';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'page': {
+            'type': 'integer',
+            'description': 'Target page number (1-based index).',
+          },
+          'direction': {
+            'type': 'string',
+            'enum': ['next', 'previous', 'first', 'last'],
+            'description': 'Relative page move direction.',
+          },
+          'pageSize': {
+            'type': 'integer',
+            'description': 'Optional new page size to set.',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final pageSize = arguments['pageSize'] as int?;
+    if (pageSize != null && pageSize > 0) {
+      controller.setPageSize(pageSize);
+    }
+
+    final page = arguments['page'] as int?;
+    final direction = arguments['direction'] as String?;
+
+    if (page != null) {
+      controller.setPage(page);
+    } else if (direction != null) {
+      final cur = controller.page;
+      final total = controller.totalPage;
+      switch (direction.toLowerCase()) {
+        case 'next':
+          controller.setPage(cur + 1);
+          break;
+        case 'previous':
+          controller.setPage(cur > 1 ? cur - 1 : 1);
+          break;
+        case 'first':
+          controller.setPage(1);
+          break;
+        case 'last':
+          controller.setPage(total);
+          break;
+      }
+    }
+
+    return MCPToolResult(
+      content: [
+        MCPContent(
+          type: 'text',
+          text: jsonEncode({
+            'status': 'success',
+            'currentPage': controller.page,
+            'totalPage': controller.totalPage,
+            'pageSize': controller.pageSize,
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+/// MCP Tool allowing the AI Assistant to query pagination status.
+class GridGetPaginationTool extends McpLocalTool {
+  final AiGridController controller;
+  GridGetPaginationTool(this.controller);
+
+  @override
+  String get name => 'grid_get_pagination_status';
+
+  @override
+  String get description =>
+      'Returns current pagination state: current page, total pages, page size, and whether pagination is active.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    return MCPToolResult(
+      content: [
+        MCPContent(
+          type: 'text',
+          text: jsonEncode({
+            'isPaginated': controller.isPaginated,
+            'currentPage': controller.page,
+            'totalPage': controller.totalPage,
+            'pageSize': controller.pageSize,
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+/// MCP Tool allowing the AI Assistant to export current grid configuration settings.
+class GridExportSettingsTool extends McpLocalTool {
+  final AiGridController controller;
+  GridExportSettingsTool(this.controller);
+
+  @override
+  String get name => 'grid_export_settings';
+
+  @override
+  String get description =>
+      'Exports the current grid settings (visible columns, grouping, sorts, filters, column filter row) as a JSON string.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final settingsJson = controller.exportSettingsJson();
+    return MCPToolResult(
+      content: [
+        MCPContent(
+          type: 'text',
+          text: settingsJson,
+        ),
+      ],
+    );
+  }
+}
+
+/// MCP Tool allowing the AI Assistant to restore grid settings from a JSON string or settings map.
+class GridRestoreSettingsTool extends McpLocalTool {
+  final AiGridController controller;
+  GridRestoreSettingsTool(this.controller);
+
+  @override
+  String get name => 'grid_restore_settings';
+
+  @override
+  String get description =>
+      'Restores grid configuration (visible columns, grouping, sorts, filters) from a settings JSON string or object.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'settingsJson': {
+            'type': 'string',
+            'description': 'JSON string containing grid settings.',
+          },
+          'settings': {
+            'type': 'object',
+            'description': 'Settings object containing visibleColumns, groupColumns, sorts, filters.',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final jsonStr = arguments['settingsJson'] as String?;
+    final settingsMap = arguments['settings'] as Map<String, dynamic>?;
+
+    if (jsonStr != null && jsonStr.isNotEmpty) {
+      controller.restoreSettingsJson(jsonStr);
+      return MCPToolResult(
+        content: [
+          MCPContent(
+            type: 'text',
+            text: 'Grid settings restored successfully from JSON.',
+          )
+        ],
+      );
+    } else if (settingsMap != null) {
+      controller.restoreSettings(settingsMap);
+      return MCPToolResult(
+        content: [
+          MCPContent(
+            type: 'text',
+            text: 'Grid settings restored successfully from settings map.',
+          )
+        ],
+      );
+    } else {
+      return MCPToolResult(
+        isError: true,
+        content: [
+          MCPContent(
+            type: 'text',
+            text: 'Please provide either "settingsJson" or "settings".',
+          )
+        ],
+      );
+    }
   }
 }

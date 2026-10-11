@@ -1,5 +1,6 @@
-import 'dart:io';
 import 'package:flutter/services.dart';
+import 'env_reader_stub.dart'
+    if (dart.library.io) 'env_reader_io.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 
 /// Loads environment variables from `.env` files or rootBundle.
@@ -12,17 +13,9 @@ class AiGridEnvLoader {
     if (_isLoaded) return;
     String content = '';
     try {
-      final fileCandidates = [
-        if (path != null) File(path),
-        File('.env'),
-        File('../.env'),
-        File('../../.env'),
-      ];
-      for (final f in fileCandidates) {
-        if (await f.exists()) {
-          content = await f.readAsString();
-          if (content.isNotEmpty) break;
-        }
+      final diskContent = await readEnvFileFromDisk(path);
+      if (diskContent != null && diskContent.isNotEmpty) {
+        content = diskContent;
       }
     } catch (_) {}
 
@@ -54,12 +47,19 @@ class AiGridEnvLoader {
 
   /// Creates a [LlmConfig] parsed from environment variables.
   static LlmConfig? createLlmConfigFromEnv() {
-    final providerStr = get('LLM_PROVIDER').trim().toLowerCase();
+    var providerStr = get('LLM_PROVIDER').trim().toLowerCase();
     final model = get('LLM_MODEL').trim();
     final apiKey = get('LLM_API_KEY').trim();
     final baseUrl = get('LLM_URL').trim();
 
     if (providerStr.isEmpty) return null;
+
+    // Normalize common provider aliases
+    if (providerStr == 'anthropic') providerStr = 'claude';
+    if (providerStr == 'openai-compatible' || providerStr == 'custom') {
+      providerStr = 'openai_compatible';
+    }
+    if (providerStr == 'google') providerStr = 'gemini';
 
     final provider = LlmProvider.fromConfigKey(providerStr);
     if (provider == LlmProvider.none) return null;
@@ -81,14 +81,23 @@ class AiGridConfig {
   /// Whether the AI assistant panel and toolbar trigger are enabled.
   final bool enableAiAssistant;
 
+  /// Whether to hide the AI assistant button entirely when no LLM is configured (if false, it is grayed out/disabled).
+  final bool hideAiAssistantIfNoLlm;
+
   /// Optional custom system prompt overriding the default agent instructions.
   final String? systemPrompt;
 
   const AiGridConfig({
     this.llmConfig,
     this.enableAiAssistant = true,
+    this.hideAiAssistantIfNoLlm = false,
     this.systemPrompt,
   });
+
+  /// Whether a valid LLM provider and credentials are configured.
+  bool get isLlmConfigured =>
+      (llmConfig ?? AiGridEnvLoader.createLlmConfigFromEnv())?.isConfigured ??
+      false;
 
   /// Automatically creates an [AiGridConfig] by reading the `.env` file.
   static Future<AiGridConfig> fromEnv({String? envPath}) async {

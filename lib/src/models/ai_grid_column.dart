@@ -32,6 +32,7 @@ class AiGridColumn {
   final bool isGroupable;
   final bool isSortable;
   final bool isFilterable;
+  final bool enableEditingMode;
   final AiGridAggregateType aggregateType;
   final String? numberFormat;
   final List<String>? selectOptions;
@@ -45,6 +46,7 @@ class AiGridColumn {
     this.isGroupable = true,
     this.isSortable = true,
     this.isFilterable = true,
+    this.enableEditingMode = false,
     this.aggregateType = AiGridAggregateType.none,
     this.numberFormat,
     this.selectOptions,
@@ -83,6 +85,7 @@ class AiGridColumn {
       type: trinaType,
       width: width,
       minWidth: minWidth,
+      enableEditingMode: enableEditingMode,
       enableSorting: isSortable,
       enableFilterMenuItem: isFilterable,
       enableDropToResize: true,

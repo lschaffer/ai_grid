@@ -253,6 +253,103 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
     super.dispose();
   }
 
+  Future<void> _exportSettingsToJsonFile() async {
+    try {
+      final jsonStr = _controller.exportSettingsJson();
+      final bytes = Uint8List.fromList(utf8.encode(jsonStr));
+      final fileName = 'grid_settings_${DateTime.now().millisecondsSinceEpoch}';
+      final savedPath = await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: bytes,
+        fileExtension: 'json',
+        mimeType: MimeType.json,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Settings exported to JSON! ${savedPath.isNotEmpty ? "($savedPath)" : ""}',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export settings: $e'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showRestoreSettingsDialog() {
+    final textController = TextEditingController(text: _controller.exportSettingsJson());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore Grid Settings'),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Paste or edit a valid JSON settings configuration below (supports visibleColumns, groupColumns, sorts, filters, showColumnFilterRow):',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: textController,
+                maxLines: 10,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  filled: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.restore, size: 16),
+            label: const Text('Apply Settings'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _controller.restoreSettingsJson(textController.text);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Grid settings successfully restored!'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -296,6 +393,61 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.tune_outlined),
+            tooltip: 'Settings & Presets',
+            onSelected: (val) async {
+              if (val == 'export_json_file') {
+                await _exportSettingsToJsonFile();
+              } else if (val == 'restore_json') {
+                _showRestoreSettingsDialog();
+              } else if (val == 'clear_settings') {
+                AiGridSettingsStorage.clear('superstore_grid_settings');
+                _controller.reset();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Auto-saved settings cleared and grid reset to defaults.'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'export_json_file',
+                child: Row(
+                  children: [
+                    Icon(Icons.file_download_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Export Settings to JSON File'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'restore_json',
+                child: Row(
+                  children: [
+                    Icon(Icons.file_upload_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Restore Settings from JSON'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'clear_settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.restore_outlined, size: 18, color: Colors.orange),
+                    SizedBox(width: 8),
+                    Text('Reset & Clear Auto-Saved Settings'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: Icon(
               widget.isDarkMode ? Icons.light_mode : Icons.dark_mode,
@@ -348,12 +500,17 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   ),
                 )
               : Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(
+                    MediaQuery.of(context).size.width < 600 ? 0.0 : 12.0,
+                  ),
                   child: AiGrid(
                     dataSource: _dataSource!,
                     controller: _controller,
                     aiConfig: _aiConfig,
                     enableAiAssistant: true,
+                    enablePagination: false,
+                    autoSave: true,
+                    persistenceKey: 'superstore_grid_settings',
                   ),
                 ),
     );

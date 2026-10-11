@@ -66,3 +66,67 @@ class LocalAiGridDataSource extends AiGridDataSource {
     return _data.take(limit).toList();
   }
 }
+
+
+/// Server-side / partial data lazy pagination data source for [AiGrid].
+///
+/// Fetches and streams data on-demand in pages from a remote backend or database
+/// matching TrinaGrid's [TrinaLazyPagination] engine.
+class LazyAiGridDataSource extends AiGridDataSource {
+  @override
+  final List<AiGridColumn> columns;
+
+  /// Callback invoked when a page of data, sorting, or filtering is requested.
+  final TrinaLazyPaginationFetch fetch;
+
+  /// Optional function returning total count of records across the entire dataset.
+  final int Function()? totalRowCountGetter;
+
+  /// Optional sample data for AI contextual reasoning.
+  final List<Map<String, dynamic>>? sampleData;
+
+  /// Whether sorting triggers a new server-side fetch with sortColumn (default: true).
+  final bool fetchWithSorting;
+
+  /// Whether filtering triggers a new server-side fetch with filterRows (default: true).
+  final bool fetchWithFiltering;
+
+  LazyAiGridDataSource({
+    required this.columns,
+    required this.fetch,
+    this.totalRowCountGetter,
+    this.sampleData,
+    this.fetchWithSorting = true,
+    this.fetchWithFiltering = true,
+  });
+
+  @override
+  int get totalRowCount => totalRowCountGetter?.call() ?? 0;
+
+  @override
+  Future<List<TrinaRow>> fetchRows() async {
+    // Handled dynamically by TrinaLazyPagination
+    return <TrinaRow>[];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getSampleData({int limit = 5}) async {
+    if (sampleData != null && sampleData!.isNotEmpty) {
+      return sampleData!.take(limit).toList();
+    }
+    try {
+      final initialRes = await fetch(
+        TrinaLazyPaginationRequest(page: 1, pageSize: limit),
+      );
+      return initialRes.rows.take(limit).map((r) {
+        final map = <String, dynamic>{};
+        for (final entry in r.cells.entries) {
+          map[entry.key] = entry.value.value;
+        }
+        return map;
+      }).toList();
+    } catch (_) {
+      return <Map<String, dynamic>>[];
+    }
+  }
+}
