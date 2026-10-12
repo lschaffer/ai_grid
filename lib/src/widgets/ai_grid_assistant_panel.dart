@@ -784,14 +784,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.mic_none, size: 18),
-            onPressed: () {},
-            color: colorScheme.onSurfaceVariant,
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.all(6),
-          ),
-          const SizedBox(width: 4),
+          // Microphone icon omitted until speech-to-text is implemented.
           IconButton(
             icon: _isLoading
                 ? SizedBox(
