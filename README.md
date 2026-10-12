@@ -21,7 +21,6 @@
 * **Hierarchical Row Grouping**: Drag-and-drop column headers or trigger grouping programmatically with aggregate rollups.
 * **Multi-Column Sorting**: Prioritized sorting across multiple columns with ascending/descending indicators.
 * **Inline Column Filtering**: Individual column filter row supporting contains, equals, starts with, ends with, and comparison operators.
-* **Read-Only by Default**: Editing mode is disabled by default (`enableEditingMode: false`) to avoid accidental cell edits, with easy per-column opt-in.
 * **Aggregate Footers**: Auto-computed sum, average, min, max, and count summary rows.
 
 ### 2. 🧠 Native AI Assistant & Model Context Protocol (MCP)
