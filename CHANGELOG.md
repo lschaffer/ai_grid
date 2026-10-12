@@ -1,6 +1,5 @@
 ## 0.0.1
 
-* Removed PDF export in favor of reliable CSV and JSON formats (eliminating column truncation issues).
 * Added Copy to Clipboard buttons for both user prompts and AI assistant responses in the AI chat panel.
 * Added Save & Restore Grid Settings feature (`exportSettings`, `exportSettingsJson`, `restoreSettings`, `restoreSettingsJson`):
   * Persists visible columns, group columns, sorting, filters, and inline column filter row visibility.
