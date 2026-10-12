@@ -115,22 +115,27 @@ class _AiGridState extends State<AiGrid> {
 
   void _restoreInitialSettingsIfNeeded() {
     if (_hasRestoredSettings) return;
-    _hasRestoredSettings = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      if (widget.initialSettings != null) {
-        _controller.restoreSettings(widget.initialSettings!);
-      } else if (widget.autoSave) {
-        final saved = AiGridSettingsStorage.load(widget.persistenceKey);
-        if (saved != null) {
-          _controller.restoreSettings(saved);
+      try {
+        if (widget.initialSettings != null) {
+          _controller.restoreSettings(widget.initialSettings!);
+        } else if (widget.autoSave) {
+          final saved =
+              await AiGridSettingsStorage.loadAsync(widget.persistenceKey) ??
+                  AiGridSettingsStorage.load(widget.persistenceKey);
+          if (saved != null && mounted) {
+            _controller.restoreSettings(saved);
+          }
         }
+      } finally {
+        _hasRestoredSettings = true;
       }
     });
   }
 
   void _onControllerStateChangedForAutoSave() {
-    if (!_controller.isAttached) return;
+    if (!_hasRestoredSettings || !_controller.isAttached) return;
     final current = _controller.exportSettings();
     widget.onSettingsChanged?.call(current);
     if (widget.autoSave) {

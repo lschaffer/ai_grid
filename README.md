@@ -1,11 +1,13 @@
 # AI Grid (`ai_grid`)
 
-[![pub version](https://img.shields.io/badge/pub-v0.0.1-blue.svg)](https://pub.dev/packages/ai_grid)
+[![pub version](https://img.shields.io/badge/pub-v0.0.2-blue.svg)](https://pub.dev/packages/ai_grid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.24.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![WASM Ready](https://img.shields.io/badge/WebAssembly-WASM%20Compatible-success.svg)](https://flutter.dev/to/wasm)
 
 **AI Grid** is an intelligent, high-performance DataGrid for Flutter that bridges enterprise tabular virtualization with native AI assistant controls and Model Context Protocol (MCP) tool execution.
+
+![AI Grid Showcase](example_1.png)
 
 * **Grid Engine**: Built on top of **[trina_grid](https://pub.dev/packages/trina_grid)** — providing fast cell virtualization, sticky hierarchical row grouping, inline filtering, multi-sort, and footers.
 * **AI Agent & Tool Orchestration**: Powered by **[dart_mcp_core](https://pub.dev/packages/dart_mcp_core)** — exposing structured MCP local tools for real-time schema introspection, precise in-engine math calculations, multi-column filtering, and natural language table operations.

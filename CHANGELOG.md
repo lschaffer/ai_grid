@@ -1,3 +1,20 @@
+## 0.0.2
+
+* **Persistent Layout Storage Across App Restarts**:
+  * Enhanced `AiGridSettingsStorage` with persistent `SharedPreferences` storage alongside memory caching.
+  * Settings now reliably persist across process termination and app restarts on Desktop, Mobile, and Web.
+* **Auto-Save Restoration & Startup Protection**:
+  * Prevented initial unconfigured grid state from overwriting saved user layout settings during `onLoaded`.
+  * Added bidirectional synchronization between `AiGridController.activeGrouping` and `TrinaGrid` row group delegate, ensuring drag-and-drop grouping in the UI immediately persists.
+* **Row Grouping Stability**:
+  * Fixed scheduler callback assertion failure (`hasRowGroups: is not true`) when clearing grouping or restoring settings with empty `groupColumns`.
+* **AI Assistant UI Refinements**:
+  * Removed unimplemented microphone icon from AI chat input row.
+* **Environment Configuration & Security**:
+  * Added `.env.example` templates and updated `.gitignore` rules for environment secrets.
+* **Documentation & Previews**:
+  * Added screenshot showcase (`example_1.png`) to README.
+
 ## 0.0.1
 
 * Added Copy to Clipboard buttons for both user prompts and AI assistant responses in the AI chat panel.

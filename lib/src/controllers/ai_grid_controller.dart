@@ -30,7 +30,16 @@ class AiGridController extends ChangeNotifier {
   List<AiGridColumn> get columns => _columns;
 
   /// Currently active grouping fields (hierarchical).
-  List<String> get activeGrouping => List.unmodifiable(_activeGrouping);
+  List<String> get activeGrouping {
+    if (_stateManager != null &&
+        _stateManager!.hasRowGroups &&
+        _stateManager!.rowGroupDelegate is TrinaRowGroupByColumnDelegate) {
+      final delegate =
+          _stateManager!.rowGroupDelegate as TrinaRowGroupByColumnDelegate;
+      return delegate.columns.map((c) => c.field).toList();
+    }
+    return List.unmodifiable(_activeGrouping);
+  }
 
   /// Active column filters keyed by column field name.
   Map<String, Map<String, dynamic>> get activeFilters =>
@@ -86,16 +95,51 @@ class AiGridController extends ChangeNotifier {
     }
   }
 
+  bool _isUpdatingFromStateManager = false;
+
+  void _onStateManagerChanged() {
+    if (_isUpdatingFromStateManager) return;
+    _isUpdatingFromStateManager = true;
+    try {
+      if (_stateManager != null) {
+        if (_stateManager!.hasRowGroups &&
+            _stateManager!.rowGroupDelegate is TrinaRowGroupByColumnDelegate) {
+          final delegate =
+              _stateManager!.rowGroupDelegate as TrinaRowGroupByColumnDelegate;
+          _activeGrouping = delegate.columns.map((c) => c.field).toList();
+        } else if (!_stateManager!.hasRowGroups) {
+          _activeGrouping = [];
+        }
+      }
+      notifyListeners();
+    } finally {
+      _isUpdatingFromStateManager = false;
+    }
+  }
+
   /// Attaches the controller to the rendered grid state.
   void attach({
     TrinaGridStateManager? stateManager,
     required List<AiGridColumn> columns,
     required AiGridDataSource dataSource,
   }) {
+    if (_stateManager != null && _stateManager != stateManager) {
+      _stateManager!.removeListener(_onStateManagerChanged);
+    }
     _stateManager = stateManager;
     _columns = columns;
     _dataSource = dataSource;
+    if (_stateManager != null) {
+      _stateManager!.removeListener(_onStateManagerChanged);
+      _stateManager!.addListener(_onStateManagerChanged);
+    }
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _stateManager?.removeListener(_onStateManagerChanged);
+    super.dispose();
   }
 
   /// Resolves field name flexibly (case-insensitive or title).

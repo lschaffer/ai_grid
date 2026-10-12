@@ -1,9 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_grid/ai_grid.dart';
 
 void main() {
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('LocalAiGridDataSource Tests', () {
     test('creates rows and provides sample data', () async {
       final sample = List.generate(
@@ -404,6 +410,40 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(controller.activeGrouping.isEmpty, isTrue);
+    });
+
+    testWidgets('AiGrid autoSave automatically restores saved group columns on startup', (tester) async {
+      AiGridSettingsStorage.save('persist_test_key', {
+        'groupColumns': ['name'],
+        'visibleColumns': ['id', 'name'],
+      });
+
+      final sample = [
+        {'id': 1, 'name': 'A'},
+        {'id': 2, 'name': 'B'},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final controller = AiGridController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AiGrid(
+              controller: controller,
+              dataSource: ds,
+              autoSave: true,
+              persistenceKey: 'persist_test_key',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.activeGrouping, ['name']);
     });
   });
 }
