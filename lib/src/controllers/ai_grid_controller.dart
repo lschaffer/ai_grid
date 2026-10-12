@@ -124,10 +124,20 @@ class AiGridController extends ChangeNotifier {
 
   /// Sets multi-level hierarchical grouping by column fields.
   void setGrouping(List<String> fields) {
+    final hadActiveGrouping = _activeGrouping.isNotEmpty;
     _activeGrouping = List.from(fields);
     if (_stateManager != null) {
       if (fields.isEmpty) {
-        _stateManager!.setRowGroup(null);
+        if (_stateManager!.hasRowGroups || hadActiveGrouping) {
+          _stateManager!.setRowGroup(
+            TrinaRowGroupByColumnDelegate(
+              columns: [],
+              showFirstExpandableIcon: false,
+              showCount: false,
+              enableCompactCount: false,
+            ),
+          );
+        }
       } else {
         final groupColumns = <TrinaColumn>[];
         for (final f in fields) {
@@ -802,7 +812,9 @@ class AiGridController extends ChangeNotifier {
               ?.map((e) => e.toString())
               .toList() ??
           [];
-      setGrouping(groups);
+      if (groups.isNotEmpty || _activeGrouping.isNotEmpty) {
+        setGrouping(groups);
+      }
     }
 
     // 3. Filters

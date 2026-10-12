@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_grid/ai_grid.dart';
 
@@ -372,6 +373,37 @@ void main() {
 
       final pageRes = await pageTool.execute({'page': 2, 'pageSize': 20});
       expect(pageRes.content.first.text?.contains('success'), isTrue);
+    });
+
+    testWidgets('AiGrid widget initializes safely with initialSettings containing empty groupColumns', (tester) async {
+      final sample = [
+        {'id': 1, 'name': 'A'},
+        {'id': 2, 'name': 'B'},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final controller = AiGridController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AiGrid(
+              controller: controller,
+              dataSource: ds,
+              initialSettings: const {
+                'groupColumns': [],
+                'visibleColumns': ['id', 'name'],
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.activeGrouping.isEmpty, isTrue);
     });
   });
 }
