@@ -66,15 +66,11 @@
   * `FitGridColumnWidth.fitHeader(min: 44)` — sized strictly to the header label.
 * **Layout Persistence**: Custom column widths automatically persist across app restarts when `autoSave: true` is enabled.
 
-### 7. 📤 Fast & Pure-Dart Data Export (Excel XLSX, CSV, TSV, & JSON)
-* Built-in **Export Dialog** accessible via toolbar, menu, or natural language AI command (`grid_export`):
-  * **Formats**: Native Excel (`.xlsx`), CSV, TSV, and JSON.
-  * **Pure-Dart Excel**: Generates `.xlsx` workbooks directly in Dart with zero C/C++ native dependencies or platform channels.
-  * **Flattened Tabular Output**: Grouped rows are exported as clean, flattened tabular records with grouping column values preserved on each row—ensuring immediate compatibility with Excel, Pandas, SQL databases, and BI tools without hierarchy distortions.
-  * **Custom Delimiters**: Comma (`,`), Semicolon (`;`), Tab (`\t`).
-  * **Options**: Include column headers, ignore fixed/frozen rows.
-  * **Column Selector**: Interactive checklist to choose which columns to export with "Select All" / "Deselect All".
-  * **Multi-Platform Saving**: Utilizes [`file_saver`](https://pub.dev/packages/file_saver) for native file save dialogs on Windows/macOS/Linux/mobile and browser downloads on Web.
+### 7. 📤 Fast & Pure-Dart Excel (.xlsx) Export
+* One-click **Export to Excel** directly accessible via the toolbar download button, mobile menu, or natural language AI command (`export`):
+  * **Native Save As Dialog**: Opens the platform's native "Save As..." dialog (`FileSaver.instance.saveAs`) allowing the user to select the destination folder and filename across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
+  * **Pure-Dart Excel Engine**: Generates `.xlsx` workbooks directly in Dart with zero C/C++ native dependencies or platform channels.
+  * **Direct Programmatic API**: Trigger export programmatically anytime via `controller.export()`.
 
 ### 8. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
 * **Client-Side Pagination**: Simple opt-in via `enablePagination: true` and `pageSize: 25`, rendering an interactive page-navigation footer with total row counts and page controls.

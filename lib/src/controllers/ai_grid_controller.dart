@@ -864,6 +864,21 @@ class AiGridController extends ChangeNotifier {
   /// opening the platform "Save As..." dialog so the user can select destination directory
   /// and filename.
   /// Works across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
+  Future<String?> export({
+    String? fileName,
+    bool includeHeaders = true,
+    bool selectedOnly = false,
+  }) =>
+      exportTableWithSaveDialog(
+        fileName: fileName,
+        includeHeaders: includeHeaders,
+        selectedOnly: selectedOnly,
+      );
+
+  /// Exports current grid data to Excel (.xlsx) using FitGrid's native XLSX encoder,
+  /// opening the platform "Save As..." dialog so the user can select destination directory
+  /// and filename.
+  /// Works across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
   Future<String?> exportTableWithSaveDialog({
     String? fileName,
     bool includeHeaders = true,

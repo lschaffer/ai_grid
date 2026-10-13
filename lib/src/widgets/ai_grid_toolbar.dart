@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../theme/ai_grid_theme.dart';
-import 'ai_grid_export_dialog.dart';
 
 /// Top Toolbar for [AiGrid], providing search, filter toggle, group toggle,
 /// refresh, export, and AI Assistant controls with responsive desktop/mobile layouts.
@@ -50,8 +49,44 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
     });
   }
 
-  void _showExportDialog(BuildContext context) {
-    AiGridExportDialog.show(context, widget.controller);
+  Future<void> _handleExport(BuildContext context) async {
+    try {
+      final savedPath = await widget.controller.exportTableWithSaveDialog();
+      if (savedPath != null && savedPath.isNotEmpty && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Table exported successfully to $savedPath'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Export failed: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -117,7 +152,7 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
                 widget.onRefresh?.call();
                 break;
               case 'export':
-                _showExportDialog(context);
+                _handleExport(context);
                 break;
             }
           },
@@ -170,7 +205,7 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
                 children: [
                   Icon(Icons.file_download_outlined, size: 18),
                   SizedBox(width: 10),
-                  Text('Export Data...', style: TextStyle(fontSize: 13)),
+                  Text('Export to Excel', style: TextStyle(fontSize: 13)),
                 ],
               ),
             ),
@@ -280,8 +315,8 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
             size: 20,
             color: colorScheme.onSurfaceVariant,
           ),
-          tooltip: 'Export Grid Data',
-          onPressed: () => _showExportDialog(context),
+          tooltip: 'Export to Excel (.xlsx)',
+          onPressed: () => _handleExport(context),
         ),
         const Spacer(),
         // Global Search Box
