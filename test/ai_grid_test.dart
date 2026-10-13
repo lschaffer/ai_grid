@@ -555,6 +555,48 @@ void main() {
       controller.autoSizeColumn('id');
       expect(controller.isColumnResized('id'), isFalse);
     });
+
+    test('AiGridController supports OR and inList filtering (e.g. New York or Denver)', () {
+      final sample = [
+        {'id': 1, 'city': 'New York'},
+        {'id': 2, 'city': 'Denver'},
+        {'id': 3, 'city': 'Chicago'},
+        {'id': 4, 'city': 'San Francisco'},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'city', title: 'City', type: AiGridColumnType.text),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final controller = AiGridController();
+      controller.attach(columns: cols, dataSource: ds);
+
+      // Test 1: operator "inList" with List of values
+      controller.setFilter('city', operator: 'inList', value: ['New York', 'Denver']);
+      expect(controller.fitController!.filter.filters['city']?.operator, FitGridFilterOperator.inList);
+      expect(controller.fitController!.data.view.length, 2);
+      expect(controller.fitController!.data.view.map((r) => r['city']), containsAll(['New York', 'Denver']));
+
+      // Test 2: operator "or" with delimited string
+      controller.setFilter('city', operator: 'or', value: 'Denver or Chicago');
+      expect(controller.fitController!.filter.filters['city']?.operator, FitGridFilterOperator.inList);
+      expect(controller.fitController!.data.view.length, 2);
+      expect(controller.fitController!.data.view.map((r) => r['city']), containsAll(['Denver', 'Chicago']));
+
+      // Test 3: automatic OR detection with contains and "New York or Denver"
+      controller.setFilter('city', operator: 'contains', value: 'New York or Denver');
+      expect(controller.fitController!.filter.filters['city']?.operator, FitGridFilterOperator.inList);
+      expect(controller.fitController!.data.view.length, 2);
+
+      // Test 4: parser and toText support
+      final parsed = FitGridColumnFilter.parse('New York or Denver', FitGridFilterKind.text);
+      expect(parsed, isNotNull);
+      expect(parsed!.operator, FitGridFilterOperator.inList);
+      expect(parsed.values, containsAll(['New York', 'Denver']));
+      expect(parsed.matches('new york', null), isTrue);
+      expect(parsed.matches('Denver', null), isTrue);
+      expect(parsed.matches('Chicago', null), isFalse);
+    });
   });
 }
 

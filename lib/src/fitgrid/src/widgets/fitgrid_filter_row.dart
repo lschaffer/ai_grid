@@ -273,6 +273,9 @@ class _FilterFieldState<T> extends State<_FilterField<T>> {
   String? _foreignHint(FitGridStrings strings) {
     final current = _current;
     if (current == null || current.toText(widget.kind) != null) return null;
+    if (current.operator == FitGridFilterOperator.inList && current.values.isNotEmpty) {
+      return 'In: ${current.values.join(', ')}';
+    }
     final label = strings.filterOperator(current.operator);
     final value = current.value;
     if (value == null) return label;

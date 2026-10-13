@@ -163,7 +163,8 @@ class AiGridController extends ChangeNotifier {
     for (final entry in currentFilters.entries) {
       _activeFilters[entry.key] = {
         'operator': entry.value.operator.name,
-        'value': entry.value.value,
+        'value': entry.value.value ??
+            (entry.value.values.isNotEmpty ? entry.value.values.join(', ') : null),
         if (entry.value.value2 != null) 'value2': entry.value.value2,
         if (entry.value.values.isNotEmpty) 'values': entry.value.values.toList(),
       };
@@ -249,7 +250,8 @@ class AiGridController extends ChangeNotifier {
       'between' => FitGridFilterOperator.between,
       'isempty' => FitGridFilterOperator.isEmpty,
       'isnotempty' => FitGridFilterOperator.isNotEmpty,
-      'inlist' || 'oneof' => FitGridFilterOperator.inList,
+      'inlist' || 'oneof' || 'in' || 'or' || 'anyof' || 'either' =>
+        FitGridFilterOperator.inList,
       _ => FitGridFilterOperator.contains,
     };
   }
@@ -271,11 +273,47 @@ class AiGridController extends ChangeNotifier {
         final field = entry.key;
         final opName = (entry.value['operator'] as String?) ?? 'contains';
         final val = entry.value['value'];
-        final op = _resolveFilterOperator(opName);
+        var op = _resolveFilterOperator(opName);
+
+        // Auto-detect OR / IN / list operations
+        if (val is Iterable) {
+          op = FitGridFilterOperator.inList;
+        } else if (val is String &&
+            (op == FitGridFilterOperator.contains || op == FitGridFilterOperator.equals)) {
+          final trimmed = val.trim();
+          if (trimmed.toLowerCase().startsWith('in:') ||
+              trimmed.toLowerCase().contains(RegExp(r'\s+or\s+'))) {
+            op = FitGridFilterOperator.inList;
+          }
+        }
 
         final col = _columns.where((c) => c.field == field).firstOrNull;
         Object? operand = val;
-        if (col != null) {
+        Set<String> setValues = const <String>{};
+
+        if (op == FitGridFilterOperator.inList) {
+          if (val is Iterable) {
+            setValues = val
+                .map((e) => e.toString().trim())
+                .where((s) => s.isNotEmpty)
+                .toSet();
+          } else if (val is String) {
+            var raw = val.trim();
+            if (raw.toLowerCase().startsWith('in:')) {
+              raw = raw.substring(3).trim();
+            } else if (raw.toLowerCase().startsWith('in(') && raw.endsWith(')')) {
+              raw = raw.substring(3, raw.length - 1).trim();
+            }
+            setValues = raw
+                .split(RegExp(r'\s*,\s*|\s+or\s+|\|', caseSensitive: false))
+                .map((e) => e.trim())
+                .where((s) => s.isNotEmpty)
+                .toSet();
+          } else if (val != null) {
+            setValues = {val.toString().trim()};
+          }
+          operand = setValues.join(', ');
+        } else if (col != null) {
           if (col.type == AiGridColumnType.number || col.type == AiGridColumnType.currency) {
             if (val is! num && val != null) {
               operand = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
@@ -292,6 +330,7 @@ class AiGridController extends ChangeNotifier {
           FitGridColumnFilter(
             operator: op,
             value: operand,
+            values: setValues,
           ),
         );
       }

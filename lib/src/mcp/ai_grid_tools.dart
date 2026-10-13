@@ -42,7 +42,9 @@ IMPORTANT RULES FOR CALCULATIONS:
 • When the user asks to calculate, average, mean, sum, total, minimum, maximum, count, or median (e.g. "calculate avg sale amount", "what is the total profit", "calculate average discount by category"), ALWAYS use the `grid_calculate` tool. DO NOT calculate numbers in your head or hallucinate math. The grid engine calculates exact values in Dart.
 
 IMPORTANT RULES FOR FILTERS:
-• When the user specifies multiple filter conditions (e.g. "filter region South and Category Furniture"), use `grid_set_filter` with the `filters` array to apply ALL conditions joined by AND.
+• When the user specifies multiple filter conditions on DIFFERENT columns (e.g. "filter region South and Category Furniture"), use `grid_set_filter` with the `filters` array to apply ALL conditions joined by AND.
+• When the user specifies OR / IN / one-of conditions on the SAME column (e.g. "filter city New York or Denver", "region South or West", "cities in Paris, London, Berlin"):
+  ALWAYS use `grid_set_filter` with `operator: "inList"` and `value: ["New York", "Denver"]` (or `value: "New York, Denver"`).
 • For negative conditions (e.g. "not Furniture", "Category not equals Furniture", "exclude South"), use operator "not equals" or "does not contain".
 
 IMPORTANT RULES FOR SORTING:
@@ -257,7 +259,7 @@ class GridSetFilterTool extends McpLocalTool {
 
   @override
   String get description =>
-      'Filters the grid by column. Supports single or multiple filters joined with AND. Supported operators: contains, equals, not equals, does not contain, startsWith, endsWith, greaterThan, lessThan.';
+      'Filters the grid by column. Supports single or multiple filters joined with AND. For OR / IN filters on a single column (e.g. city New York or Denver), use operator "inList" with an array or comma-separated values. Supported operators: contains, equals, not equals, does not contain, startsWith, endsWith, greaterThan, lessThan, inList, between, isEmpty, isNotEmpty.';
 
   @override
   Map<String, dynamic> get inputSchema => {
@@ -277,9 +279,16 @@ class GridSetFilterTool extends McpLocalTool {
               'startsWith',
               'endsWith',
               'greaterThan',
-              'lessThan'
+              'lessThan',
+              'inList',
+              'oneOf',
+              'in',
+              'or',
+              'between',
+              'isEmpty',
+              'isNotEmpty'
             ],
-            'description': 'Filter operator to apply.',
+            'description': 'Filter operator to apply. Use "inList" or "or" for matching one of multiple values.',
           },
           'value': {
             'description': 'The filter value to match against.',

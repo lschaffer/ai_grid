@@ -396,6 +396,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.tune_outlined),
             tooltip: 'Layout Presets & Settings',
+            constraints: const BoxConstraints(minWidth: 340, maxWidth: 400),
             onSelected: (val) async {
               if (val == 'preset_grouping') {
                 _controller.restoreSettings({
@@ -470,7 +471,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   children: [
                     Icon(Icons.layers_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('Preset: Group by Category & Region'),
+                    Flexible(child: Text('Preset: Group by Category & Region')),
                   ],
                 ),
               ),
@@ -480,7 +481,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   children: [
                     Icon(Icons.attach_money, size: 18),
                     SizedBox(width: 8),
-                    Text('Preset: Financial Focus (Custom Widths)'),
+                    Flexible(child: Text('Preset: Financial Focus (Custom Widths)')),
                   ],
                 ),
               ),
@@ -490,7 +491,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   children: [
                     Icon(Icons.filter_alt_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('Preset: High Value Sales (> \$500)'),
+                    Flexible(child: Text('Preset: High Value Sales (> \$500)')),
                   ],
                 ),
               ),
@@ -501,7 +502,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   children: [
                     Icon(Icons.file_download_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('Export Layout (FitGrid JSON)'),
+                    Flexible(child: Text('Export Layout (FitGrid JSON)')),
                   ],
                 ),
               ),
@@ -511,7 +512,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   children: [
                     Icon(Icons.file_upload_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('Restore Layout from JSON'),
+                    Flexible(child: Text('Restore Layout from JSON')),
                   ],
                 ),
               ),
@@ -522,7 +523,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   children: [
                     Icon(Icons.restore_outlined, size: 18, color: Colors.orange),
                     SizedBox(width: 8),
-                    Text('Reset Layout to Defaults'),
+                    Flexible(child: Text('Reset Layout to Defaults')),
                   ],
                 ),
               ),
