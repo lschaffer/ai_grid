@@ -614,13 +614,36 @@ class AiGridController extends ChangeNotifier {
     showAllColumns();
   }
 
+  /// Exports native [FitGridSavedState] snapshot directly.
+  FitGridSavedState? saveLayoutState() => _fitController?.saveState();
+
+  /// Restores native [FitGridSavedState] snapshot directly.
+  void restoreLayoutState(FitGridSavedState state) {
+    if (_fitController != null) {
+      _fitController!.restoreState(state);
+      _activeSortColumn = state.sort.isNotEmpty ? state.sort.first.columnId : null;
+      _isSortDescending = state.sort.isNotEmpty && state.sort.first.direction == FitGridSortDirection.descending;
+      _searchQuery = state.query;
+      _hiddenFields.clear();
+      _hiddenFields.addAll(state.hiddenColumns);
+      notifyListeners();
+    }
+  }
+
   /// Exports all current interactive grid settings to a Map.
+  /// Uses FitGrid's native [FitGridSavedState] (column widths, order, frozen columns, sorts, filters, search)
+  /// combined with AI Grid's grouping and UI toggles.
   Map<String, dynamic> exportSettings() {
+    final fitState = _fitController?.saveState().toJson() ?? <String, dynamic>{};
+
     return {
-      'version': '1.0',
+      ...fitState,
+      'groupColumns': List<String>.from(activeGrouping),
+      'showColumnFilterRow': _showColumnFilterRow,
+      'showGroupPanel': _showGroupPanel,
+      // Backwards-compatibility fields for legacy callers and tools
       'visibleColumns': visibleColumns,
       'hiddenColumns': hiddenColumns,
-      'groupColumns': List<String>.from(activeGrouping),
       'sorts': _fitController != null && _fitController!.data.sortKeys.isNotEmpty
           ? _fitController!.data.sortKeys
               .map((k) => {
@@ -637,7 +660,6 @@ class AiGridController extends ChangeNotifier {
                 ]
               : <Map<String, dynamic>>[]),
       'filters': Map<String, dynamic>.from(activeFilters),
-      'showColumnFilterRow': _showColumnFilterRow,
       'timestamp': DateTime.now().toIso8601String(),
     };
   }
@@ -649,28 +671,91 @@ class AiGridController extends ChangeNotifier {
   }
 
   /// Restores grid state from a saved settings Map.
+  /// Seamlessly handles native FitGrid [FitGridSavedState] (order, widths, freezes, sorts, filters)
+  /// as well as AI Grid grouping and legacy settings shapes.
   void restoreSettings(Map<String, dynamic> settings) {
-    // 1. Column visibility
-    if (settings.containsKey('visibleColumns')) {
-      final list = (settings['visibleColumns'] as List?)
-          ?.map((e) => e.toString())
-          .toList();
-      if (list != null && list.isNotEmpty) {
-        showOnlyColumns(list);
+    // 1. Native FitGrid state restoration
+    if (_fitController != null) {
+      try {
+        final fitState = FitGridSavedState.fromJson(settings);
+        _fitController!.restoreState(fitState);
+
+        if (fitState.sort.isNotEmpty) {
+          _activeSortColumn = fitState.sort.first.columnId;
+          _isSortDescending = fitState.sort.first.direction == FitGridSortDirection.descending;
+        } else if (!settings.containsKey('sorts')) {
+          _activeSortColumn = null;
+          _isSortDescending = false;
+        }
+
+        if (fitState.query.isNotEmpty) {
+          _searchQuery = fitState.query;
+        }
+
+        if (fitState.hiddenColumns.isNotEmpty) {
+          _hiddenFields.clear();
+          _hiddenFields.addAll(fitState.hiddenColumns);
+        }
+      } catch (e) {
+        debugPrint('Error restoring FitGridSavedState: $e');
       }
-    } else if (settings.containsKey('hiddenColumns')) {
-      final hidden = (settings['hiddenColumns'] as List?)
-              ?.map((e) => e.toString())
-              .toSet() ??
-          {};
-      final map = <String, bool>{};
-      for (final col in _columns) {
-        map[col.field] = !hidden.contains(col.field);
-      }
-      setColumnsVisibility(map);
     }
 
-    // 2. Group columns
+    // 2. Visible/Hidden columns fallback
+    if (!settings.containsKey('columnOrder')) {
+      if (settings.containsKey('visibleColumns')) {
+        final list = (settings['visibleColumns'] as List?)
+            ?.map((e) => e.toString())
+            .toList();
+        if (list != null && list.isNotEmpty) {
+          showOnlyColumns(list);
+        }
+      } else if (settings.containsKey('hiddenColumns')) {
+        final hidden = (settings['hiddenColumns'] as List?)
+                ?.map((e) => e.toString())
+                .toSet() ??
+            {};
+        final map = <String, bool>{};
+        for (final col in _columns) {
+          map[col.field] = !hidden.contains(col.field);
+        }
+        setColumnsVisibility(map);
+      }
+    }
+
+    // 3. Filters restoration (supports both 'operator' and FitGrid 'op')
+    if (settings.containsKey('filters')) {
+      final filters = settings['filters'] as Map<String, dynamic>? ?? {};
+      clearAllFilters();
+      for (final entry in filters.entries) {
+        final valMap = entry.value as Map<String, dynamic>?;
+        if (valMap != null) {
+          final op = (valMap['operator'] ?? valMap['op'])?.toString() ?? 'contains';
+          final val = valMap['value'];
+          setFilter(entry.key, operator: op, value: val);
+        }
+      }
+    }
+
+    // 4. Sorts restoration
+    if (settings.containsKey('sorts')) {
+      final sorts = (settings['sorts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (sorts.isNotEmpty) {
+        multiSort(sorts);
+      } else {
+        clearSorting();
+      }
+    } else if (settings.containsKey('sort')) {
+      final sorts = (settings['sort'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (sorts.isNotEmpty) {
+        multiSort(sorts.map((s) => {
+          'field': s['column'],
+          'descending': s['dir'] == 'descending',
+        }).toList());
+      }
+    }
+
+    // 3. Group columns (AI Grid feature)
     if (settings.containsKey('groupColumns')) {
       final groups = (settings['groupColumns'] as List?)
               ?.map((e) => e.toString())
@@ -681,35 +766,12 @@ class AiGridController extends ChangeNotifier {
       }
     }
 
-    // 3. Filters
-    if (settings.containsKey('filters')) {
-      final filters = settings['filters'] as Map<String, dynamic>? ?? {};
-      clearAllFilters();
-      for (final entry in filters.entries) {
-        final valMap = entry.value as Map<String, dynamic>?;
-        if (valMap != null) {
-          setFilter(
-            entry.key,
-            operator: valMap['operator']?.toString() ?? 'contains',
-            value: valMap['value'],
-          );
-        }
-      }
-    }
-
-    // 4. Sorts
-    if (settings.containsKey('sorts')) {
-      final sorts = (settings['sorts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      if (sorts.isNotEmpty) {
-        multiSort(sorts);
-      } else {
-        clearSorting();
-      }
-    }
-
-    // 5. Column filter row
+    // 4. UI toggles
     if (settings.containsKey('showColumnFilterRow')) {
       _showColumnFilterRow = settings['showColumnFilterRow'] == true;
+    }
+    if (settings.containsKey('showGroupPanel')) {
+      _showGroupPanel = settings['showGroupPanel'] == true;
     }
 
     notifyListeners();

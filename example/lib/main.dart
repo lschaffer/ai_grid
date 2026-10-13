@@ -301,7 +301,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Restore Grid Settings'),
+        title: const Text('Restore Grid Layout Settings'),
         content: SizedBox(
           width: 500,
           child: Column(
@@ -309,7 +309,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Paste or edit a valid JSON settings configuration below (supports visibleColumns, groupColumns, sorts, filters, showColumnFilterRow):',
+                'Paste or edit a valid FitGrid JSON configuration below (supports columnOrder, widths, frozen, sorts, filters, and groupColumns):',
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 12),
@@ -332,13 +332,13 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           ),
           FilledButton.icon(
             icon: const Icon(Icons.restore, size: 16),
-            label: const Text('Apply Settings'),
+            label: const Text('Apply Layout'),
             onPressed: () {
               Navigator.pop(ctx);
               _controller.restoreSettingsJson(textController.text);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Grid settings successfully restored!'),
+                  content: Text('Grid layout successfully restored!'),
                   behavior: SnackBarBehavior.floating,
                   backgroundColor: Colors.green,
                 ),
@@ -395,9 +395,58 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.tune_outlined),
-            tooltip: 'Settings & Presets',
+            tooltip: 'Layout Presets & Settings',
             onSelected: (val) async {
-              if (val == 'export_json_file') {
+              if (val == 'preset_grouping') {
+                _controller.restoreSettings({
+                  'groupColumns': ['Category', 'Region'],
+                  'sort': [
+                    {'column': 'Sales', 'dir': 'descending'},
+                  ],
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Applied Preset: Grouped by Category & Region, sorted by Sales'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else if (val == 'preset_financial') {
+                _controller.restoreSettings({
+                  'widths': {
+                    'OrderID': 110.0,
+                    'CustomerName': 180.0,
+                    'Sales': 140.0,
+                    'Profit': 140.0,
+                    'Discount': 100.0,
+                  },
+                  'sort': [
+                    {'column': 'Profit', 'dir': 'descending'},
+                  ],
+                  'groupColumns': <String>[],
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Applied Preset: Financial Focus (Custom column widths & sorted by Profit)'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else if (val == 'preset_high_value') {
+                _controller.restoreSettings({
+                  'filters': {
+                    'Sales': {'op': 'greaterThan', 'value': 500},
+                  },
+                  'sort': [
+                    {'column': 'Sales', 'dir': 'descending'},
+                  ],
+                  'groupColumns': <String>[],
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Applied Preset: High Value Orders (Sales > \$500)'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else if (val == 'export_json_file') {
                 await _exportSettingsToJsonFile();
               } else if (val == 'restore_json') {
                 _showRestoreSettingsDialog();
@@ -407,7 +456,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Auto-saved settings cleared and grid reset to defaults.'),
+                      content: Text('Layout settings cleared and grid reset to defaults.'),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -416,12 +465,43 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
             },
             itemBuilder: (ctx) => [
               const PopupMenuItem(
+                value: 'preset_grouping',
+                child: Row(
+                  children: [
+                    Icon(Icons.layers_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Preset: Group by Category & Region'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'preset_financial',
+                child: Row(
+                  children: [
+                    Icon(Icons.attach_money, size: 18),
+                    SizedBox(width: 8),
+                    Text('Preset: Financial Focus (Custom Widths)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'preset_high_value',
+                child: Row(
+                  children: [
+                    Icon(Icons.filter_alt_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Preset: High Value Sales (> \$500)'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
                 value: 'export_json_file',
                 child: Row(
                   children: [
                     Icon(Icons.file_download_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('Export Settings to JSON File'),
+                    Text('Export Layout (FitGrid JSON)'),
                   ],
                 ),
               ),
@@ -431,7 +511,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   children: [
                     Icon(Icons.file_upload_outlined, size: 18),
                     SizedBox(width: 8),
-                    Text('Restore Settings from JSON'),
+                    Text('Restore Layout from JSON'),
                   ],
                 ),
               ),
@@ -442,7 +522,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   children: [
                     Icon(Icons.restore_outlined, size: 18, color: Colors.orange),
                     SizedBox(width: 8),
-                    Text('Reset & Clear Auto-Saved Settings'),
+                    Text('Reset Layout to Defaults'),
                   ],
                 ),
               ),
