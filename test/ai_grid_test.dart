@@ -441,5 +441,38 @@ void main() {
 
       expect(controller.activeGrouping, ['name']);
     });
+
+    testWidgets('AiGrid renders both vertical and horizontal Scrollbars', (tester) async {
+      final sample = [
+        {'id': 1, 'name': 'A', 'val': 10},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number, width: 200),
+        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text, width: 300),
+        const AiGridColumn(field: 'val', title: 'Val', type: AiGridColumnType.number, width: 400),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final controller = AiGridController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              height: 300,
+              child: AiGrid(
+                controller: controller,
+                dataSource: ds,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollbars = find.byType(Scrollbar);
+      expect(scrollbars, findsNWidgets(2));
+    });
   });
 }
+

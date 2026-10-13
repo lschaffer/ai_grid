@@ -1139,16 +1139,23 @@ class _FitGridState<T> extends State<FitGrid<T>> {
             theme: theme,
             child: Scrollbar(
               controller: _verticalController,
-              child: Scrollable(
-                controller: _verticalController,
-                axisDirection: AxisDirection.down,
-                viewportBuilder: (context, verticalOffset) => Scrollable(
-                  controller: _horizontalController,
-                  axisDirection: textDirection == TextDirection.rtl
-                      ? AxisDirection.left
-                      : AxisDirection.right,
-                  viewportBuilder: (context, horizontalOffset) =>
-                      buildSection(verticalOffset, horizontalOffset),
+              notificationPredicate: (notification) =>
+                  notification.metrics.axis == Axis.vertical,
+              child: Scrollbar(
+                controller: _horizontalController,
+                notificationPredicate: (notification) =>
+                    notification.metrics.axis == Axis.horizontal,
+                child: Scrollable(
+                  controller: _verticalController,
+                  axisDirection: AxisDirection.down,
+                  viewportBuilder: (context, verticalOffset) => Scrollable(
+                    controller: _horizontalController,
+                    axisDirection: textDirection == TextDirection.rtl
+                        ? AxisDirection.left
+                        : AxisDirection.right,
+                    viewportBuilder: (context, horizontalOffset) =>
+                        buildSection(verticalOffset, horizontalOffset),
+                  ),
                 ),
               ),
             ),

@@ -11,6 +11,9 @@
   * Direct pure-Dart Excel (`.xlsx`) export using FitGrid's native XLSX engine without native dependencies.
 * **`material_ui` Ecosystem Compatibility**:
   * Migrated UI components to `package:material_ui/material_ui.dart` for seamless Flutter 3.47 unbundled environments.
+* **Dual-Axis Horizontal & Vertical Scrollbars**:
+  * Added dedicated horizontal `Scrollbar` bound to `_horizontalController` with axis-specific notification predicates alongside the vertical scrollbar.
+  * Both horizontal and vertical scrollbars are now fully visible, interactive, and draggable across Windows, macOS, Linux, Web, and Mobile.
 * **Pub.dev Ready**:
   * Eliminated all local path dependencies (`dart_mcp_core: ^1.1.4`).
 
