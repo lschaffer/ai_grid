@@ -101,7 +101,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           title: 'Order ID',
           type: AiGridColumnType.text,
           aggregateType: AiGridAggregateType.count,
-          numberFormat: 'Total: #,###',
+          numberFormat: '#,###',
           width: 140,
         ),
         const AiGridColumn(

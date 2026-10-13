@@ -88,7 +88,11 @@ class AiGridColumn {
     if (aggregateType != AiGridAggregateType.none) {
       final isCount = aggregateType == AiGridAggregateType.count;
       final defaultFmt = isCount ? '#,###' : '#,###.##';
-      final nf = NumberFormat(numberFormat ?? defaultFmt);
+      var rawFmt = numberFormat ?? defaultFmt;
+      if (isCount && rawFmt.contains('Total:')) {
+        rawFmt = rawFmt.replaceAll('Total:', '').trim();
+      }
+      final nf = NumberFormat(rawFmt);
 
       footLabel = switch (aggregateType) {
         AiGridAggregateType.sum => 'Total: ',

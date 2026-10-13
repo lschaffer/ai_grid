@@ -14,6 +14,10 @@
 * **Dual-Axis Horizontal & Vertical Scrollbars**:
   * Added dedicated horizontal `Scrollbar` bound to `_horizontalController` with axis-specific notification predicates alongside the vertical scrollbar.
   * Both horizontal and vertical scrollbars are now fully visible, interactive, and draggable across Windows, macOS, Linux, Web, and Mobile.
+* **Interactive Column Header Menus & Drag-to-Group**:
+  * Enabled 3-dots column menus (`showColumnMenu: true`) on all column headers offering sort ascending/descending, filter dialogs, freeze/pin to start or end, auto-fit column width, and one-click Group/Ungroup.
+  * Unlocked 2D header dragging so columns can be dragged directly up into `AiGridGroupPanel` to group.
+  * Added aggregate cell tooltips and fixed footer count number formatting.
 * **Pub.dev Ready**:
   * Eliminated all local path dependencies (`dart_mcp_core: ^1.1.4`).
 

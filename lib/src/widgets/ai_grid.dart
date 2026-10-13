@@ -423,6 +423,9 @@ class _AiGridState extends State<AiGrid> {
               controller: _fitController,
               theme: gridTheme,
               showFilterRow: _controller.showColumnFilterRow,
+              showColumnMenu: true,
+              columnMenuBuilder: (context, column, defaults) =>
+                  _buildColumnMenu(context, column, defaults),
               reorderableColumns: true,
               resizableColumns: true,
               multiSort: true,
@@ -507,6 +510,9 @@ class _AiGridState extends State<AiGrid> {
               controller: _fitController,
               theme: gridTheme,
               showFilterRow: _controller.showColumnFilterRow,
+              showColumnMenu: true,
+              columnMenuBuilder: (context, column, defaults) =>
+                  _buildColumnMenu(context, column, defaults),
               reorderableColumns: true,
               resizableColumns: true,
               multiSort: true,
@@ -517,5 +523,44 @@ class _AiGridState extends State<AiGrid> {
         ],
       ),
     );
+  }
+
+  List<PopupMenuEntry<void>> _buildColumnMenu(
+    BuildContext context,
+    FitGridColumn<Map<String, dynamic>> column,
+    List<PopupMenuEntry<void>> defaults,
+  ) {
+    final isGrouped = _controller.activeGrouping.contains(column.id);
+    final groupItem = PopupMenuItem<void>(
+      onTap: () {
+        if (isGrouped) {
+          _controller.removeGroup(column.id);
+        } else {
+          _controller.addGroup(column.id);
+        }
+      },
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Icon(
+              isGrouped ? Icons.layers_clear_outlined : Icons.layers_outlined,
+              size: 18,
+            ),
+          ),
+          Flexible(
+            child: Text(
+              isGrouped ? 'Ungroup by ${column.label}' : 'Group by ${column.label}',
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return [
+      groupItem,
+      const PopupMenuDivider(),
+      ...defaults,
+    ];
   }
 }
