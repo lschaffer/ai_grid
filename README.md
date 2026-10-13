@@ -7,7 +7,7 @@
 
 **AI Grid** is an intelligent, high-performance DataGrid for Flutter that bridges enterprise tabular virtualization with native AI assistant controls and Model Context Protocol (MCP) tool execution.
 
-![AI Grid Showcase](example_1.png)
+![AI Grid Showcase](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_1.png)
 
 ![AI Grid Live Demo](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_grid_example1.gif)
 
