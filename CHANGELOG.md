@@ -18,6 +18,13 @@
   * Enabled 3-dots column menus (`showColumnMenu: true`) on all column headers offering sort ascending/descending, filter dialogs, freeze/pin to start or end, auto-fit column width, and one-click Group/Ungroup.
   * Unlocked 2D header dragging so columns can be dragged directly up into `AiGridGroupPanel` to group.
   * Added aggregate cell tooltips and fixed footer count number formatting.
+* **Interactive Column Width Resizing & Sizing Policies**:
+  * Enabled interactive draggable divider handles on column headers allowing users to resize column widths dynamically.
+  * Double-clicking any column divider handle auto-fits the column to measured cell contents.
+  * Added `AiGridColumn.columnWidth` supporting all **[FitGridColumnWidth](https://pub.dev/packages/fitgrid_table#column-widths)** policies (`auto`, `fixed`, `flex`, `fitHeader`) with custom `min` and `max` constraints.
+  * Added `AiGridColumn.resizable` (defaults to `true`) and `maxWidth`.
+  * Added programmatic controller methods: `setColumnWidth`, `autoSizeColumn`, `autoSizeAllColumns`, `columnWidths`, and `isColumnResized`.
+  * Preserved initial column widths while keeping columns resizable, with full persistence in `exportSettings` and `restoreSettings`.
 * **Pub.dev Ready**:
   * Eliminated all local path dependencies (`dart_mcp_core: ^1.1.4`).
 

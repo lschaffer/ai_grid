@@ -101,6 +101,12 @@ class _AiGridState extends State<AiGrid> {
       selectionMode: FitGridSelectionMode.multiple,
     );
 
+    for (final col in widget.dataSource.columns) {
+      if (col.width != null && col.width! > 0) {
+        _fitController.columns.setWidth(col.field, col.width!);
+      }
+    }
+
     if (widget.pageSize != null || widget.enablePagination) {
       _fitController.pagination.enabled = true;
       _fitController.pagination.pageSize = widget.pageSize ?? 40;

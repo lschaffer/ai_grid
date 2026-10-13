@@ -56,8 +56,17 @@
   * Auto-flexing search bar that adapts to any screen width without pixel overflows.
   * Instant 1-tap Mode Switcher tab bar (`[ 📊 Data Grid ]` | `[ ✨ AI Assistant ]`).
   * Full-screen mobile assistant view with quick `[← Back to Data Grid]` navigation.
+### 6. ↔️ Interactive Column Resizing & Width Policies
+* **Drag-to-Resize**: Hovering between column headers reveals draggable divider handles to interactively adjust column widths.
+* **Auto-Fit on Double-Click**: Double-clicking any column divider handle or choosing "Size to fit" in the column menu auto-fits the column to its actual cell content.
+* **Flexible Sizing Policies**: Configure `columnWidth` with any policy from [fitgrid_table](https://pub.dev/packages/fitgrid_table#column-widths):
+  * `FitGridColumnWidth.auto(min: 80, max: 300)` — dynamic content-based measurement.
+  * `FitGridColumnWidth.fixed(120)` — pinned exact pixel width.
+  * `FitGridColumnWidth.flex(1, min: 140)` — proportional flex share of remaining grid width.
+  * `FitGridColumnWidth.fitHeader(min: 44)` — sized strictly to the header label.
+* **Layout Persistence**: Custom column widths automatically persist across app restarts when `autoSave: true` is enabled.
 
-### 6. 📤 Fast & Pure-Dart Data Export (Excel XLSX, CSV, TSV, & JSON)
+### 7. 📤 Fast & Pure-Dart Data Export (Excel XLSX, CSV, TSV, & JSON)
 * Built-in **Export Dialog** accessible via toolbar, menu, or natural language AI command (`grid_export`):
   * **Formats**: Native Excel (`.xlsx`), CSV, TSV, and JSON.
   * **Pure-Dart Excel**: Generates `.xlsx` workbooks directly in Dart with zero C/C++ native dependencies or platform channels.
@@ -67,18 +76,18 @@
   * **Column Selector**: Interactive checklist to choose which columns to export with "Select All" / "Deselect All".
   * **Multi-Platform Saving**: Utilizes [`file_saver`](https://pub.dev/packages/file_saver) for native file save dialogs on Windows/macOS/Linux/mobile and browser downloads on Web.
 
-### 7. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
+### 8. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
 * **Client-Side Pagination**: Simple opt-in via `enablePagination: true` and `pageSize: 25`, rendering an interactive page-navigation footer with total row counts and page controls.
 * **Server-Side Partial Data Load (`LazyAiGridDataSource`)**:
   * Only requests and loads the slice of records for the active page from your backend or REST/GraphQL API.
   * Dynamically passes current page, page size, active column sorting, and active filter criteria to your `fetch` callback.
 
-### 8. 🌐 WebAssembly (WASM) Compatible
+### 9. 🌐 WebAssembly (WASM) Compatible
 * Fully verified with Flutter WebAssembly (`dart2wasm`).
 * Zero direct dependencies on legacy `dart:html`.
 * Native filesystem operations are cleanly isolated behind conditional imports, ensuring zero runtime or compile-time breakages in browser WASM environments.
 
-### 9. 🎨 Modern Adaptive Theming
+### 10. 🎨 Modern Adaptive Theming
 * Harmonious styling that automatically reflects the parent application's Material 3 `ThemeData` across Light and Dark modes.
 
 ---

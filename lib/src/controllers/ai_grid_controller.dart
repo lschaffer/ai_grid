@@ -111,6 +111,13 @@ class AiGridController extends ChangeNotifier {
     _columns = columns;
     _dataSource = dataSource;
 
+    // Seed initial column width overrides if declared and not yet overridden
+    for (final col in _columns) {
+      if (col.width != null && col.width! > 0 && !_fitController!.columns.isResized(col.field)) {
+        _fitController!.columns.setWidth(col.field, col.width!);
+      }
+    }
+
     _fitController!.data.removeListener(_onFitControllerChanged);
     _fitController!.columns.removeListener(_onFitControllerChanged);
     _fitController!.data.addListener(_onFitControllerChanged);
@@ -576,6 +583,36 @@ class AiGridController extends ChangeNotifier {
       return _fitController!.columns.columns.where((c) => !c.visible).map((c) => c.id).toList();
     }
     return _hiddenFields.toList();
+  }
+
+  /// Sets an explicit width in pixels for a column.
+  void setColumnWidth(String field, double width) {
+    final actual = _resolveField(field) ?? field;
+    _fitController?.columns.setWidth(actual, width);
+    notifyListeners();
+  }
+
+  /// Restores a column to its declared width policy (e.g. auto-fitting to content).
+  void autoSizeColumn(String field) {
+    final actual = _resolveField(field) ?? field;
+    _fitController?.columns.autoSize(actual);
+    notifyListeners();
+  }
+
+  /// Restores all columns to their declared width policies.
+  void autoSizeAllColumns() {
+    _fitController?.columns.autoSizeAll();
+    notifyListeners();
+  }
+
+  /// Map of column fields to their explicit width overrides.
+  Map<String, double> get columnWidths =>
+      _fitController?.columns.widthOverrides ?? const {};
+
+  /// Whether a column currently has a width override instead of following policy.
+  bool isColumnResized(String field) {
+    final actual = _resolveField(field) ?? field;
+    return _fitController?.columns.isResized(actual) ?? false;
   }
 
   /// Toggles visibility of the inline filter row.

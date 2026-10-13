@@ -473,6 +473,55 @@ void main() {
       final scrollbars = find.byType(Scrollbar);
       expect(scrollbars, findsNWidgets(2));
     });
+
+    test('AiGridColumn toFitGridColumn handles resizable, fixed, and custom columnWidth', () {
+      // Default: resizable=true -> auto width (not pinned)
+      const col1 = AiGridColumn(field: 'name', title: 'Name', width: 160);
+      final fitCol1 = col1.toFitGridColumn();
+      expect(fitCol1.resizable, isTrue);
+      expect(fitCol1.width.isPinned, isFalse);
+      expect(fitCol1.width, isA<FitGridAutoWidth>());
+
+      // Resizable=false with explicit width -> fixed width (pinned)
+      const col2 = AiGridColumn(field: 'id', title: 'ID', width: 80, resizable: false);
+      final fitCol2 = col2.toFitGridColumn();
+      expect(fitCol2.resizable, isFalse);
+      expect(fitCol2.width.isPinned, isTrue);
+      expect(fitCol2.width, isA<FitGridFixedWidth>());
+
+      // Custom columnWidth (e.g. flex)
+      const col3 = AiGridColumn(
+        field: 'desc',
+        title: 'Description',
+        columnWidth: FitGridColumnWidth.flex(2, min: 100),
+      );
+      final fitCol3 = col3.toFitGridColumn();
+      expect(fitCol3.resizable, isTrue);
+      expect(fitCol3.width, isA<FitGridFlexWidth>());
+    });
+
+    test('AiGridController sets and resets column widths', () {
+      final sample = [
+        {'id': 1, 'name': 'Item 1'},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number, width: 100),
+        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text, width: 200),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final controller = AiGridController();
+      controller.attach(columns: cols, dataSource: ds);
+
+      expect(controller.columnWidths['id'], 100.0);
+      expect(controller.columnWidths['name'], 200.0);
+      expect(controller.isColumnResized('id'), isTrue);
+
+      controller.setColumnWidth('id', 150.0);
+      expect(controller.columnWidths['id'], 150.0);
+
+      controller.autoSizeColumn('id');
+      expect(controller.isColumnResized('id'), isFalse);
+    });
   });
 }
 

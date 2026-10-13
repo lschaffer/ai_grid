@@ -27,8 +27,11 @@ class AiGridColumn {
   final String field;
   final String title;
   final AiGridColumnType type;
-  final double width;
+  final double? width;
   final double minWidth;
+  final double? maxWidth;
+  final FitGridColumnWidth? columnWidth;
+  final bool resizable;
   final bool isGroupable;
   final bool isSortable;
   final bool isFilterable;
@@ -41,8 +44,11 @@ class AiGridColumn {
     required this.field,
     required this.title,
     this.type = AiGridColumnType.text,
-    this.width = 160.0,
+    this.width,
     this.minWidth = 80.0,
+    this.maxWidth,
+    this.columnWidth,
+    this.resizable = true,
     this.isGroupable = true,
     this.isSortable = true,
     this.isFilterable = true,
@@ -154,13 +160,19 @@ class AiGridColumn {
       );
     }
 
+    final effectiveWidth = columnWidth ??
+        (!resizable && width != null && width! > 0
+            ? FitGridColumnWidth.fixed(width!)
+            : FitGridColumnWidth.auto(min: minWidth, max: maxWidth));
+
     return FitGridColumn<Map<String, dynamic>>(
       id: field,
       label: title,
       value: (row) => _formatDisplayValue(row[field]),
-      width: width > 0 ? FitGridColumnWidth.fixed(width) : const FitGridColumnWidth.auto(),
+      width: effectiveWidth,
       alignment: alignment,
       sortable: isSortable,
+      resizable: resizable,
       sortValue: (row) => _sortValueOf(row[field]),
       filter: filterSpec,
       aggregate: aggregateFunc,
