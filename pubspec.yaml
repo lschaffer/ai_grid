@@ -1,8 +1,8 @@
 name: ai_grid
 description: "An intelligent DataGrid for Flutter with native AI assistant and MCP skill control."
 version: 0.1.0
-repository: https://github.com/doonfrs/ai_grid
-issue_tracker: https://github.com/doonfrs/ai_grid/issues
+repository: https://github.com/lschaffer/ai_grid
+issue_tracker: https://github.com/lschaffer/ai_grid/issues
 topics:
   - datagrid
   - ai

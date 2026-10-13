@@ -1,0 +1,11 @@
+# Exclude large media files to stay well under pub.dev's 10 MB limit
+*.gif
+ai_grid_example1.gif
+
+# Development & test artifacts
+.github/
+benchmark/
+migrate_working_dir/
+*.log
+.env
+.env.*
