@@ -26,6 +26,10 @@
   * Added `AiGridColumn.resizable` (defaults to `true`) and `maxWidth`.
   * Added programmatic controller methods: `setColumnWidth`, `autoSizeColumn`, `autoSizeAllColumns`, `columnWidths`, and `isColumnResized`.
   * Preserved initial column widths while keeping columns resizable, with full persistence in `exportSettings` and `restoreSettings`.
+* **Filter Row Header Persistence & Cleaner Assistant Output**:
+  * Fixed sequential multi-filtering clearing previously displayed filter text in the column filter row by removing intermediate `clearColumnFilters()` calls and keying `_FilterField` widgets per column.
+  * Synchronized filter state changes between the grid filter row and `AiGridController._activeFilters`.
+  * Cleaned up AI Assistant filter confirmation text by removing repetitive `(active filters joined by AND)` phrases.
 * **Pub.dev Ready**:
   * Eliminated all local path dependencies (`dart_mcp_core: ^1.1.4`).
 

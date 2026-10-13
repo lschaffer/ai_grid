@@ -60,7 +60,7 @@ IMPORTANT RULES FOR COLUMN VISIBILITY:
 • When the user asks to hide specific columns (e.g. "hide column X"), use `hideColumns: ["X"]` or `column: "X", visible: false`.
 • When the user asks to restore or show all columns, use `grid_reset`.
 
-Confirm the actions and calculations clearly and concisely to the user.
+Confirm the actions and calculations clearly and concisely to the user. Do not append extra explanatory notes like "(active filters joined by AND)" or "(joined by AND)".
 ''';
 
   /// Creates a SkillManifest representing the AI Grid skill.
@@ -322,7 +322,7 @@ class GridSetFilterTool extends McpLocalTool {
         content: [
           MCPContent(
             type: 'text',
-            text: 'Filters applied (joined by AND): $desc.',
+            text: 'Filters applied: $desc.',
           )
         ],
       );
@@ -345,7 +345,7 @@ class GridSetFilterTool extends McpLocalTool {
         content: [
           MCPContent(
             type: 'text',
-            text: 'Filter applied: $column $op "$value" (active filters joined by AND).',
+            text: 'Filter applied: $column $op "$value".',
           )
         ],
       );

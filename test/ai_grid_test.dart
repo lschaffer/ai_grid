@@ -137,6 +137,38 @@ void main() {
       expect(controller.activeFilters['category']?['value'], 'Tech');
     });
 
+    test('sequential setFilter calls preserve previous filters in both controller and fitController', () {
+      final controller = AiGridController();
+      final sample = [
+        {'orderId': 1, 'Quantity': 5, 'Discount': 0.2},
+        {'orderId': 2, 'Quantity': 2, 'Discount': 0.0},
+        {'orderId': 3, 'Quantity': 7, 'Discount': 0.0},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'orderId', title: 'Order ID', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'Quantity', title: 'Quantity', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'Discount', title: 'Discount', type: AiGridColumnType.number),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      controller.attach(columns: cols, dataSource: ds);
+
+      // 1. First filter on Discount
+      controller.setFilter('Discount', operator: 'not equals', value: '0');
+      expect(controller.activeFilters.containsKey('Discount'), isTrue);
+      expect(controller.fitController!.filter.filters.containsKey('Discount'), isTrue);
+      expect(controller.fitController!.filter.filters['Discount']?.operator, FitGridFilterOperator.notEquals);
+
+      // 2. Second filter on Quantity
+      controller.setFilter('Quantity', operator: 'greaterThan', value: '4');
+      // Verify Discount was NOT cleared
+      expect(controller.activeFilters.containsKey('Discount'), isTrue);
+      expect(controller.activeFilters.containsKey('Quantity'), isTrue);
+      expect(controller.fitController!.filter.filters.containsKey('Discount'), isTrue);
+      expect(controller.fitController!.filter.filters.containsKey('Quantity'), isTrue);
+      expect(controller.fitController!.filter.filters['Discount']?.operator, FitGridFilterOperator.notEquals);
+      expect(controller.fitController!.filter.filters['Quantity']?.operator, FitGridFilterOperator.greaterThan);
+    });
+
     test('supports negative filter operators (not equals, does not contain)', () {
       final controller = AiGridController();
       final sample = [
@@ -214,7 +246,8 @@ void main() {
           {'field': 'sector', 'operator': 'equals', 'value': 'Tech'},
         ]
       });
-      expect(filterRes.content.first.text?.contains('Filters applied (joined by AND)'), isTrue);
+      expect(filterRes.content.first.text?.contains('Filters applied:'), isTrue);
+      expect(filterRes.content.first.text?.contains('joined by AND'), isFalse);
 
       // Test grouping
       final groupRes =

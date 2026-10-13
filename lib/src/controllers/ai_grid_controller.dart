@@ -22,6 +22,7 @@ class AiGridController extends ChangeNotifier {
   bool _showColumnFilterRow = true;
   bool _showGroupPanel = true;
   bool _showAiAssistant = false;
+  bool _isApplyingFilters = false;
 
   /// Underlying FitGridController if attached.
   FitGridController<Map<String, dynamic>>? get fitController => _fitController;
@@ -101,6 +102,7 @@ class AiGridController extends ChangeNotifier {
     if (_fitController != null && _fitController != fitController && fitController != null) {
       _fitController!.data.removeListener(_onFitControllerChanged);
       _fitController!.columns.removeListener(_onFitControllerChanged);
+      _fitController!.filter.removeListener(_onFitFilterChanged);
     }
     _fitController = fitController ??
         _fitController ??
@@ -120,8 +122,10 @@ class AiGridController extends ChangeNotifier {
 
     _fitController!.data.removeListener(_onFitControllerChanged);
     _fitController!.columns.removeListener(_onFitControllerChanged);
+    _fitController!.filter.removeListener(_onFitFilterChanged);
     _fitController!.data.addListener(_onFitControllerChanged);
     _fitController!.columns.addListener(_onFitControllerChanged);
+    _fitController!.filter.addListener(_onFitFilterChanged);
 
     // Reapply active state if pre-configured
     if (_activeGrouping.isNotEmpty) {
@@ -148,7 +152,23 @@ class AiGridController extends ChangeNotifier {
   void dispose() {
     _fitController?.data.removeListener(_onFitControllerChanged);
     _fitController?.columns.removeListener(_onFitControllerChanged);
+    _fitController?.filter.removeListener(_onFitFilterChanged);
     super.dispose();
+  }
+
+  void _onFitFilterChanged() {
+    if (_isApplyingFilters || _fitController == null) return;
+    final currentFilters = _fitController!.filter.filters;
+    _activeFilters.clear();
+    for (final entry in currentFilters.entries) {
+      _activeFilters[entry.key] = {
+        'operator': entry.value.operator.name,
+        'value': entry.value.value,
+        if (entry.value.value2 != null) 'value2': entry.value.value2,
+        if (entry.value.values.isNotEmpty) 'values': entry.value.values.toList(),
+      };
+    }
+    notifyListeners();
   }
 
   /// Resolves field name flexibly (case-insensitive or title).
@@ -236,35 +256,47 @@ class AiGridController extends ChangeNotifier {
 
   void _applyActiveFilters() {
     if (_fitController == null) return;
-    _fitController!.filter.clearColumnFilters();
-
-    for (final entry in _activeFilters.entries) {
-      final field = entry.key;
-      final opName = (entry.value['operator'] as String?) ?? 'contains';
-      final val = entry.value['value'];
-      final op = _resolveFilterOperator(opName);
-
-      final col = _columns.where((c) => c.field == field).firstOrNull;
-      Object? operand = val;
-      if (col != null) {
-        if (col.type == AiGridColumnType.number || col.type == AiGridColumnType.currency) {
-          if (val is! num && val != null) {
-            operand = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
-          }
-        } else if (col.type == AiGridColumnType.date) {
-          if (val is! DateTime && val != null) {
-            operand = DateTime.tryParse(val.toString());
-          }
+    _isApplyingFilters = true;
+    try {
+      final activeFields = _activeFilters.keys.toSet();
+      // 1. Remove filters in FitGrid that are no longer active in _activeFilters
+      for (final existingField in _fitController!.filter.filters.keys.toList()) {
+        if (!activeFields.contains(existingField)) {
+          _fitController!.filter.setFilter(existingField, null);
         }
       }
 
-      _fitController!.filter.setFilter(
-        field,
-        FitGridColumnFilter(
-          operator: op,
-          value: operand,
-        ),
-      );
+      // 2. Set or update all active filters
+      for (final entry in _activeFilters.entries) {
+        final field = entry.key;
+        final opName = (entry.value['operator'] as String?) ?? 'contains';
+        final val = entry.value['value'];
+        final op = _resolveFilterOperator(opName);
+
+        final col = _columns.where((c) => c.field == field).firstOrNull;
+        Object? operand = val;
+        if (col != null) {
+          if (col.type == AiGridColumnType.number || col.type == AiGridColumnType.currency) {
+            if (val is! num && val != null) {
+              operand = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+            }
+          } else if (col.type == AiGridColumnType.date) {
+            if (val is! DateTime && val != null) {
+              operand = DateTime.tryParse(val.toString());
+            }
+          }
+        }
+
+        _fitController!.filter.setFilter(
+          field,
+          FitGridColumnFilter(
+            operator: op,
+            value: operand,
+          ),
+        );
+      }
+    } finally {
+      _isApplyingFilters = false;
     }
   }
 
