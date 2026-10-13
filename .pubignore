@@ -2,10 +2,27 @@
 *.gif
 ai_grid_example1.gif
 
-# Development & test artifacts
+# Build and IDE artifacts
+.dart_tool/
+build/
+coverage/
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Development, benchmarks, and internal artifacts
 .github/
 benchmark/
 migrate_working_dir/
+plugins/
+tool/
 *.log
+.DS_Store
+
+# Secrets & environment
 .env
 .env.*
+*.env
+!.env.example
