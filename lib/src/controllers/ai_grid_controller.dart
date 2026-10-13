@@ -823,60 +823,135 @@ class AiGridController extends ChangeNotifier {
     return _dataSource!.getSampleData(limit: limit);
   }
 
-  /// Exports current grid data to CSV, TSV, XLSX, or JSON and saves it via FileSaver.
-  Future<String> exportGrid({
-    String format = 'csv',
-    List<String>? columns,
+  /// Exports current grid data to Excel (.xlsx) using FitGrid's native XLSX encoder,
+  /// opening the platform "Save As..." dialog so the user can select destination directory
+  /// and filename.
+  /// Works across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
+  Future<String?> exportTableWithSaveDialog({
+    String? fileName,
     bool includeHeaders = true,
-    bool ignoreFixedRows = false,
-    String separator = ',',
+    bool selectedOnly = false,
   }) async {
     final fc = _fitController;
     if (fc == null) throw Exception('Grid is not attached yet');
 
-    final fileName = 'grid_export_${DateTime.now().millisecondsSinceEpoch}';
-    final fmt = format.toLowerCase().trim();
+    final exportData = fc.export(
+      includeHeaders: includeHeaders,
+      selectedOnly: selectedOnly,
+    );
 
-    final exportData = fc.export(includeHeaders: includeHeaders);
+    final bytes = fitGridToXlsx(exportData);
+    final rawName = (fileName != null && fileName.trim().isNotEmpty)
+        ? fileName.trim()
+        : 'grid_export_${DateTime.now().millisecondsSinceEpoch}';
+    final cleanName = rawName.replaceAll(RegExp(r'\.xlsx$', caseSensitive: false), '');
 
-    if (fmt == 'csv') {
-      final content = fitGridToCsv(exportData);
-      final bytes = Uint8List.fromList(utf8.encode(content));
-      return await FileSaver.instance.saveFile(
-        name: fileName,
+    try {
+      final savedPath = await FileSaver.instance.saveAs(
+        name: cleanName,
         bytes: bytes,
-        fileExtension: 'csv',
-        mimeType: MimeType.csv,
+        fileExtension: 'xlsx',
+        mimeType: MimeType.microsoftExcel,
+        dialogTitle: 'Export Grid Data to Excel',
       );
-    } else if (fmt == 'tsv') {
-      final content = fitGridToTsv(exportData);
-      final bytes = Uint8List.fromList(utf8.encode(content));
+      return savedPath;
+    } on UnsupportedError catch (e) {
+      debugPrint('saveAs unsupported on platform ($e), falling back to saveFile');
       return await FileSaver.instance.saveFile(
-        name: fileName,
-        bytes: bytes,
-        fileExtension: 'tsv',
-        mimeType: MimeType.text,
-      );
-    } else if (fmt == 'xlsx') {
-      final bytes = fitGridToXlsx(exportData);
-      return await FileSaver.instance.saveFile(
-        name: fileName,
+        name: cleanName,
         bytes: bytes,
         fileExtension: 'xlsx',
         mimeType: MimeType.microsoftExcel,
       );
+    } catch (e) {
+      debugPrint('saveAs error ($e), falling back to saveFile');
+      return await FileSaver.instance.saveFile(
+        name: cleanName,
+        bytes: bytes,
+        fileExtension: 'xlsx',
+        mimeType: MimeType.microsoftExcel,
+      );
+    }
+  }
+
+  /// Exports current grid data to CSV, TSV, XLSX, or JSON and saves it via FileSaver.
+  /// If [useSaveAs] is true, opens the platform "Save As..." dialog so the user
+  /// can select an output directory and filename.
+  Future<String> exportGrid({
+    String format = 'xlsx',
+    List<String>? columns,
+    bool includeHeaders = true,
+    bool ignoreFixedRows = false,
+    String separator = ',',
+    bool useSaveAs = true,
+    String? fileName,
+    bool selectedOnly = false,
+  }) async {
+    final fc = _fitController;
+    if (fc == null) throw Exception('Grid is not attached yet');
+
+    final rawName = (fileName != null && fileName.trim().isNotEmpty)
+        ? fileName.trim()
+        : 'grid_export_${DateTime.now().millisecondsSinceEpoch}';
+    final fmt = format.toLowerCase().trim();
+
+    final exportData = fc.export(
+      includeHeaders: includeHeaders,
+      selectedOnly: selectedOnly,
+    );
+
+    Uint8List bytes;
+    String extension;
+    MimeType mimeType;
+
+    if (fmt == 'xlsx') {
+      bytes = fitGridToXlsx(exportData);
+      extension = 'xlsx';
+      mimeType = MimeType.microsoftExcel;
+    } else if (fmt == 'csv') {
+      final content = fitGridToCsv(exportData);
+      bytes = Uint8List.fromList(utf8.encode(content));
+      extension = 'csv';
+      mimeType = MimeType.csv;
+    } else if (fmt == 'tsv') {
+      final content = fitGridToTsv(exportData);
+      bytes = Uint8List.fromList(utf8.encode(content));
+      extension = 'tsv';
+      mimeType = MimeType.text;
     } else if (fmt == 'json') {
       final rows = fc.data.view;
       final jsonStr = const JsonEncoder.withIndent('  ').convert(rows);
-      final bytes = Uint8List.fromList(utf8.encode(jsonStr));
-      return await FileSaver.instance.saveFile(
-        name: fileName,
-        bytes: bytes,
-        fileExtension: 'json',
-        mimeType: MimeType.json,
-      );
+      bytes = Uint8List.fromList(utf8.encode(jsonStr));
+      extension = 'json';
+      mimeType = MimeType.json;
     } else {
       throw Exception('Unsupported export format: $format');
     }
+
+    final cleanName = rawName.replaceAll(RegExp('\\.$extension\$', caseSensitive: false), '');
+
+    if (useSaveAs) {
+      try {
+        final path = await FileSaver.instance.saveAs(
+          name: cleanName,
+          bytes: bytes,
+          fileExtension: extension,
+          mimeType: mimeType,
+          dialogTitle: 'Export Grid Data',
+        );
+        if (path != null && path.isNotEmpty) {
+          return path;
+        }
+      } catch (e) {
+        debugPrint('FileSaver.saveAs failed ($e), falling back to saveFile');
+      }
+    }
+
+    return await FileSaver.instance.saveFile(
+      name: cleanName,
+      bytes: bytes,
+      fileExtension: extension,
+      mimeType: mimeType,
+    );
   }
 }

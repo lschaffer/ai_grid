@@ -99,7 +99,8 @@
 | `grid_group` | Sets hierarchical row grouping fields. |
 | `grid_set_column_visibility` | Shows or hides specific columns. |
 | `grid_search` | Applies global tabular text search. |
-| `grid_export` | Exports grid data to CSV or JSON and downloads/saves the file. |
+| `export` | **Exports table data to Excel (.xlsx)** using FitGrid and opens the native Save As... dialog to select output directory and filename. Works on Web, Desktop, and Mobile. |
+| `grid_export` | Exports grid data to XLSX, CSV, TSV, or JSON and downloads/saves the file. |
 | `grid_go_to_page` | Navigates pagination to a specific page or relative direction ("next", "previous", "first", "last"). |
 | `grid_get_pagination_status` | Returns active pagination status (current page, total pages, page size, isPaginated). |
 | `grid_export_settings` | Exports current grid settings (visible columns, grouping, sorts, filters) as a JSON string. |
@@ -116,9 +117,8 @@ Add `ai_grid` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ai_grid: ^0.0.1
-  trina_grid: ^2.3.0
-  dart_mcp_core: ^1.1.3
+  ai_grid: ^0.0.3
+  material_ui: ^1.4.0
 ```
 
 *(Note for local development: If using local checkouts, path dependencies can be specified via dependency overrides).*

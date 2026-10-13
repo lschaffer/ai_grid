@@ -24,6 +24,7 @@ class AiGridSkill {
       GridGroupTool(controller),
       GridSetColumnVisibilityTool(controller),
       GridResetTool(controller),
+      ExportTool(controller),
       GridExportTool(controller),
       GridGoToPageTool(controller),
       GridGetPaginationTool(controller),
@@ -48,7 +49,10 @@ IMPORTANT RULES FOR SORTING:
 • When the user asks to sort by multiple columns, use `grid_sort` with the `sorts` array parameter.
 
 IMPORTANT RULES FOR EXPORTING:
-• When the user asks to export or download the grid (e.g. "export to CSV", "download as JSON"), use the `grid_export` tool.
+• When the user asks to export, download, or save table or grid data (e.g. "export table", "export data", "export grid", "export to excel", "export to xlsx", "download data", "save table"):
+  ALWAYS call the `export` tool.
+  This triggers the platform "Save As..." dialog (on Web, Desktop, and Mobile) so the user can select their output directory and enter their desired filename, exporting cleanly to Excel (.xlsx) using FitGrid's native XLSX engine.
+• For legacy or programmatic raw CSV/JSON downloads, `grid_export` is also available.
 
 IMPORTANT RULES FOR COLUMN VISIBILITY:
 • When the user says "show fields X, Y, Z" or "only show columns A, B" or "display columns A, B, C":
@@ -677,8 +681,86 @@ class GridResetTool extends McpLocalTool {
   }
 }
 
-/// MCP tool to export current grid data to CSV or JSON.
+/// MCP tool to export current grid data to Excel (.xlsx) using FitGrid's XLSX engine
+/// and prompt the user with a native Save As... dialog to select output directory and filename.
+class ExportTool extends McpLocalTool {
+  final AiGridController controller;
+  ExportTool(this.controller);
 
+  @override
+  String get name => 'export';
+
+  @override
+  String get description =>
+      'Exports current grid data to Excel (.xlsx) using FitGrid and opens the platform Save As... dialog to select output directory and filename. Works on Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'fileName': {
+            'type': 'string',
+            'description':
+                'Optional initial filename without extension (e.g. "sales_report"). Defaults to grid_export_<timestamp>.',
+          },
+          'includeHeaders': {
+            'type': 'boolean',
+            'description':
+                'Whether to include column headers as the first row. Defaults to true.',
+          },
+          'selectedOnly': {
+            'type': 'boolean',
+            'description':
+                'Whether to export only selected rows instead of all visible rows. Defaults to false.',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    try {
+      final fileName = arguments['fileName'] as String?;
+      final includeHeaders = (arguments['includeHeaders'] as bool?) ?? true;
+      final selectedOnly = (arguments['selectedOnly'] as bool?) ?? false;
+
+      final savedPath = await controller.exportTableWithSaveDialog(
+        fileName: fileName,
+        includeHeaders: includeHeaders,
+        selectedOnly: selectedOnly,
+      );
+
+      if (savedPath == null || savedPath.isEmpty) {
+        return MCPToolResult(
+          content: [
+            MCPContent(
+              type: 'text',
+              text: 'Export cancelled by user (file was not saved).',
+            ),
+          ],
+        );
+      }
+
+      return MCPToolResult(
+        content: [
+          MCPContent(
+            type: 'text',
+            text:
+                'Table successfully exported to Excel (.xlsx)! Saved to: $savedPath',
+          ),
+        ],
+      );
+    } catch (e) {
+      return MCPToolResult(
+        isError: true,
+        content: [
+          MCPContent(type: 'text', text: 'Failed to export table: $e'),
+        ],
+      );
+    }
+  }
+}
+
+/// MCP tool to export current grid data to CSV or JSON.
 class GridExportTool extends McpLocalTool {
   final AiGridController controller;
   GridExportTool(this.controller);
@@ -688,7 +770,7 @@ class GridExportTool extends McpLocalTool {
 
   @override
   String get description =>
-      'Exports grid data to CSV or JSON and downloads/saves the file. Supports specifying custom format, column selection, and CSV separator.';
+      'Exports grid data to XLSX, CSV, TSV, or JSON and downloads/saves the file. Supports specifying custom format, column selection, and CSV separator.';
 
   @override
   Map<String, dynamic> get inputSchema => {
@@ -697,8 +779,8 @@ class GridExportTool extends McpLocalTool {
           'format': {
             'type': 'string',
             'description':
-                'Export file format: "csv" or "json". Defaults to "csv".',
-            'enum': ['csv', 'json'],
+                'Export file format: "xlsx", "csv", "tsv", or "json". Defaults to "xlsx".',
+            'enum': ['xlsx', 'csv', 'tsv', 'json'],
           },
           'columns': {
             'type': 'array',

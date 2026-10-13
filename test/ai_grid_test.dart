@@ -235,9 +235,13 @@ void main() {
       expect(controller.activeSortColumn, isNull);
 
       // Test export tool declaration
-      final exportTool = tools.firstWhere((t) => t.name == 'grid_export');
-      expect(exportTool.name, 'grid_export');
-      expect(exportTool.inputSchema['properties']?['format'], isNotNull);
+      final exportTool = tools.firstWhere((t) => t.name == 'export');
+      expect(exportTool.name, 'export');
+      expect(exportTool.description.contains('Save As'), isTrue);
+
+      final legacyExportTool = tools.firstWhere((t) => t.name == 'grid_export');
+      expect(legacyExportTool.name, 'grid_export');
+      expect(legacyExportTool.inputSchema['properties']?['format'], isNotNull);
 
       // Test column enableEditingMode
       final testCol = const AiGridColumn(

@@ -5,8 +5,10 @@
   * Direct canvas cell painting (~3ms frame time on 1M rows) instead of widget-per-cell virtualization.
   * Native content-based column auto-sizing (`autoSize`, `autoSizeAll`).
   * Built-in multi-column sorting with background isolate sorting support for large datasets.
-* **Native Excel (XLSX) Export**:
-  * Added pure Dart Excel (`.xlsx`) export alongside CSV, TSV, and JSON formats without external native dependencies.
+* **Native Excel (XLSX) Export & `export` Tool**:
+  * Added new MCP tool `export` triggered by natural prompts such as "export table", "export data", "export to excel", or "save table".
+  * Prompts the user with the native platform "Save As..." dialog (`FileSaver.instance.saveAs`) to select output directory and filename across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
+  * Direct pure-Dart Excel (`.xlsx`) export using FitGrid's native XLSX engine without native dependencies.
 * **`material_ui` Ecosystem Compatibility**:
   * Migrated UI components to `package:material_ui/material_ui.dart` for seamless Flutter 3.47 unbundled environments.
 * **Pub.dev Ready**:
