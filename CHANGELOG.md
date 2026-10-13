@@ -1,73 +1,52 @@
-## 0.0.3
+# Changelog
 
-* **Engine Migration to `fitgrid_table`**:
-  * Migrated underlying grid engine to **[fitgrid_table](https://pub.dev/packages/fitgrid_table)**.
-  * Direct canvas cell painting (~3ms frame time on 1M rows) instead of widget-per-cell virtualization.
-  * Native content-based column auto-sizing (`autoSize`, `autoSizeAll`).
-  * Built-in multi-column sorting with background isolate sorting support for large datasets.
-* **Native Excel (XLSX) Export & Direct Save As Dialog**:
-  * Removed obsolete modal export dialog; clicking the toolbar export button or selecting export from the mobile action menu now directly opens the native platform "Save As..." dialog (`FileSaver.instance.saveAs`).
-  * Direct pure-Dart Excel (`.xlsx`) export using FitGrid's native XLSX engine without native dependencies across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
-  * Added new MCP tool `export` triggered by natural prompts such as "export table", "export data", "export to excel", or "save table".
-  * Added programmatic `AiGridController.export()` method alias.
-* **`material_ui` Ecosystem Compatibility**:
-  * Migrated UI components to `package:material_ui/material_ui.dart` for seamless Flutter 3.47 unbundled environments.
-* **Dual-Axis Horizontal & Vertical Scrollbars**:
-  * Added dedicated horizontal `Scrollbar` bound to `_horizontalController` with axis-specific notification predicates alongside the vertical scrollbar.
-  * Both horizontal and vertical scrollbars are now fully visible, interactive, and draggable across Windows, macOS, Linux, Web, and Mobile.
-* **Interactive Column Header Menus & Drag-to-Group**:
-  * Enabled 3-dots column menus (`showColumnMenu: true`) on all column headers offering sort ascending/descending, filter dialogs, freeze/pin to start or end, auto-fit column width, and one-click Group/Ungroup.
-  * Unlocked 2D header dragging so columns can be dragged directly up into `AiGridGroupPanel` to group.
-  * Added aggregate cell tooltips and fixed footer count number formatting.
-* **Interactive Column Width Resizing & Sizing Policies**:
-  * Enabled interactive draggable divider handles on column headers allowing users to resize column widths dynamically.
-  * Double-clicking any column divider handle auto-fits the column to measured cell contents.
-  * Added `AiGridColumn.columnWidth` supporting all **[FitGridColumnWidth](https://pub.dev/packages/fitgrid_table#column-widths)** policies (`auto`, `fixed`, `flex`, `fitHeader`) with custom `min` and `max` constraints.
-  * Added `AiGridColumn.resizable` (defaults to `true`) and `maxWidth`.
-  * Added programmatic controller methods: `setColumnWidth`, `autoSizeColumn`, `autoSizeAllColumns`, `columnWidths`, and `isColumnResized`.
-  * Preserved initial column widths while keeping columns resizable, with full persistence in `exportSettings` and `restoreSettings`.
-* **Filter Row Header Persistence & Cleaner Assistant Output**:
-  * Fixed sequential multi-filtering clearing previously displayed filter text in the column filter row by removing intermediate `clearColumnFilters()` calls and keying `_FilterField` widgets per column.
-  * Synchronized filter state changes between the grid filter row and `AiGridController._activeFilters`.
-  * Cleaned up AI Assistant filter confirmation text by removing repetitive `(active filters joined by AND)` phrases.
-* **Pub.dev Ready**:
-  * Eliminated all local path dependencies (`dart_mcp_core: ^1.1.4`).
+## 0.1.0
 
-## 0.0.2
+Initial feature-complete release of **AI Grid**: An intelligent, ultra-high-performance DataGrid for Flutter with native AI Assistant and Model Context Protocol (MCP) skill control.
 
-* **Persistent Layout Storage Across App Restarts**:
-  * Enhanced `AiGridSettingsStorage` with persistent `SharedPreferences` storage alongside memory caching.
-  * Settings now reliably persist across process termination and app restarts on Desktop, Mobile, and Web.
-* **Auto-Save Restoration & Startup Protection**:
-  * Prevented initial unconfigured grid state from overwriting saved user layout settings during `onLoaded`.
-  * Added bidirectional synchronization between `AiGridController.activeGrouping` and `TrinaGrid` row group delegate, ensuring drag-and-drop grouping in the UI immediately persists.
-* **Row Grouping Stability**:
-  * Fixed scheduler callback assertion failure (`hasRowGroups: is not true`) when clearing grouping or restoring settings with empty `groupColumns`.
-* **AI Assistant UI Refinements**:
-  * Removed unimplemented microphone icon from AI chat input row.
-* **Environment Configuration & Security**:
-  * Added `.env.example` templates and updated `.gitignore` rules for environment secrets.
-* **Documentation & Previews**:
-  * Added screenshot showcase (`example_1.png`) to README.
+### High-Performance Canvas Grid Engine
+* **Direct Canvas Cell Painting**: Renders cells directly to the Flutter canvas with ~3ms frame times on up to 1,000,000 rows.
+* **Full 2D Virtualization**: Handles large datasets smoothly with minimal memory footprint across Desktop, Web, and Mobile.
+* **WebAssembly (WASM) Ready**: Fully compatible with `dart2wasm` and modern Flutter web compilation.
+* **`material_ui` Ecosystem Compatibility**: Native compatibility with `package:material_ui` for unbundled Flutter 3.47+ environments.
 
-## 0.0.1
+### Native AI Assistant & Model Context Protocol (MCP)
+* **Model Context Protocol (MCP) Integration**: Built directly on [dart_mcp_core](https://pub.dev/packages/dart_mcp_core) to expose real-time tabular introspection and control tools to LLMs.
+* **13 Interactive MCP Tools**: Includes tools for schema inspection, state retrieval, multi-column filtering, multi-level sorting, grouping, column visibility, calculations, exports, and layout persistence.
+* **Hallucination-Free Math Engine (`grid_calculate`)**: In-grid calculations for sums, averages, medians, minimums, maximums, and counts executed directly in Dart rather than LLM mental math.
+* **Responsive Assistant UI**:
+  * **Desktop**: Moveable, resizable, and floatable draggable overlay window (`draggable_overlay_window`).
+  * **Mobile**: Full-screen bottom-sheet assistant with responsive tab switching and overflow-free toolbars.
+  * **Copy Actions**: Quick 1-click clipboard copy for user prompts and assistant responses.
 
-* Added Copy to Clipboard buttons for both user prompts and AI assistant responses in the AI chat panel.
-* Added Save & Restore Grid Settings feature (`exportSettings`, `exportSettingsJson`, `restoreSettings`, `restoreSettingsJson`):
-  * Persists visible columns, group columns, sorting, filters, and inline column filter row visibility.
-  * Added `autoSave: true` and `persistenceKey` parameters to `AiGrid` to automatically persist and restore grid layout on startup.
-  * Added `AiGridSettingsStorage` in-memory/session storage manager.
-  * Added `grid_export_settings` and `grid_restore_settings` MCP tools to allow the AI Assistant to export or restore layouts.
-  * Added Settings & Presets dropdown menu in example app with "Export Settings to JSON File", "Restore Settings from JSON", and "Reset Auto-Saved Settings".
-* Initial release of **AI Grid**: An intelligent, high-performance DataGrid for Flutter with native AI assistant and Model Context Protocol (MCP) skill control.
-* Built on top of [trina_grid](https://pub.dev/packages/trina_grid) for fast tabular virtualization and hierarchical grouping.
-* Native AI Agent integration powered by [dart_mcp_core](https://pub.dev/packages/dart_mcp_core).
-* 12 local MCP tools for real-time grid introspection, multi-column AND filtering, negative filtering, sorting, grouping, column visibility, and state management.
-* Built-in exact calculation engine (`grid_calculate`) for sums, averages, counts, min, max, and medians without LLM math hallucinations.
-* Export feature supporting fast and reliable CSV and JSON formats with flattened tabular structure compatible with Excel, Pandas, and BI tools.
-* Responsive layouts:
-  * Desktop: Floatable, moveable, and resizable AI assistant window (`draggable_overlay_window`).
-  * Mobile: Non-overflowing flexible toolbar with dropdown menus, full-screen assistant mode, and seamless 1-tap tab switching.
-* WebAssembly (WASM / `dart2wasm`) compatible.
-* Read-only editing mode default with per-column opt-in (`enableEditingMode: false`).
-* Automatic light and dark theme adaptation.
+### Advanced Filtering & Search
+* **Inline Column Filter Row**: Quick-filter inputs under column headers supporting text and numeric prefix syntax (`>`, `>=`, `<`, `<=`, `!=`, `=`, `..` ranges).
+* **Multi-Value "OR" & Checklist Filters**: Supports multi-value match (`inList`), comma/pipe-separated inputs, and natural queries (e.g. `in: New York, Denver` or `New York or Denver`).
+* **Multi-Column Filtering**: Applies multiple column filters simultaneously joined with AND logic.
+* **Negative Filtering**: Built-in support for `not equals` and `does not contain` conditions.
+* **Global Search Panel**: Real-time cross-column full-text search with match highlighting.
+
+### Multi-Level Grouping & Aggregations
+* **Interactive Drag-to-Group**: Drag column headers directly into the group panel to establish multi-level hierarchical grouping.
+* **Tree View Groups**: Collapsible group rows with group item counts and custom formatting.
+* **Aggregate Footers**: Built-in footer summaries displaying column metrics (Sum, Average, Min, Max, Count) with number formatting.
+
+### Interactive Column Management
+* **Interactive Column Resizing**: Draggable column header divider handles allow users to interactively resize column widths.
+* **Auto-Fit on Double Click**: Double-clicking any column divider handle automatically measures and sizes the column to fit cell contents.
+* **Flexible Sizing Policies**: Supports `auto`, `fixed`, `flex`, and `fitHeader` column sizing with custom `min` and `max` constraints.
+* **Column Header Menus**: 3-dots column menus on every header offering sort ascending/descending, filter dialogs, freeze/pin to start or end, auto-fit width, and one-click grouping.
+* **Column Visibility**: Show or hide individual columns, or isolate specific columns (`showOnly: [...]`).
+
+### Pure-Dart Excel (XLSX) & Data Export
+* **Native Excel Export**: Pure-Dart `.xlsx` spreadsheet export engine with zero native platform dependencies.
+* **Native Platform "Save As..." Integration**: Triggers platform-native directory selection and filename prompt (`file_saver`) across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
+* **CSV & JSON Export**: Flattened tabular export options for Excel, Pandas, and BI tooling.
+
+### Layout Persistence & Settings Presets
+* **State Persistence**: Complete export and restore of grid configurations (group columns, sorting, filters, visible columns, and column widths) to/from JSON.
+* **Automatic Layout Restoration (`autoSave`)**: Automatically saves and restores user layout preferences across app restarts using `SharedPreferences`.
+
+### Scroll & Theme Polish
+* **Dual-Axis Draggable Scrollbars**: Synchronized, visible, and interactive horizontal and vertical scrollbars.
+* **Theme Adaptation**: Automatic adaptation to ambient light and dark application themes.
