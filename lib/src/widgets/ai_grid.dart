@@ -1,18 +1,18 @@
-import 'package:flutter/material.dart';
 import 'package:draggable_overlay_window/draggable_overlay_window.dart';
-import 'package:trina_grid/trina_grid.dart';
+import 'package:material_ui/material_ui.dart';
 import '../config/ai_grid_config.dart';
 import '../config/ai_grid_settings_storage.dart';
 import '../controllers/ai_grid_controller.dart';
+import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_data_source.dart';
 import '../theme/ai_grid_theme.dart';
 import 'ai_grid_assistant_panel.dart';
 import 'ai_grid_group_panel.dart';
 import 'ai_grid_toolbar.dart';
 
-/// An intelligent DataGrid widget for Flutter.
+/// An intelligent DataGrid widget for Flutter powered by [FitGrid].
 ///
-/// Combines high-performance tabular virtualization, hierarchical grouping,
+/// Combines high-performance canvas virtualization, hierarchical grouping,
 /// inline column filtering, aggregate summary footers, global search,
 /// and native AI assistant capabilities with responsive desktop (floating window)
 /// and mobile (tab/full-screen view with dropdown actions) layouts.
@@ -22,11 +22,11 @@ class AiGrid extends StatefulWidget {
   final bool showToolbar;
   final bool enableAiAssistant;
   final AiGridConfig? aiConfig;
-  final TrinaGridConfiguration? configuration;
-  final Future<void> Function(String prompt)? onAiPrompt;
+  final FitGridThemeData? theme;
 
-  /// Custom footer callback (e.g. for custom pagination or status bars).
-  final CreateFooterCallBack? createFooter;
+  /// Optional configuration for backwards-compatibility.
+  final dynamic configuration;
+  final Future<void> Function(String prompt)? onAiPrompt;
 
   /// Whether client-side pagination should be enabled by default.
   final bool enablePagination;
@@ -60,9 +60,9 @@ class AiGrid extends StatefulWidget {
     this.showToolbar = true,
     this.enableAiAssistant = true,
     this.aiConfig,
+    this.theme,
     this.configuration,
     this.onAiPrompt,
-    this.createFooter,
     this.enablePagination = false,
     this.pageSize,
     this.showTotalRows = true,
@@ -79,9 +79,9 @@ class AiGrid extends StatefulWidget {
 
 class _AiGridState extends State<AiGrid> {
   late AiGridController _controller;
+  late FitGridController<Map<String, dynamic>> _fitController;
   late final DraggableWindowController _draggableWindowController;
   bool _internalController = false;
-  List<TrinaRow> _rows = [];
   bool _isLoading = true;
 
   @override
@@ -93,6 +93,24 @@ class _AiGridState extends State<AiGrid> {
       _controller = AiGridController();
       _internalController = true;
     }
+
+    final fitColumns = widget.dataSource.columns.map((c) => c.toFitGridColumn()).toList();
+    _fitController = FitGridController<Map<String, dynamic>>(
+      columns: fitColumns,
+      rows: const [],
+      selectionMode: FitGridSelectionMode.multiple,
+    );
+
+    if (widget.pageSize != null || widget.enablePagination) {
+      _fitController.pagination.enabled = true;
+      _fitController.pagination.pageSize = widget.pageSize ?? 40;
+    }
+
+    _controller.attach(
+      fitController: _fitController,
+      columns: widget.dataSource.columns,
+      dataSource: widget.dataSource,
+    );
 
     _draggableWindowController = DraggableWindowController(
       initialPosition: const Offset(360, 60),
@@ -157,6 +175,13 @@ class _AiGridState extends State<AiGrid> {
     if (widget.dataSource != oldWidget.dataSource) {
       oldWidget.dataSource.removeListener(_onDataSourceChanged);
       widget.dataSource.addListener(_onDataSourceChanged);
+      _fitController.columns.columns =
+          widget.dataSource.columns.map((c) => c.toFitGridColumn()).toList();
+      _controller.attach(
+        fitController: _fitController,
+        columns: widget.dataSource.columns,
+        dataSource: widget.dataSource,
+      );
       _loadData();
     }
   }
@@ -167,6 +192,7 @@ class _AiGridState extends State<AiGrid> {
     _controller.removeListener(_syncAiAssistantWindowState);
     _controller.removeListener(_onControllerStateChangedForAutoSave);
     _draggableWindowController.dispose();
+    _fitController.dispose();
     if (_internalController) {
       _controller.dispose();
     }
@@ -178,48 +204,15 @@ class _AiGridState extends State<AiGrid> {
   }
 
   Future<void> _loadData() async {
-    if (widget.dataSource is LazyAiGridDataSource) {
-      if (mounted) {
-        setState(() {
-          _rows = <TrinaRow>[];
-          _isLoading = false;
-        });
-      }
-      return;
-    }
     setState(() => _isLoading = true);
     final rows = await widget.dataSource.fetchRows();
     if (mounted) {
       setState(() {
-        _rows = rows;
+        _fitController.data.rows = rows;
         _isLoading = false;
       });
+      _restoreInitialSettingsIfNeeded();
     }
-  }
-
-  CreateFooterCallBack? _resolveFooter() {
-    if (widget.createFooter != null) {
-      return widget.createFooter;
-    }
-    if (widget.dataSource is LazyAiGridDataSource) {
-      final lazySource = widget.dataSource as LazyAiGridDataSource;
-      return (stateManager) => TrinaLazyPagination(
-            stateManager: stateManager,
-            fetch: lazySource.fetch,
-            fetchWithSorting: lazySource.fetchWithSorting,
-            fetchWithFiltering: lazySource.fetchWithFiltering,
-            showTotalRows: widget.showTotalRows,
-            enableGotoPage: widget.enableGotoPage,
-          );
-    }
-    if (widget.enablePagination || widget.pageSize != null) {
-      return (stateManager) => TrinaPagination(
-            stateManager,
-            showTotalRows: widget.showTotalRows,
-            enableGotoPage: widget.enableGotoPage,
-          );
-    }
-    return null;
   }
 
   @override
@@ -234,14 +227,10 @@ class _AiGridState extends State<AiGrid> {
       );
     }
 
-    final trinaColumns =
-        widget.dataSource.columns.map((c) => c.toTrinaColumn()).toList();
-
-    final config = widget.configuration ??
-        AiGridTheme.createThemeFromContext(
-          context,
-          showColumnFilter: _controller.showColumnFilterRow,
-        );
+    final effectiveTheme = widget.theme ??
+        (widget.configuration is FitGridThemeData
+            ? widget.configuration as FitGridThemeData
+            : AiGridTheme.createThemeFromContext(context));
 
     final borderColor = isDark
         ? colorScheme.outlineVariant.withAlpha(80)
@@ -272,16 +261,14 @@ class _AiGridState extends State<AiGrid> {
                           isDark,
                           colorScheme,
                           borderColor,
-                          config,
-                          trinaColumns,
+                          effectiveTheme,
                           isLlmConfigured,
                         )
                       : _buildDesktopLayout(
                           context,
                           isDark,
                           colorScheme,
-                          config,
-                          trinaColumns,
+                          effectiveTheme,
                           isLlmConfigured,
                         );
                 }(),
@@ -298,8 +285,7 @@ class _AiGridState extends State<AiGrid> {
     bool isDark,
     ColorScheme colorScheme,
     Color borderColor,
-    TrinaGridConfiguration config,
-    List<TrinaColumn> trinaColumns,
+    FitGridThemeData gridTheme,
     bool isLlmConfigured,
   ) {
     return Column(
@@ -313,7 +299,6 @@ class _AiGridState extends State<AiGrid> {
             onRefresh: _loadData,
           ),
         if (widget.enableAiAssistant && isLlmConfigured) ...[
-          // Sleek Mobile Mode Switcher Tab Bar
           Container(
             height: 38,
             decoration: BoxDecoration(
@@ -421,7 +406,6 @@ class _AiGridState extends State<AiGrid> {
             ),
           ),
         ],
-        // Body view: either Assistant full-screen or DataGrid + Group Panel
         if (_controller.showAiAssistant && widget.enableAiAssistant)
           Expanded(
             child: AiGridAssistantPanel(
@@ -435,25 +419,15 @@ class _AiGridState extends State<AiGrid> {
         else ...[
           AiGridGroupPanel(controller: _controller),
           Expanded(
-            child: TrinaGrid(
-              columns: trinaColumns,
-              rows: List<TrinaRow>.from(_rows),
-              configuration: config,
-              createFooter: _resolveFooter(),
-              onLoaded: (TrinaGridOnLoadedEvent event) {
-                _controller.attach(
-                  stateManager: event.stateManager,
-                  columns: widget.dataSource.columns,
-                  dataSource: widget.dataSource,
-                );
-                if (widget.pageSize != null) {
-                  event.stateManager.setPageSize(widget.pageSize!);
-                }
-                event.stateManager.setShowColumnFilter(
-                  _controller.showColumnFilterRow,
-                );
-                _restoreInitialSettingsIfNeeded();
-              },
+            child: FitGrid<Map<String, dynamic>>(
+              controller: _fitController,
+              theme: gridTheme,
+              showFilterRow: _controller.showColumnFilterRow,
+              reorderableColumns: true,
+              resizableColumns: true,
+              multiSort: true,
+              paginated: widget.enablePagination || widget.pageSize != null,
+              pageSize: widget.pageSize ?? 40,
             ),
           ),
         ],
@@ -465,8 +439,7 @@ class _AiGridState extends State<AiGrid> {
     BuildContext context,
     bool isDark,
     ColorScheme colorScheme,
-    TrinaGridConfiguration config,
-    List<TrinaColumn> trinaColumns,
+    FitGridThemeData gridTheme,
     bool isLlmConfigured,
   ) {
     return OverlayWindowStack(
@@ -530,25 +503,15 @@ class _AiGridState extends State<AiGrid> {
             ),
           AiGridGroupPanel(controller: _controller),
           Expanded(
-            child: TrinaGrid(
-              columns: trinaColumns,
-              rows: List<TrinaRow>.from(_rows),
-              configuration: config,
-              createFooter: _resolveFooter(),
-              onLoaded: (TrinaGridOnLoadedEvent event) {
-                _controller.attach(
-                  stateManager: event.stateManager,
-                  columns: widget.dataSource.columns,
-                  dataSource: widget.dataSource,
-                );
-                if (widget.pageSize != null) {
-                  event.stateManager.setPageSize(widget.pageSize!);
-                }
-                event.stateManager.setShowColumnFilter(
-                  _controller.showColumnFilterRow,
-                );
-                _restoreInitialSettingsIfNeeded();
-              },
+            child: FitGrid<Map<String, dynamic>>(
+              controller: _fitController,
+              theme: gridTheme,
+              showFilterRow: _controller.showColumnFilterRow,
+              reorderableColumns: true,
+              resizableColumns: true,
+              multiSort: true,
+              paginated: widget.enablePagination || widget.pageSize != null,
+              pageSize: widget.pageSize ?? 40,
             ),
           ),
         ],

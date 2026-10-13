@@ -1,6 +1,6 @@
 # AI Grid (`ai_grid`)
 
-[![pub version](https://img.shields.io/badge/pub-v0.0.2-blue.svg)](https://pub.dev/packages/ai_grid)
+[![pub version](https://img.shields.io/badge/pub-v0.0.3-blue.svg)](https://pub.dev/packages/ai_grid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.24.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![WASM Ready](https://img.shields.io/badge/WebAssembly-WASM%20Compatible-success.svg)](https://flutter.dev/to/wasm)
@@ -9,17 +9,18 @@
 
 ![AI Grid Showcase](example_1.png)
 
-* **Grid Engine**: Built on top of **[trina_grid](https://pub.dev/packages/trina_grid)** — providing fast cell virtualization, sticky hierarchical row grouping, inline filtering, multi-sort, and footers.
+* **Grid Engine**: Powered by **[fitgrid_table](https://pub.dev/packages/fitgrid_table)** — measuring your content instead of guessing widths, painting cells via direct canvas rendering (~3ms frame times on 1M rows), sticky hierarchical row grouping, isolate multi-sort, and summary footers.
 * **AI Agent & Tool Orchestration**: Powered by **[dart_mcp_core](https://pub.dev/packages/dart_mcp_core)** — exposing structured MCP local tools for real-time schema introspection, precise in-engine math calculations, multi-column filtering, and natural language table operations.
 
 ---
 
 ## ✨ Key Features
 
-### 1. ⚡ High-Performance Virtualized DataGrid
-* **Infinite & Virtualized Rendering**: Smooth 60/120 FPS scrolling over thousands of rows without performance bottlenecks.
+### 1. ⚡ High-Performance Canvas DataGrid
+* **Direct Canvas Rendering**: Cells are painted directly to the canvas rather than building hundreds of individual widgets, delivering consistent 60/120 FPS scrolling even over 1,000,000 rows.
+* **Content-Based Auto-Sizing**: Automatically measures content to fit columns without manual pixel width calculations.
 * **Hierarchical Row Grouping**: Drag-and-drop column headers or trigger grouping programmatically with aggregate rollups.
-* **Multi-Column Sorting**: Prioritized sorting across multiple columns with ascending/descending indicators.
+* **Multi-Column Sorting**: Prioritized multi-column sorting with background isolate execution for massive datasets.
 * **Inline Column Filtering**: Individual column filter row supporting contains, equals, starts with, ends with, and comparison operators.
 * **Aggregate Footers**: Auto-computed sum, average, min, max, and count summary rows.
 
@@ -56,22 +57,21 @@
   * Instant 1-tap Mode Switcher tab bar (`[ 📊 Data Grid ]` | `[ ✨ AI Assistant ]`).
   * Full-screen mobile assistant view with quick `[← Back to Data Grid]` navigation.
 
-### 6. 📤 Fast & Reliable Data Export (CSV & JSON)
+### 6. 📤 Fast & Pure-Dart Data Export (Excel XLSX, CSV, TSV, & JSON)
 * Built-in **Export Dialog** accessible via toolbar, menu, or natural language AI command (`grid_export`):
-  * **Formats**: Clean CSV and JSON (PDF export was removed to avoid column truncation and layout issues).
+  * **Formats**: Native Excel (`.xlsx`), CSV, TSV, and JSON.
+  * **Pure-Dart Excel**: Generates `.xlsx` workbooks directly in Dart with zero C/C++ native dependencies or platform channels.
   * **Flattened Tabular Output**: Grouped rows are exported as clean, flattened tabular records with grouping column values preserved on each row—ensuring immediate compatibility with Excel, Pandas, SQL databases, and BI tools without hierarchy distortions.
-  * **Custom Delimiters**: Comma (`,`), Semicolon (`;`), Tab (`	`).
+  * **Custom Delimiters**: Comma (`,`), Semicolon (`;`), Tab (`\t`).
   * **Options**: Include column headers, ignore fixed/frozen rows.
   * **Column Selector**: Interactive checklist to choose which columns to export with "Select All" / "Deselect All".
   * **Multi-Platform Saving**: Utilizes [`file_saver`](https://pub.dev/packages/file_saver) for native file save dialogs on Windows/macOS/Linux/mobile and browser downloads on Web.
 
 ### 7. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
-* **Client-Side Pagination**: Simple opt-in via `enablePagination: true` and `pageSize: 25`, rendering an interactive page-navigation footer with total row counts and "Go to Page" dialog.
+* **Client-Side Pagination**: Simple opt-in via `enablePagination: true` and `pageSize: 25`, rendering an interactive page-navigation footer with total row counts and page controls.
 * **Server-Side Partial Data Load (`LazyAiGridDataSource`)**:
-  * Directly supports `trina_grid`'s **`TrinaLazyPagination`** architecture.
   * Only requests and loads the slice of records for the active page from your backend or REST/GraphQL API.
-  * Dynamically passes current page, page size, active column sorting, and active filter criteria to your `fetch` callback via `TrinaLazyPaginationRequest`.
-* **Custom Footers**: Pass `createFooter: (stateManager) => ...` for custom status bars, infinite scrolling (`TrinaInfinityScrollRows`), or specialized widgets.
+  * Dynamically passes current page, page size, active column sorting, and active filter criteria to your `fetch` callback.
 
 ### 8. 🌐 WebAssembly (WASM) Compatible
 * Fully verified with Flutter WebAssembly (`dart2wasm`).

@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../config/ai_grid_config.dart';
 import '../controllers/ai_grid_controller.dart';

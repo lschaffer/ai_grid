@@ -1,4 +1,4 @@
-export 'package:trina_grid/trina_grid.dart';
+export 'src/fitgrid/fitgrid_table.dart';
 export 'src/models/ai_grid_column.dart';
 export 'src/models/ai_grid_data_source.dart';
 export 'src/controllers/ai_grid_controller.dart';

@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_grid/ai_grid.dart';
@@ -244,8 +244,8 @@ void main() {
         field: 'test',
         title: 'Test',
         enableEditingMode: false,
-      ).toTrinaColumn();
-      expect(testCol.enableEditingMode, isFalse);
+      ).toFitGridColumn();
+      expect(testCol.isEditable, isFalse);
 
       // Test state
       final stateRes = await stateTool.execute({});
@@ -342,21 +342,13 @@ void main() {
 
       final lazyDs = LazyAiGridDataSource(
         columns: cols,
-        fetch: (request) async {
-          final page = request.page;
-          final pageSize = request.pageSize;
-          final rows = List.generate(
+        fetch: ({required page, required pageSize, sortColumn, descending = false, searchQuery}) async {
+          return List.generate(
             pageSize,
-            (i) => TrinaRow(
-              cells: {
-                'id': TrinaCell(value: (page - 1) * pageSize + i + 1),
-                'name': TrinaCell(value: 'Item ${(page - 1) * pageSize + i + 1}'),
-              },
-            ),
-          );
-          return TrinaLazyPaginationResponse(
-            totalPage: 10,
-            rows: rows,
+            (i) => {
+              'id': (page - 1) * pageSize + i + 1,
+              'name': 'Item ${(page - 1) * pageSize + i + 1}',
+            },
           );
         },
         totalRowCountGetter: () => 100,

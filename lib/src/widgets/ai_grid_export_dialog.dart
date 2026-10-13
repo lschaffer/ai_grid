@@ -1,11 +1,7 @@
-import 'dart:convert';
-import 'dart:typed_data';
-import 'package:file_saver/file_saver.dart';
-import 'package:flutter/material.dart';
-import 'package:trina_grid/trina_grid.dart';
+import 'package:material_ui/material_ui.dart';
 import '../controllers/ai_grid_controller.dart';
 
-/// Dialog for configuring and exporting grid data as CSV or JSON.
+/// Dialog for configuring and exporting grid data as CSV, XLSX, TSV, or JSON.
 class AiGridExportDialog extends StatefulWidget {
   final AiGridController controller;
 
@@ -27,9 +23,8 @@ class AiGridExportDialog extends StatefulWidget {
 }
 
 class _AiGridExportDialogState extends State<AiGridExportDialog> {
-  String _selectedFormat = 'csv';
+  String _selectedFormat = 'xlsx';
   bool _includeHeaders = true;
-  bool _ignoreFixedRows = false;
   String _csvSeparator = ',';
   bool _isExporting = false;
   String? _statusMessage;
@@ -47,8 +42,7 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
   }
 
   Future<void> _handleExport() async {
-    final sm = widget.controller.stateManager;
-    if (sm == null) {
+    if (!widget.controller.isAttached) {
       setState(() {
         _isError = true;
         _statusMessage = 'Grid is not ready for export.';
@@ -75,38 +69,13 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
       _isError = false;
     });
 
-    final fileName = 'grid_export_${DateTime.now().millisecondsSinceEpoch}';
-
     try {
-      String savedPath = '';
-      if (_selectedFormat == 'csv') {
-        final content = await TrinaGridExportCsv().export(
-          stateManager: sm,
-          columns: chosenColumns,
-          includeHeaders: _includeHeaders,
-          separator: _csvSeparator,
-          ignoreFixedRows: _ignoreFixedRows,
-        );
-        savedPath = await FileSaver.instance.saveFile(
-          name: fileName,
-          bytes: Uint8List.fromList(utf8.encode(content)),
-          fileExtension: 'csv',
-          mimeType: MimeType.csv,
-        );
-      } else if (_selectedFormat == 'json') {
-        final content = await TrinaGridExportJson().export(
-          stateManager: sm,
-          columns: chosenColumns,
-          includeHeaders: _includeHeaders,
-          ignoreFixedRows: _ignoreFixedRows,
-        );
-        savedPath = await FileSaver.instance.saveFile(
-          name: fileName,
-          bytes: Uint8List.fromList(utf8.encode(content)),
-          fileExtension: 'json',
-          mimeType: MimeType.json,
-        );
-      }
+      final savedPath = await widget.controller.exportGrid(
+        format: _selectedFormat,
+        columns: chosenColumns,
+        includeHeaders: _includeHeaders,
+        separator: _csvSeparator,
+      );
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -154,7 +123,7 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
         ],
       ),
       content: SizedBox(
-        width: 440,
+        width: 460,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -164,6 +133,11 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [
+                  ButtonSegment(
+                    value: 'xlsx',
+                    label: Text('Excel (XLSX)'),
+                    icon: Icon(Icons.table_view_outlined, size: 16),
+                  ),
                   ButtonSegment(
                     value: 'csv',
                     label: Text('CSV'),
@@ -188,13 +162,6 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
                 value: _includeHeaders,
                 onChanged: (val) => setState(() => _includeHeaders = val ?? true),
               ),
-              CheckboxListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Ignore fixed/frozen rows', style: TextStyle(fontSize: 13)),
-                value: _ignoreFixedRows,
-                onChanged: (val) => setState(() => _ignoreFixedRows = val ?? false),
-              ),
               if (_selectedFormat == 'csv') ...[
                 const SizedBox(height: 8),
                 const Text('CSV Separator:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
@@ -205,7 +172,7 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
                     const SizedBox(width: 8),
                     _separatorButton(';', 'Semicolon (;)'),
                     const SizedBox(width: 8),
-                    _separatorButton('\t', 'Tab (\t)'),
+                    _separatorButton('\t', 'Tab (\\t)'),
                   ],
                 ),
               ],
@@ -250,14 +217,18 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: ListView(
-                  children: _selectedColumns.keys.map((colTitle) {
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  children: _selectedColumns.entries.map((entry) {
                     return CheckboxListTile(
                       dense: true,
+                      controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      title: Text(colTitle, style: const TextStyle(fontSize: 13)),
-                      value: _selectedColumns[colTitle] ?? false,
+                      title: Text(entry.key, style: const TextStyle(fontSize: 13)),
+                      value: entry.value,
                       onChanged: (val) {
-                        setState(() => _selectedColumns[colTitle] = val ?? false);
+                        setState(() {
+                          _selectedColumns[entry.key] = val ?? false;
+                        });
                       },
                     );
                   }).toList(),
@@ -271,27 +242,15 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
                     color: _isError ? Colors.red.shade50 : Colors.green.shade50,
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                      color: _isError ? Colors.red.shade200 : Colors.green.shade200,
+                      color: _isError ? Colors.red.shade300 : Colors.green.shade300,
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _isError ? Icons.error_outline : Icons.check_circle_outline,
-                        color: _isError ? Colors.red : Colors.green,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          _statusMessage!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _isError ? Colors.red.shade900 : Colors.green.shade900,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    _statusMessage!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _isError ? Colors.red.shade900 : Colors.green.shade900,
+                    ),
                   ),
                 ),
               ],
@@ -313,26 +272,24 @@ class _AiGridExportDialogState extends State<AiGridExportDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : const Icon(Icons.file_download, size: 16),
-          label: Text(_isExporting ? 'Exporting...' : 'Export'),
+          label: Text(_isExporting ? 'Exporting...' : 'Export File'),
         ),
       ],
     );
   }
 
-  Widget _separatorButton(String val, String label) {
-    final isSelected = _csvSeparator == val;
+  Widget _separatorButton(String sep, String label) {
+    final isSelected = _csvSeparator == sep;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return ChoiceChip(
       label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: isSelected,
-      onSelected: (_) => setState(() => _csvSeparator = val),
+      onSelected: (selected) {
+        if (selected) setState(() => _csvSeparator = sep);
+      },
       selectedColor: colorScheme.primaryContainer,
-      labelStyle: TextStyle(
-        color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
     );
   }
 }

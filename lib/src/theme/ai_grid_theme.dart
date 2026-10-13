@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:trina_grid/trina_grid.dart';
+import 'package:material_ui/material_ui.dart';
+import '../fitgrid/fitgrid_table.dart';
 
 /// Provides theme configurations for [AiGrid].
 ///
@@ -19,108 +19,53 @@ class AiGridTheme {
   static const Color rowHoverColor = Color(0xFFF0F7FF);
   static const Color chipBackground = Color(0xFFFFFFFF);
 
-  /// Automatically derives a [TrinaGridConfiguration] from the parent app's [ThemeData].
+  /// Automatically derives a [FitGridThemeData] from the parent app's [ThemeData].
   ///
   /// Seamlessly adapts to Dark Mode, Light Mode, and custom brand colors.
-  static TrinaGridConfiguration createThemeFromContext(
+  static FitGridThemeData createThemeFromContext(
     BuildContext context, {
-    bool showColumnFilter = true,
+    FitGridDensity density = FitGridDensity.standard,
   }) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final colorScheme = theme.colorScheme;
-
-    final bgColor = isDark ? colorScheme.surface : Colors.white;
-    final oddRowColor = isDark
-        ? colorScheme.surfaceContainer
-        : const Color(0xFFFAFAFA);
-    final gridBorder = isDark
-        ? colorScheme.outlineVariant.withAlpha(80)
-        : borderColor;
-    final txtColor = colorScheme.onSurface;
-    final headerBg = isDark
-        ? colorScheme.surfaceContainerHighest
-        : const Color(0xFFF8FAFC);
-
-    return TrinaGridConfiguration(
-      style: TrinaGridStyleConfig(
-        gridBackgroundColor: bgColor,
-        rowColor: bgColor,
-        oddRowColor: bgColor,
-        evenRowColor: oddRowColor,
-        borderColor: gridBorder,
-        activatedBorderColor: colorScheme.primary,
-        inactivatedBorderColor: gridBorder,
-        columnTextStyle: TextStyle(
-          color: txtColor,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'Segoe UI',
-        ),
-        cellTextStyle: TextStyle(
-          color: txtColor,
-          fontSize: 13,
-          fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'Segoe UI',
-        ),
-        columnHeight: 44,
-        rowHeight: 40,
-        columnFilterHeight: 38,
-        filterHeaderColor: headerBg,
-        defaultColumnFilterPadding: const EdgeInsets.symmetric(
-          horizontal: 6,
-          vertical: 3,
-        ),
-        enableColumnBorderVertical: true,
-        enableColumnBorderHorizontal: true,
-        enableCellBorderVertical: true,
-        enableCellBorderHorizontal: true,
-      ),
-      columnFilter: TrinaGridColumnFilterConfig(
-        filters: FilterHelper.defaultFilters,
-      ),
-    );
+    return FitGridThemeData.fromTheme(theme, density: density);
   }
 
-  /// Creates a standard Fluent-style [TrinaGridConfiguration].
-  static TrinaGridConfiguration createFluentConfiguration({
-    bool showColumnFilter = true,
+  /// Creates a standard Fluent-style [FitGridThemeData].
+  static FitGridThemeData createFluentConfiguration({
+    FitGridDensity density = FitGridDensity.standard,
   }) {
-    return TrinaGridConfiguration(
-      style: const TrinaGridStyleConfig(
-        gridBackgroundColor: backgroundLight,
-        rowColor: backgroundLight,
-        oddRowColor: backgroundLight,
-        evenRowColor: Color(0xFFFAFAFA),
-        borderColor: borderColor,
-        activatedBorderColor: activatedBorderColor,
-        inactivatedBorderColor: borderColor,
-        columnTextStyle: TextStyle(
-          color: textColor,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          fontFamily: 'Segoe UI',
-        ),
-        cellTextStyle: TextStyle(
-          color: textColor,
-          fontSize: 13,
-          fontFamily: 'Segoe UI',
-        ),
-        columnHeight: 44,
-        rowHeight: 40,
-        columnFilterHeight: 38,
-        filterHeaderColor: Color(0xFFF8FAFC),
-        defaultColumnFilterPadding: EdgeInsets.symmetric(
-          horizontal: 6,
-          vertical: 3,
-        ),
-        enableColumnBorderVertical: true,
-        enableColumnBorderHorizontal: true,
-        enableCellBorderVertical: true,
-        enableCellBorderHorizontal: true,
+    final divider = borderColor;
+
+    return FitGridThemeData(
+      headerBackground: headerBackground,
+      headerForeground: textColor,
+      headerTextStyle: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: textColor,
+        fontFamily: 'Segoe UI',
       ),
-      columnFilter: TrinaGridColumnFilterConfig(
-        filters: FilterHelper.defaultFilters,
+      rowBackground: backgroundLight,
+      alternateRowBackground: const Color(0xFFFAFAFA),
+      cellTextStyle: const TextStyle(
+        fontSize: 13,
+        color: textColor,
+        fontFamily: 'Segoe UI',
       ),
+      rowDivider: divider,
+      columnDivider: divider,
+      border: divider,
+      hoverBackground: rowHoverColor,
+      selectedBackground: const Color(0xFFE5F1FB),
+      focusOutline: activatedBorderColor,
+      sortIconColor: textMuted,
+      placeholderForeground: textMuted,
+      tooltipBackground: const Color(0xFF2D3748),
+      tooltipForeground: Colors.white,
+      searchHighlight: const Color(0xFFFFE082),
+      frozenShadow: Colors.black.withAlpha(20),
+      groupHeaderBackground: groupPanelBackground,
+      density: density,
     );
   }
 }

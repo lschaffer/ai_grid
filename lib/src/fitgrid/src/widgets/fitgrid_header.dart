@@ -1,0 +1,849 @@
+import 'dart:math' as math;
+
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter/semantics.dart';
+
+import '../model/column_group.dart';
+import '../model/enums.dart';
+import '../model/fitgrid_column.dart';
+import '../model/sort_key.dart';
+import '../sizing/column_layout.dart';
+import '../theme/fitgrid_strings.dart';
+import '../theme/fitgrid_theme.dart';
+
+/// The pinned header row.
+///
+/// Built from real widgets, unlike the body. That is not an inconsistency: the
+/// header is one row, so the widget cost is a rounding error, and it is the
+/// part of the grid that needs tap targets, hover states, drag handles and
+/// tooltips — everything widgets are good at. Spend widgets where they buy
+/// something.
+///
+/// It mirrors the body's band geometry rather than reimplementing it: pinned
+/// columns are laid out against the viewport, scrolling ones against the scroll
+/// offset, and the scrolling band is the only thing clipped. A header that
+/// computed its own positions would drift out of step with the body by exactly
+/// one rounding error per resize.
+class FitGridHeader<T> extends StatelessWidget {
+  const FitGridHeader({
+    required this.columns,
+    required this.layout,
+    required this.theme,
+    required this.horizontalOffset,
+    this.sortColumnId,
+    this.sortDirection = FitGridSortDirection.none,
+    this.sortKeys = const <FitGridSortKey>[],
+    required this.onSort,
+    this.onResize,
+    this.onResizeEnd,
+    this.onAutoSize,
+    this.onReorder,
+    this.onColumnMenu,
+    this.activeFilters = const <String>{},
+    this.columnGroups = const <FitGridColumnGroup>[],
+    super.key,
+  });
+
+  final List<FitGridColumn<T>> columns;
+  final FitGridColumnLayout layout;
+  final FitGridThemeData theme;
+  final double horizontalOffset;
+  final String? sortColumnId;
+  final FitGridSortDirection sortDirection;
+
+  /// The whole sort, highest priority first. When it is set it wins over
+  /// [sortColumnId] and [sortDirection], and with more than one key each
+  /// sorted header shows its priority beside the arrow.
+  final List<FitGridSortKey> sortKeys;
+
+  final ValueChanged<String>? onSort;
+
+  /// Where a column sits in the sort and which way it runs, or (-1, none).
+  (int, FitGridSortDirection) sortStateOf(String columnId) {
+    if (sortKeys.isNotEmpty) {
+      for (var i = 0; i < sortKeys.length; i++) {
+        if (sortKeys[i].columnId == columnId) {
+          return (i, sortKeys[i].direction);
+        }
+      }
+      return (-1, FitGridSortDirection.none);
+    }
+    return columnId == sortColumnId
+        ? (0, sortDirection)
+        : (-1, FitGridSortDirection.none);
+  }
+
+  /// Called with a column id and the width the user has dragged it to. The
+  /// width is raw: the sizer still clamps it against the column's own policy,
+  /// so a drag cannot push a column past bounds it declared.
+  final void Function(String columnId, double width)? onResize;
+
+  /// Called once when a resize drag ends, with the width it was left at.
+  final void Function(String columnId, double width)? onResizeEnd;
+
+  /// Called when the user double-clicks a resize handle, asking for the column
+  /// to size itself again.
+  final ValueChanged<String>? onAutoSize;
+
+  /// Called when a header cell is dragged onto another, with the two column
+  /// ids. Null leaves columns where they were declared.
+  final void Function(String movedId, String targetId)? onReorder;
+
+  /// Opens the column menu for a column. Given the context of the button that
+  /// asked, so the menu can be anchored to it. Null shows no menu button.
+  final void Function(String columnId, BuildContext anchor)? onColumnMenu;
+
+  /// Ids of the columns carrying a filter, whose headers show a filter glyph.
+  final Set<String> activeFilters;
+
+  /// Bands spanning several columns, drawn as a row above their headers.
+  final List<FitGridColumnGroup> columnGroups;
+
+  /// Height of the band row. Nothing when there are no groups, so a grid
+  /// without them keeps the header height it always had.
+  static double groupRowHeight(
+    FitGridThemeData theme,
+    List<FitGridColumnGroup> groups,
+  ) => groups.isEmpty
+      ? 0.0
+      : (theme.effectiveHeaderHeight * 0.75).roundToDouble();
+
+  /// Total height of the header, band row included.
+  static double heightFor(
+    FitGridThemeData theme,
+    List<FitGridColumnGroup> groups,
+  ) => theme.effectiveHeaderHeight + groupRowHeight(theme, groups);
+
+  /// The group each column belongs to, by id.
+  Map<String, FitGridColumnGroup> get _groupOf {
+    final out = <String, FitGridColumnGroup>{};
+    for (final group in columnGroups) {
+      for (final id in group.columnIds) {
+        out.putIfAbsent(id, () => group);
+      }
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textDirection = Directionality.of(context);
+
+    return SizedBox(
+      height: heightFor(theme, columnGroups),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final viewport = constraints.maxWidth;
+          final leading = layout.leadingFrozenWidth;
+          final trailing = layout.trailingFrozenWidth;
+          final bandWidth = math.max(0.0, viewport - leading - trailing);
+
+          return ClipRect(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ColoredBox(color: theme.headerBackground),
+                ),
+                // The scrolling band is the only part that moves, and the only
+                // part that needs clipping. Its children are positioned
+                // relative to the band, so the same offsets the body uses work
+                // here unchanged.
+                Positioned.directional(
+                  textDirection: textDirection,
+                  start: leading,
+                  top: 0,
+                  bottom: 0,
+                  width: bandWidth,
+                  child: ClipRect(
+                    child: _Band<T>(
+                      header: this,
+                      textDirection: textDirection,
+                      firstColumn: layout.leadingFrozenCount,
+                      lastColumn: layout.trailingFrozenStart,
+                      origin: leading + horizontalOffset,
+                      clipped: true,
+                    ),
+                  ),
+                ),
+                if (layout.leadingFrozenCount > 0)
+                  Positioned.directional(
+                    textDirection: textDirection,
+                    start: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: leading,
+                    child: _Band<T>(
+                      header: this,
+                      textDirection: textDirection,
+                      firstColumn: 0,
+                      lastColumn: layout.leadingFrozenCount,
+                      origin: 0,
+                      clipped: false,
+                    ),
+                  ),
+                if (layout.trailingFrozenStart < layout.length)
+                  Positioned.directional(
+                    textDirection: textDirection,
+                    start: viewport - trailing,
+                    top: 0,
+                    bottom: 0,
+                    width: trailing,
+                    child: _Band<T>(
+                      header: this,
+                      textDirection: textDirection,
+                      firstColumn: layout.trailingFrozenStart,
+                      lastColumn: layout.length,
+                      origin: layout.offsets[layout.trailingFrozenStart],
+                      clipped: false,
+                    ),
+                  ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    height: theme.dividerThickness,
+                    color: theme.border,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  bool canResize(FitGridColumn<T> column) =>
+      onResize != null && column.resizable && !column.width.isPinned;
+
+  /// Hit width of the handle on the trailing edge of column [i].
+  ///
+  /// A finger is much wider than a divider, so the target is far wider than the
+  /// grip drawn on it. It cannot simply be as wide as it likes, though: the
+  /// strip straddles two columns, and a target wide enough to cover a narrow
+  /// column entirely would eat that column's own header tap. So it gives up
+  /// half of whichever neighbour is narrower, and no more.
+  double targetWidth(int i) {
+    final here = layout.widths[i];
+    final next = i + 1 < layout.length ? layout.widths[i + 1] : here;
+    final room = math.min(here, next);
+    return math.max(
+      theme.resizeHandleWidth,
+      math.min(theme.resizeTouchTargetWidth, room),
+    );
+  }
+}
+
+/// One contiguous run of header cells, positioned relative to [origin] in
+/// content space.
+class _Band<T> extends StatelessWidget {
+  const _Band({
+    required this.header,
+    required this.textDirection,
+    required this.firstColumn,
+    required this.lastColumn,
+    required this.origin,
+    required this.clipped,
+  });
+
+  final FitGridHeader<T> header;
+  final TextDirection textDirection;
+  final int firstColumn;
+  final int lastColumn;
+  final double origin;
+
+  /// Whether the band is inside a clip, which decides whether a resize handle
+  /// straddling its edge survives. The pinned bands are exactly as wide as
+  /// their content and are not clipped, so their handles overhang into the
+  /// scrolling band the way the eye expects.
+  final bool clipped;
+
+  @override
+  Widget build(BuildContext context) {
+    if (lastColumn <= firstColumn) return const SizedBox.shrink();
+    final layout = header.layout;
+    final groupOf = header._groupOf;
+    final bandHeight = FitGridHeader.groupRowHeight(
+      header.theme,
+      header.columnGroups,
+    );
+    FitGridColumnGroup? groupAt(int i) => groupOf[header.columns[i].id];
+
+    // Contiguous runs of one group, within this band only: a group split by a
+    // pin or a drag gets a band per run, each over its own columns.
+    final runs = <(int, int, FitGridColumnGroup)>[];
+    for (var i = firstColumn; i < lastColumn;) {
+      final group = groupAt(i);
+      var end = i + 1;
+      while (end < lastColumn && groupAt(end) == group && group != null) {
+        end++;
+      }
+      if (group != null) runs.add((i, end, group));
+      i = end;
+    }
+
+    return Stack(
+      clipBehavior: clipped ? Clip.hardEdge : Clip.none,
+      children: [
+        for (final (start, end, group) in runs)
+          Positioned.directional(
+            textDirection: textDirection,
+            start: layout.offsets[start] - origin,
+            top: 0,
+            height: bandHeight,
+            width: layout.offsets[end] - layout.offsets[start],
+            child: _GroupCell(
+              group: group,
+              theme: header.theme,
+              isLast: end == layout.length,
+            ),
+          ),
+        for (var i = firstColumn; i < lastColumn; i++)
+          Positioned.directional(
+            textDirection: textDirection,
+            start: layout.offsets[i] - origin,
+            // An ungrouped column's header takes both rows, so it reads as
+            // one cell rather than a label under an empty band.
+            top: groupAt(i) == null ? 0 : bandHeight,
+            bottom: 0,
+            width: layout.widths[i],
+            child: _HeaderCell<T>(
+              column: header.columns[i],
+              width: layout.widths[i],
+              theme: header.theme,
+              isLast: i == layout.length - 1,
+              direction: header.sortStateOf(header.columns[i].id).$2,
+              // A priority is only worth showing when there is more than one
+              // key to rank: "1" beside the only sorted column is noise.
+              sortPriority: header.sortKeys.length > 1
+                  ? header.sortStateOf(header.columns[i].id).$1
+                  : -1,
+              onTap: header.columns[i].sortable && header.onSort != null
+                  ? () => header.onSort!(header.columns[i].id)
+                  : null,
+              onReorder: header.onReorder,
+              onMenu:
+                  header.onColumnMenu == null ||
+                      header.columns[i].id.startsWith('__fitgrid')
+                  ? null
+                  : (anchor) =>
+                        header.onColumnMenu!(header.columns[i].id, anchor),
+              filtered: header.activeFilters.contains(header.columns[i].id),
+            ),
+          ),
+        // The handles are a sibling layer rather than children of the cells: a
+        // handle straddles the divider, so half of it belongs to the next
+        // column along, and a child cannot be hit outside its parent's box.
+        for (var i = firstColumn; i < lastColumn; i++)
+          if (header.canResize(header.columns[i]))
+            Positioned.directional(
+              textDirection: textDirection,
+              // Offsets are measured from the leading edge, which is the right
+              // one in RTL — so this is the same sum in both directions.
+              start: layout.offsets[i + 1] - origin - header.targetWidth(i) / 2,
+              top: groupAt(i) == null ? 0 : bandHeight,
+              bottom: 0,
+              width: header.targetWidth(i),
+              child: _ResizeHandle(
+                theme: header.theme,
+                textDirection: textDirection,
+                startWidth: layout.widths[i],
+                clamp: header.columns[i].width.clamp,
+                onResize: (width) =>
+                    header.onResize!(header.columns[i].id, width),
+                onResizeEnd: header.onResizeEnd == null
+                    ? null
+                    : (width) =>
+                          header.onResizeEnd!(header.columns[i].id, width),
+                onAutoSize: header.onAutoSize == null
+                    ? null
+                    : () => header.onAutoSize!(header.columns[i].id),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+/// One band of the group row, spanning its columns.
+class _GroupCell extends StatelessWidget {
+  const _GroupCell({
+    required this.group,
+    required this.theme,
+    required this.isLast,
+  });
+
+  final FitGridColumnGroup group;
+  final FitGridThemeData theme;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final divider = BorderSide(
+      color: theme.columnDivider,
+      width: theme.dividerThickness,
+    );
+    Widget cell = DecoratedBox(
+      decoration: BoxDecoration(
+        border: BorderDirectional(
+          bottom: divider,
+          end: isLast ? BorderSide.none : divider,
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: theme.effectiveHeaderPadding.left,
+        ),
+        child: Center(
+          child: Text(
+            group.label,
+            style: theme.headerTextStyle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+    );
+    if (group.tooltip != null) {
+      cell = Tooltip(message: group.tooltip!, child: cell);
+    }
+    return Semantics(
+      container: true,
+      header: true,
+      child: ClipRect(child: cell),
+    );
+  }
+}
+
+/// The grab area straddling a column's trailing divider.
+///
+/// Drag it to set the column's width; double-click it to hand the column back
+/// to its own width policy, which for the `auto` columns this package is built
+/// around means measuring the content again.
+///
+/// The drag is tracked against the width the column started at rather than read
+/// back from the layout each frame. Reading it back would compound rounding,
+/// and worse, would stall the moment the column hit a clamp: the pointer would
+/// keep moving while the width did not, and the two would never agree again.
+///
+/// The tracked width is clamped by the column's own bounds as it goes. Left
+/// unclamped, a drag past the column's max would bank the overshoot, and
+/// dragging back would do nothing until the pointer had paid all of it back.
+class _ResizeHandle extends StatefulWidget {
+  const _ResizeHandle({
+    required this.theme,
+    required this.textDirection,
+    required this.startWidth,
+    required this.clamp,
+    required this.onResize,
+    required this.onResizeEnd,
+    required this.onAutoSize,
+  });
+
+  final FitGridThemeData theme;
+  final TextDirection textDirection;
+  final double startWidth;
+
+  /// The column's width policy bounds, applied to the tracked width.
+  final double Function(double width) clamp;
+  final ValueChanged<double> onResize;
+  final ValueChanged<double>? onResizeEnd;
+  final VoidCallback? onAutoSize;
+
+  @override
+  State<_ResizeHandle> createState() => _ResizeHandleState();
+}
+
+class _ResizeHandleState extends State<_ResizeHandle> {
+  bool _hovered = false;
+  bool _dragging = false;
+  double _width = 0.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _hovered || _dragging;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onDoubleTap: widget.onAutoSize,
+        onHorizontalDragStart: (_) => setState(() {
+          _dragging = true;
+          _width = widget.startWidth;
+        }),
+        onHorizontalDragUpdate: (details) {
+          // In RTL a column grows as the pointer moves left, so the gesture's
+          // dx means the opposite thing. Flipping it here keeps everything
+          // downstream in plain widths.
+          final delta = widget.textDirection == TextDirection.rtl
+              ? -details.delta.dx
+              : details.delta.dx;
+          _width = widget.clamp(
+            math.max(widget.theme.minColumnWidth, _width + delta),
+          );
+          widget.onResize(_width);
+        },
+        onHorizontalDragEnd: (_) {
+          setState(() => _dragging = false);
+          widget.onResizeEnd?.call(_width);
+        },
+        onHorizontalDragCancel: () => setState(() => _dragging = false),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // The bar only shows while the handle is engaged. A permanent one
+            // would compete with the column divider it sits on.
+            if (active)
+              Positioned.fill(
+                child: Center(
+                  child: SizedBox(
+                    width: widget.theme.dividerThickness * 2,
+                    child: ColoredBox(color: widget.theme.focusOutline),
+                  ),
+                ),
+              ),
+            // The grip itself is always drawn, quietly, so the column is
+            // visibly draggable before the pointer arrives — and so a touch
+            // user, who has no hover state and no cursor to change, can see
+            // that the divider does something.
+            //
+            // The glyph is centred on the divider and sized independently of
+            // the strip it hangs in: the strip is a finger-sized hit target,
+            // and drawing a grip that wide would look like a smudge.
+            OverflowBox(
+              maxWidth: widget.theme.sortIconSize,
+              child: Icon(
+                widget.theme.resizeGripIcon,
+                size: widget.theme.sortIconSize,
+                color: active
+                    ? widget.theme.focusOutline
+                    : widget.theme.sortIconColor.withValues(alpha: 0.28),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderCell<T> extends StatelessWidget {
+  const _HeaderCell({
+    required this.column,
+    required this.width,
+    required this.theme,
+    required this.isLast,
+    required this.direction,
+    required this.onTap,
+    required this.onReorder,
+    this.sortPriority = -1,
+    this.onMenu,
+    this.filtered = false,
+  });
+
+  final FitGridColumn<T> column;
+  final double width;
+  final FitGridThemeData theme;
+  final bool isLast;
+  final FitGridSortDirection direction;
+
+  /// Zero-based rank in a multi-column sort, or -1 to show none.
+  final int sortPriority;
+
+  /// Opens this column's menu, anchored to the given context.
+  final void Function(BuildContext anchor)? onMenu;
+
+  /// Whether a filter is narrowing this column, which earns a glyph.
+  final bool filtered;
+  final VoidCallback? onTap;
+  final void Function(String movedId, String targetId)? onReorder;
+
+  /// The cell with its trailing divider: a border down the full height, or
+  /// with [FitGridThemeData.headerDividerExtent] a short line centred on the
+  /// edge.
+  Widget _divided(Widget child) {
+    if (isLast) return child;
+    final side = BorderSide(
+      color: theme.columnDivider,
+      width: theme.dividerThickness,
+    );
+    final extent = theme.headerDividerExtent;
+    if (extent == null) {
+      return DecoratedBox(
+        decoration: BoxDecoration(border: BorderDirectional(end: side)),
+        child: child,
+      );
+    }
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        child,
+        PositionedDirectional(
+          end: 0,
+          top: 0,
+          bottom: 0,
+          width: side.width,
+          child: Center(
+            child: SizedBox(
+              width: side.width,
+              height: extent,
+              child: ColoredBox(color: side.color),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Gap between the label and the sort icon.
+  static const double _sortGap = 4.0;
+
+  /// Label width worth keeping. Below this the icon is dropped, because a
+  /// header showing two ellipsized characters and an arrow says less than one
+  /// showing four characters.
+  static const double _minLabelWidth = 16.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final alignment = switch (column.effectiveHeaderAlignment) {
+      FitGridAlignment.start => MainAxisAlignment.start,
+      FitGridAlignment.center => MainAxisAlignment.center,
+      FitGridAlignment.end => MainAxisAlignment.end,
+    };
+
+    // The label flexes but the sort icon does not, so a column squeezed
+    // narrower than the icon plus its gap would overflow the row. The icon is
+    // dropped rather than allowed to overflow: a header cell that has run out
+    // of room should lose its affordance, not paint over the column beside it.
+    //
+    // The measurement has to happen inside the padding, which is why this is a
+    // LayoutBuilder rather than arithmetic on `width` — `effectiveHeaderPadding`
+    // can be overridden per theme, and a narrow column may have none of its
+    // width left by the time the padding has taken its share.
+    Widget content = LayoutBuilder(
+      builder: (context, constraints) {
+        // The menu button and the filter glyph are claimed before the sort
+        // icon: the menu is the only way to reach hiding, pinning and
+        // filtering, whereas sorting also answers to a tap on the label. The
+        // priority badge goes first of all, since the arrow alone still says
+        // which way the column runs.
+        final extra = theme.sortIconSize + _sortGap;
+        var room = constraints.maxWidth - _minLabelWidth;
+        final showMenu = onMenu != null && room >= extra;
+        if (showMenu) room -= extra;
+        final showFilter = filtered && room >= extra;
+        if (showFilter) room -= extra;
+        final showSort = column.sortable && room >= extra;
+        if (showSort) room -= extra;
+        final badge = theme.sortIconSize * 0.7;
+        final showBadge = showSort && sortPriority >= 0 && room >= badge;
+        return Row(
+          mainAxisAlignment: alignment,
+          children: [
+            Flexible(
+              child: Text(
+                column.label,
+                style: theme.headerTextStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (showSort) ...[
+              const SizedBox(width: _sortGap),
+              Icon(
+                switch (direction) {
+                  FitGridSortDirection.ascending => theme.sortAscendingIcon,
+                  FitGridSortDirection.descending => theme.sortDescendingIcon,
+                  FitGridSortDirection.none => theme.sortUnsortedIcon,
+                },
+                size: theme.sortIconSize,
+                // An unsorted column still shows an affordance, but a quiet
+                // one — otherwise the icons read as noise across a wide header.
+                color: direction == FitGridSortDirection.none
+                    ? theme.sortIconColor.withValues(alpha: 0.35)
+                    : theme.sortIconColor,
+              ),
+              if (showBadge)
+                SizedBox(
+                  width: badge,
+                  child: Text(
+                    '${sortPriority + 1}',
+                    style: theme.headerTextStyle.copyWith(
+                      fontSize: theme.sortIconSize * 0.6,
+                      color: theme.sortIconColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                  ),
+                ),
+            ],
+            if (showFilter) ...[
+              const SizedBox(width: _sortGap),
+              Icon(
+                theme.filterActiveIcon,
+                size: theme.sortIconSize,
+                color: theme.focusOutline,
+              ),
+            ],
+            if (showMenu) ...[
+              const SizedBox(width: _sortGap),
+              Builder(
+                builder: (anchor) => Semantics(
+                  // Its own node, or on a column that is not sortable — whose
+                  // header has no button of its own to stop the merge — the
+                  // label folds into the header's and the button vanishes.
+                  container: true,
+                  button: true,
+                  label: FitGridLocalizations.of(
+                    context,
+                  ).columnMenuLabel(column.label),
+                  child: InkResponse(
+                    radius: theme.sortIconSize,
+                    onTap: () => onMenu!(anchor),
+                    child: Icon(
+                      theme.columnMenuIcon,
+                      size: theme.sortIconSize,
+                      color: theme.sortIconColor.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+
+    if (column.headerBuilder != null) {
+      content = Builder(builder: column.headerBuilder!);
+    }
+
+    if (column.tooltip != null) {
+      content = Tooltip(message: column.tooltip!, child: content);
+    }
+
+    // `header: true` rather than `SemanticsRole.columnHeader`: that role is
+    // only legal directly under a `row` under a `table`, and this row also
+    // carries resize handles and drag targets, which are neither. The flag
+    // announces the same thing without demanding a structure the header does
+    // not have.
+    final strings = FitGridLocalizations.of(context);
+    Widget cell = Semantics(
+      header: true,
+      // No `label` here: the cell already contains a `Text` with the same
+      // string, and setting both makes a reader say the column name twice.
+      sortKey: const OrdinalSortKey(0),
+      button: onTap != null,
+      hint: onTap == null
+          ? null
+          : switch (direction) {
+                  FitGridSortDirection.ascending => strings.sortedAscending,
+                  FitGridSortDirection.descending => strings.sortedDescending,
+                  FitGridSortDirection.none => strings.notSorted,
+                } +
+                (sortPriority >= 0
+                    ? strings.sortPriority(sortPriority + 1)
+                    : ''),
+      child: _divided(
+        InkWell(
+          onTap: onTap,
+          child: Padding(padding: theme.effectiveHeaderPadding, child: content),
+        ),
+      ),
+    );
+
+    if (onReorder == null || !column.reorderable) {
+      return SizedBox(
+        width: width,
+        child: ClipRect(child: cell),
+      );
+    }
+
+    // Captured by value, not by the variable: the builder below closes over
+    // this, and assigning the drag target back into the same name would make
+    // the header contain itself. That recursion is unbounded and shows up as a
+    // stack overflow rather than as a layout error.
+    final inner = cell;
+
+    // Reordering is a header affair end to end: the body's column order is
+    // derived from the controller, so a drop here is a single `move` and the
+    // painted cells follow on the next build with nothing to animate and
+    // nothing to keep in sync.
+    return SizedBox(
+      width: width,
+      child: ClipRect(
+        child: DragTarget<String>(
+          onWillAcceptWithDetails: (details) => details.data != column.id,
+          onAcceptWithDetails: (details) => onReorder!(details.data, column.id),
+          builder: (context, candidate, _) => Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Draggable<String>(
+                data: column.id,
+                axis: Axis.horizontal,
+                feedback: _DragFeedback(
+                  label: column.label,
+                  width: width,
+                  theme: theme,
+                ),
+                childWhenDragging: Opacity(opacity: 0.35, child: inner),
+                child: inner,
+              ),
+              // Where the dropped column would land.
+              if (candidate.isNotEmpty)
+                Positioned.directional(
+                  textDirection: Directionality.of(context),
+                  start: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: theme.dividerThickness * 3,
+                  child: ColoredBox(color: theme.focusOutline),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DragFeedback extends StatelessWidget {
+  const _DragFeedback({
+    required this.label,
+    required this.width,
+    required this.theme,
+  });
+
+  final String label;
+  final double width;
+  final FitGridThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 4,
+      color: theme.headerBackground,
+      borderRadius: theme.tooltipBorderRadius,
+      child: SizedBox(
+        width: width,
+        height: theme.effectiveHeaderHeight,
+        child: Padding(
+          padding: theme.effectiveHeaderPadding,
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              label,
+              style: theme.headerTextStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

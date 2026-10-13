@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:trina_grid/trina_grid.dart';
+import 'package:material_ui/material_ui.dart';
 import '../controllers/ai_grid_controller.dart';
+import '../models/ai_grid_column.dart';
 import '../theme/ai_grid_theme.dart';
 
 /// Top Group Panel widget.
@@ -37,12 +37,23 @@ class AiGridGroupPanel extends StatelessWidget {
 
         final groups = controller.activeGrouping;
 
-        return DragTarget<TrinaColumn>(
+        return DragTarget<Object>(
           onWillAcceptWithDetails: (details) {
-            return !controller.activeGrouping.contains(details.data.field);
+            final data = details.data;
+            if (data is String) {
+              return !controller.activeGrouping.contains(data);
+            } else if (data is AiGridColumn) {
+              return !controller.activeGrouping.contains(data.field);
+            }
+            return false;
           },
           onAcceptWithDetails: (details) {
-            controller.addGroup(details.data.field);
+            final data = details.data;
+            if (data is String) {
+              controller.addGroup(data);
+            } else if (data is AiGridColumn) {
+              controller.addGroup(data.field);
+            }
           },
           builder: (context, candidateData, rejectedData) {
             final isHovering = candidateData.isNotEmpty;

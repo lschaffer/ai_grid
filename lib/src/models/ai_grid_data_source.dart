@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:trina_grid/trina_grid.dart';
 import 'ai_grid_column.dart';
 
 /// Abstract contract for data sources feeding [AiGrid].
@@ -13,7 +12,7 @@ abstract class AiGridDataSource with ChangeNotifier {
   int get totalRowCount;
 
   /// Fetches rows to be displayed in the grid.
-  Future<List<TrinaRow>> fetchRows();
+  Future<List<Map<String, dynamic>>> fetchRows();
 
   /// Retrieves a lightweight JSON sample of rows for LLM contextual awareness.
   Future<List<Map<String, dynamic>>> getSampleData({int limit = 5});
@@ -24,14 +23,11 @@ class LocalAiGridDataSource extends AiGridDataSource {
   @override
   final List<AiGridColumn> columns;
   List<Map<String, dynamic>> _data;
-  List<TrinaRow> _cachedRows = [];
 
   LocalAiGridDataSource({
     required this.columns,
     required List<Map<String, dynamic>> initialData,
-  }) : _data = List.from(initialData) {
-    _rebuildRows();
-  }
+  }) : _data = List<Map<String, dynamic>>.from(initialData);
 
   @override
   int get totalRowCount => _data.length;
@@ -41,24 +37,13 @@ class LocalAiGridDataSource extends AiGridDataSource {
 
   /// Updates or replaces the local dataset and notifies listeners.
   void setData(List<Map<String, dynamic>> newData) {
-    _data = List.from(newData);
-    _rebuildRows();
+    _data = List<Map<String, dynamic>>.from(newData);
     notifyListeners();
   }
 
-  void _rebuildRows() {
-    _cachedRows = _data.map((item) {
-      final cells = <String, TrinaCell>{};
-      for (final col in columns) {
-        cells[col.field] = TrinaCell(value: item[col.field]);
-      }
-      return TrinaRow(cells: cells);
-    }).toList();
-  }
-
   @override
-  Future<List<TrinaRow>> fetchRows() async {
-    return _cachedRows;
+  Future<List<Map<String, dynamic>>> fetchRows() async {
+    return _data;
   }
 
   @override
@@ -67,17 +52,22 @@ class LocalAiGridDataSource extends AiGridDataSource {
   }
 }
 
+/// Dynamic page fetch function signature.
+typedef AiGridPaginationFetch = Future<List<Map<String, dynamic>>> Function({
+  required int page,
+  required int pageSize,
+  String? sortColumn,
+  bool descending,
+  String? searchQuery,
+});
 
 /// Server-side / partial data lazy pagination data source for [AiGrid].
-///
-/// Fetches and streams data on-demand in pages from a remote backend or database
-/// matching TrinaGrid's [TrinaLazyPagination] engine.
 class LazyAiGridDataSource extends AiGridDataSource {
   @override
   final List<AiGridColumn> columns;
 
   /// Callback invoked when a page of data, sorting, or filtering is requested.
-  final TrinaLazyPaginationFetch fetch;
+  final AiGridPaginationFetch fetch;
 
   /// Optional function returning total count of records across the entire dataset.
   final int Function()? totalRowCountGetter;
@@ -85,28 +75,19 @@ class LazyAiGridDataSource extends AiGridDataSource {
   /// Optional sample data for AI contextual reasoning.
   final List<Map<String, dynamic>>? sampleData;
 
-  /// Whether sorting triggers a new server-side fetch with sortColumn (default: true).
-  final bool fetchWithSorting;
-
-  /// Whether filtering triggers a new server-side fetch with filterRows (default: true).
-  final bool fetchWithFiltering;
-
   LazyAiGridDataSource({
     required this.columns,
     required this.fetch,
     this.totalRowCountGetter,
     this.sampleData,
-    this.fetchWithSorting = true,
-    this.fetchWithFiltering = true,
   });
 
   @override
   int get totalRowCount => totalRowCountGetter?.call() ?? 0;
 
   @override
-  Future<List<TrinaRow>> fetchRows() async {
-    // Handled dynamically by TrinaLazyPagination
-    return <TrinaRow>[];
+  Future<List<Map<String, dynamic>>> fetchRows() async {
+    return fetch(page: 1, pageSize: 100);
   }
 
   @override
@@ -115,16 +96,8 @@ class LazyAiGridDataSource extends AiGridDataSource {
       return sampleData!.take(limit).toList();
     }
     try {
-      final initialRes = await fetch(
-        TrinaLazyPaginationRequest(page: 1, pageSize: limit),
-      );
-      return initialRes.rows.take(limit).map((r) {
-        final map = <String, dynamic>{};
-        for (final entry in r.cells.entries) {
-          map[entry.key] = entry.value.value;
-        }
-        return map;
-      }).toList();
+      final initialRes = await fetch(page: 1, pageSize: limit);
+      return initialRes.take(limit).toList();
     } catch (_) {
       return <Map<String, dynamic>>[];
     }

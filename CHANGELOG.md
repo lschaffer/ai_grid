@@ -1,3 +1,17 @@
+## 0.0.3
+
+* **Engine Migration to `fitgrid_table`**:
+  * Migrated underlying grid engine to **[fitgrid_table](https://pub.dev/packages/fitgrid_table)**.
+  * Direct canvas cell painting (~3ms frame time on 1M rows) instead of widget-per-cell virtualization.
+  * Native content-based column auto-sizing (`autoSize`, `autoSizeAll`).
+  * Built-in multi-column sorting with background isolate sorting support for large datasets.
+* **Native Excel (XLSX) Export**:
+  * Added pure Dart Excel (`.xlsx`) export alongside CSV, TSV, and JSON formats without external native dependencies.
+* **`material_ui` Ecosystem Compatibility**:
+  * Migrated UI components to `package:material_ui/material_ui.dart` for seamless Flutter 3.47 unbundled environments.
+* **Pub.dev Ready**:
+  * Eliminated all local path dependencies (`dart_mcp_core: ^1.1.4`).
+
 ## 0.0.2
 
 * **Persistent Layout Storage Across App Restarts**:

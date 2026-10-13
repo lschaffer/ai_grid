@@ -1,15 +1,15 @@
 import 'dart:convert';
-import 'package:file_saver/file_saver.dart';
 import 'dart:math' as math;
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
-import 'package:trina_grid/trina_grid.dart';
+import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_data_source.dart';
 
 /// Controller coordinating grid state, grouping, filtering, sorting,
 /// column visibility, and introspection for AI Assistant tools.
 class AiGridController extends ChangeNotifier {
-  TrinaGridStateManager? _stateManager;
+  FitGridController<Map<String, dynamic>>? _fitController;
   AiGridDataSource? _dataSource;
   List<AiGridColumn> _columns = [];
 
@@ -23,23 +23,17 @@ class AiGridController extends ChangeNotifier {
   bool _showGroupPanel = true;
   bool _showAiAssistant = false;
 
-  /// Underlying TrinaGridStateManager if attached.
-  TrinaGridStateManager? get stateManager => _stateManager;
+  /// Underlying FitGridController if attached.
+  FitGridController<Map<String, dynamic>>? get fitController => _fitController;
+
+  /// Compatibility getter for legacy callers.
+  dynamic get stateManager => _fitController;
 
   /// Grid columns defined for this DataGrid.
   List<AiGridColumn> get columns => _columns;
 
   /// Currently active grouping fields (hierarchical).
-  List<String> get activeGrouping {
-    if (_stateManager != null &&
-        _stateManager!.hasRowGroups &&
-        _stateManager!.rowGroupDelegate is TrinaRowGroupByColumnDelegate) {
-      final delegate =
-          _stateManager!.rowGroupDelegate as TrinaRowGroupByColumnDelegate;
-      return delegate.columns.map((c) => c.field).toList();
-    }
-    return List.unmodifiable(_activeGrouping);
-  }
+  List<String> get activeGrouping => List.unmodifiable(_activeGrouping);
 
   /// Active column filters keyed by column field name.
   Map<String, Map<String, dynamic>> get activeFilters =>
@@ -63,98 +57,96 @@ class AiGridController extends ChangeNotifier {
   /// Whether the AI Assistant panel is visible.
   bool get showAiAssistant => _showAiAssistant;
 
-  /// Whether the controller is attached to an active grid StateManager.
-  bool get isAttached => _stateManager != null;
-
+  /// Whether the controller is attached to an active grid controller.
+  bool get isAttached => _fitController != null;
 
   /// Current page number (1-based index).
-  int get page => _stateManager?.page ?? 1;
+  int get page => (_fitController?.pagination.pageIndex ?? 0) + 1;
 
   /// Total number of pages available.
-  int get totalPage => _stateManager?.totalPage ?? 1;
+  int get totalPage => _fitController?.pagination.pageCount ?? 1;
 
   /// Number of rows per page.
-  int get pageSize => _stateManager?.pageSize ?? 40;
+  int get pageSize => _fitController?.pagination.pageSize ?? 40;
 
   /// Whether pagination is currently active on the grid.
-  bool get isPaginated => _stateManager?.isPaginated ?? false;
+  bool get isPaginated => _fitController?.pagination.enabled ?? false;
 
-  /// Navigates to a specific page number.
+  /// Navigates to a specific page number (1-based).
   void setPage(int page) {
-    if (_stateManager != null) {
-      _stateManager!.setPage(page);
+    if (_fitController != null && _fitController!.pagination.enabled) {
+      _fitController!.pagination.pageIndex = (page - 1).clamp(0, totalPage - 1);
       notifyListeners();
     }
   }
 
   /// Sets the number of rows displayed per page.
   void setPageSize(int size) {
-    if (_stateManager != null) {
-      _stateManager!.setPageSize(size);
+    if (_fitController != null && _fitController!.pagination.enabled) {
+      _fitController!.pagination.pageSize = size;
       notifyListeners();
     }
   }
 
-  bool _isUpdatingFromStateManager = false;
-
-  void _onStateManagerChanged() {
-    if (_isUpdatingFromStateManager) return;
-    _isUpdatingFromStateManager = true;
-    try {
-      if (_stateManager != null) {
-        if (_stateManager!.hasRowGroups &&
-            _stateManager!.rowGroupDelegate is TrinaRowGroupByColumnDelegate) {
-          final delegate =
-              _stateManager!.rowGroupDelegate as TrinaRowGroupByColumnDelegate;
-          _activeGrouping = delegate.columns.map((c) => c.field).toList();
-        } else if (!_stateManager!.hasRowGroups) {
-          _activeGrouping = [];
-        }
-      }
-      notifyListeners();
-    } finally {
-      _isUpdatingFromStateManager = false;
-    }
+  void _onFitControllerChanged() {
+    notifyListeners();
   }
 
-  /// Attaches the controller to the rendered grid state.
+  /// Attaches the controller to the rendered grid controller and data source.
   void attach({
-    TrinaGridStateManager? stateManager,
+    FitGridController<Map<String, dynamic>>? fitController,
     required List<AiGridColumn> columns,
     required AiGridDataSource dataSource,
   }) {
-    if (_stateManager != null && _stateManager != stateManager) {
-      _stateManager!.removeListener(_onStateManagerChanged);
+    if (_fitController != null && _fitController != fitController && fitController != null) {
+      _fitController!.data.removeListener(_onFitControllerChanged);
+      _fitController!.columns.removeListener(_onFitControllerChanged);
     }
-    _stateManager = stateManager;
+    _fitController = fitController ??
+        _fitController ??
+        FitGridController<Map<String, dynamic>>(
+          columns: columns.map((c) => c.toFitGridColumn()).toList(),
+          rows: dataSource is LocalAiGridDataSource ? dataSource.data : const [],
+        );
     _columns = columns;
     _dataSource = dataSource;
-    if (_stateManager != null) {
-      _stateManager!.removeListener(_onStateManagerChanged);
-      _stateManager!.addListener(_onStateManagerChanged);
+
+    _fitController!.data.removeListener(_onFitControllerChanged);
+    _fitController!.columns.removeListener(_onFitControllerChanged);
+    _fitController!.data.addListener(_onFitControllerChanged);
+    _fitController!.columns.addListener(_onFitControllerChanged);
+
+    // Reapply active state if pre-configured
+    if (_activeGrouping.isNotEmpty) {
+      setGrouping(_activeGrouping);
     }
+    if (_activeSortColumn != null) {
+      sort(_activeSortColumn!, descending: _isSortDescending);
+    }
+    if (_searchQuery.isNotEmpty) {
+      search(_searchQuery);
+    }
+    if (_hiddenFields.isNotEmpty) {
+      for (final col in _columns) {
+        if (_hiddenFields.contains(col.field)) {
+          _fitController!.columns.setVisible(col.field, false);
+        }
+      }
+    }
+
     notifyListeners();
   }
 
   @override
   void dispose() {
-    _stateManager?.removeListener(_onStateManagerChanged);
+    _fitController?.data.removeListener(_onFitControllerChanged);
+    _fitController?.columns.removeListener(_onFitControllerChanged);
     super.dispose();
   }
 
   /// Resolves field name flexibly (case-insensitive or title).
   String? _resolveField(String name) {
     final clean = name.toLowerCase().replaceAll(' ', '').replaceAll('_', '');
-    if (_stateManager != null) {
-      for (final col in _stateManager!.columns) {
-        if (col.field.toLowerCase() == clean ||
-            col.field.toLowerCase() == name.toLowerCase() ||
-            col.title.toLowerCase().replaceAll(' ', '') == clean ||
-            col.title.toLowerCase() == name.toLowerCase()) {
-          return col.field;
-        }
-      }
-    }
     for (final col in _columns) {
       if (col.field.toLowerCase() == clean ||
           col.field.toLowerCase() == name.toLowerCase() ||
@@ -168,39 +160,21 @@ class AiGridController extends ChangeNotifier {
 
   /// Sets multi-level hierarchical grouping by column fields.
   void setGrouping(List<String> fields) {
-    final hadActiveGrouping = _activeGrouping.isNotEmpty;
     _activeGrouping = List.from(fields);
-    if (_stateManager != null) {
+    if (_fitController != null) {
       if (fields.isEmpty) {
-        if (_stateManager!.hasRowGroups || hadActiveGrouping) {
-          _stateManager!.setRowGroup(
-            TrinaRowGroupByColumnDelegate(
-              columns: [],
-              showFirstExpandableIcon: false,
-              showCount: false,
-              enableCompactCount: false,
-            ),
-          );
-        }
+        _fitController!.grouping.groups = const [];
       } else {
-        final groupColumns = <TrinaColumn>[];
-        for (final f in fields) {
+        _fitController!.grouping.groups = fields.map((f) {
           final actual = _resolveField(f) ?? f;
-          final c = _stateManager!.columns.firstWhere(
-            (col) => col.field == actual,
-            orElse: () => _stateManager!.columns.first,
+          final col = _columns.where((c) => c.field == actual).firstOrNull;
+          final title = col?.title ?? actual;
+          return FitGridGroup<Map<String, dynamic>>(
+            keyOf: (row) => row[actual]?.toString() ?? '',
+            label: (key, rows) => '$title: $key (${rows.length})',
           );
-          groupColumns.add(c);
-        }
-        _stateManager!.setRowGroup(
-          TrinaRowGroupByColumnDelegate(
-            columns: groupColumns,
-            showFirstExpandableIcon: true,
-            showCount: true,
-            enableCompactCount: true,
-          ),
-        );
-        _stateManager!.expandAllRowGroups();
+        }).toList();
+        _fitController!.grouping.expandAll();
       }
     }
     notifyListeners();
@@ -229,72 +203,62 @@ class AiGridController extends ChangeNotifier {
     setGrouping([]);
   }
 
-  TrinaFilterType _resolveFilterType(String operator) {
+  FitGridFilterOperator _resolveFilterOperator(String operator) {
     final clean = operator.toLowerCase().replaceAll(' ', '').replaceAll('_', '');
-    switch (clean) {
-      case 'notequals':
-      case 'neq':
-      case 'ne':
-      case '!=':
-      case '<>':
-      case 'not':
-        return const TrinaFilterTypeNotEquals();
-      case 'notcontains':
-      case 'doesnotcontain':
-      case '!contains':
-      case 'exclude':
-      case 'excludes':
-        return const TrinaFilterTypeDoesNotContain();
-      case 'equals':
-      case 'eq':
-      case '=':
-      case '==':
-        return const TrinaFilterTypeEquals();
-      case 'startswith':
-        return const TrinaFilterTypeStartsWith();
-      case 'endswith':
-        return const TrinaFilterTypeEndsWith();
-      case 'greaterthan':
-      case 'gt':
-      case '>':
-        return const TrinaFilterTypeGreaterThan();
-      case 'greaterthanorequalto':
-      case 'gte':
-      case '>=':
-        return const TrinaFilterTypeGreaterThanOrEqualTo();
-      case 'lessthan':
-      case 'lt':
-      case '<':
-        return const TrinaFilterTypeLessThan();
-      case 'lessthanorequalto':
-      case 'lte':
-      case '<=':
-        return const TrinaFilterTypeLessThanOrEqualTo();
-      case 'contains':
-      default:
-        return const TrinaFilterTypeContains();
-    }
+    return switch (clean) {
+      'notequals' || 'neq' || 'ne' || '!=' || '<>' || 'not' =>
+        FitGridFilterOperator.notEquals,
+      'notcontains' || 'doesnotcontain' || '!contains' || 'exclude' || 'excludes' =>
+        FitGridFilterOperator.notContains,
+      'equals' || 'eq' || '=' || '==' => FitGridFilterOperator.equals,
+      'startswith' => FitGridFilterOperator.startsWith,
+      'endswith' => FitGridFilterOperator.endsWith,
+      'greaterthan' || 'gt' || '>' => FitGridFilterOperator.greaterThan,
+      'greaterthanorequalto' || 'greaterorequal' || 'gte' || '>=' =>
+        FitGridFilterOperator.greaterOrEqual,
+      'lessthan' || 'lt' || '<' => FitGridFilterOperator.lessThan,
+      'lessthanorequalto' || 'lessorequal' || 'lte' || '<=' =>
+        FitGridFilterOperator.lessOrEqual,
+      'between' => FitGridFilterOperator.between,
+      'isempty' => FitGridFilterOperator.isEmpty,
+      'isnotempty' => FitGridFilterOperator.isNotEmpty,
+      'inlist' || 'oneof' => FitGridFilterOperator.inList,
+      _ => FitGridFilterOperator.contains,
+    };
   }
 
   void _applyActiveFilters() {
-    if (_stateManager == null) return;
-    if (_activeFilters.isEmpty) {
-      _stateManager!.setFilterWithFilterRows([]);
-      return;
-    }
+    if (_fitController == null) return;
+    _fitController!.filter.clearColumnFilters();
 
-    final filterRows = _activeFilters.entries.map((entry) {
+    for (final entry in _activeFilters.entries) {
       final field = entry.key;
-      final op = (entry.value['operator'] as String?) ?? 'contains';
-      final val = entry.value['value']?.toString() ?? '';
-      return FilterHelper.createFilterRow(
-        columnField: field,
-        filterType: _resolveFilterType(op),
-        filterValue: val,
-      );
-    }).toList();
+      final opName = (entry.value['operator'] as String?) ?? 'contains';
+      final val = entry.value['value'];
+      final op = _resolveFilterOperator(opName);
 
-    _stateManager!.setFilterWithFilterRows(filterRows);
+      final col = _columns.where((c) => c.field == field).firstOrNull;
+      Object? operand = val;
+      if (col != null) {
+        if (col.type == AiGridColumnType.number || col.type == AiGridColumnType.currency) {
+          if (val is! num && val != null) {
+            operand = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+          }
+        } else if (col.type == AiGridColumnType.date) {
+          if (val is! DateTime && val != null) {
+            operand = DateTime.tryParse(val.toString());
+          }
+        }
+      }
+
+      _fitController!.filter.setFilter(
+        field,
+        FitGridColumnFilter(
+          operator: op,
+          value: operand,
+        ),
+      );
+    }
   }
 
   /// Applies a column filter programmatically, preserving other active column filters (AND logic).
@@ -340,15 +304,14 @@ class AiGridController extends ChangeNotifier {
   void removeFilter(String field) {
     final actualField = _resolveField(field) ?? field;
     _activeFilters.remove(actualField);
-    _applyActiveFilters();
+    _fitController?.filter.setFilter(actualField, null);
     notifyListeners();
   }
 
   /// Clears all column filters.
   void clearAllFilters() {
     _activeFilters.clear();
-    _stateManager?.clearAllColumnFilters();
-    _applyActiveFilters();
+    _fitController?.filter.clearColumnFilters();
     notifyListeners();
   }
 
@@ -359,83 +322,49 @@ class AiGridController extends ChangeNotifier {
     bool filteredOnly = true,
     String? groupBy,
   }) {
-    if (_stateManager == null && _dataSource == null) {
+    if (_fitController == null && _dataSource == null) {
       return {'error': 'Grid is not initialized'};
     }
 
     final actualField = _resolveField(field) ?? field;
-    final String columnTitle = _stateManager?.columns
-            .firstWhere((c) => c.field == actualField,
-                orElse: () => _stateManager!.columns.first)
-            .title ??
-        _columns
-            .firstWhere((c) => c.field == actualField,
-                orElse: () => _columns.isNotEmpty
-                    ? _columns.first
-                    : const AiGridColumn(field: '', title: ''))
-            .title;
+    final String columnTitle = _columns
+        .where((c) => c.field == actualField)
+        .firstOrNull
+        ?.title ?? actualField;
 
-    final TrinaColumn? trinaCol = _stateManager?.columns.firstWhere(
-      (c) => c.field == actualField,
-      orElse: () => _stateManager!.columns.first,
-    );
+    final targetColumn = _columns.where((c) => c.field == actualField).firstOrNull;
+
+    List<Map<String, dynamic>> rows = [];
+    if (_fitController != null) {
+      rows = filteredOnly ? _fitController!.data.view : _fitController!.data.rows;
+    } else if (_dataSource is LocalAiGridDataSource) {
+      rows = (_dataSource as LocalAiGridDataSource).data;
+    }
 
     if (groupBy != null && groupBy.isNotEmpty) {
       final actualGroupField = _resolveField(groupBy) ?? groupBy;
-      final String groupTitle = _stateManager?.columns
-              .firstWhere((c) => c.field == actualGroupField,
-                  orElse: () => _stateManager!.columns.first)
-              .title ??
-          _columns
-              .firstWhere((c) => c.field == actualGroupField,
-                  orElse: () => _columns.isNotEmpty
-                      ? _columns.first
-                      : const AiGridColumn(field: '', title: ''))
-              .title;
+      final String groupTitle = _columns
+          .where((c) => c.field == actualGroupField)
+          .firstOrNull
+          ?.title ?? actualGroupField;
 
       final groups = <dynamic, List<num>>{};
-
-      if (_stateManager != null) {
-        final rows = filteredOnly
-            ? (_stateManager!.refRows.hasRange
-                ? _stateManager!.refRows.filterOrOriginalList
-                : _stateManager!.refRows)
-            : _stateManager!.refRows.originalList;
-        for (final row in rows) {
-          if (row.type.isGroup) continue;
-          final gVal = row.cells[actualGroupField]?.value ?? 'Unknown';
-          final val = row.cells[actualField]?.value;
-          if (val is num) {
-            groups.putIfAbsent(gVal, () => []).add(val);
-          } else if (val != null) {
-            final parsed = num.tryParse(
-                val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
-            if (parsed != null) {
-              groups.putIfAbsent(gVal, () => []).add(parsed);
-            }
-          }
-        }
-      } else if (_dataSource is LocalAiGridDataSource) {
-        final rawRows = (_dataSource as LocalAiGridDataSource).data;
-        for (final item in rawRows) {
-          final gVal = item[actualGroupField] ?? 'Unknown';
-          final val = item[actualField];
-          if (val is num) {
-            groups.putIfAbsent(gVal, () => []).add(val);
-          } else if (val != null) {
-            final parsed = num.tryParse(
-                val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
-            if (parsed != null) {
-              groups.putIfAbsent(gVal, () => []).add(parsed);
-            }
+      for (final row in rows) {
+        final gVal = row[actualGroupField]?.toString() ?? 'Unknown';
+        final val = row[actualField];
+        if (val is num) {
+          groups.putIfAbsent(gVal, () => []).add(val);
+        } else if (val != null) {
+          final parsed = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+          if (parsed != null) {
+            groups.putIfAbsent(gVal, () => []).add(parsed);
           }
         }
       }
 
       final results = <String, dynamic>{};
       for (final entry in groups.entries) {
-        final nums = entry.value;
-        results[entry.key.toString()] = _computeStats(nums, operation, trinaCol);
+        results[entry.key.toString()] = _computeStats(entry.value, operation, targetColumn);
       }
 
       return {
@@ -450,38 +379,17 @@ class AiGridController extends ChangeNotifier {
     }
 
     final numbers = <num>[];
-    if (_stateManager != null) {
-      final rows = filteredOnly
-          ? (_stateManager!.refRows.hasRange
-              ? _stateManager!.refRows.filterOrOriginalList
-              : _stateManager!.refRows)
-          : _stateManager!.refRows.originalList;
-      for (final row in rows) {
-        if (row.type.isGroup) continue;
-        final val = row.cells[actualField]?.value;
-        if (val is num) {
-          numbers.add(val);
-        } else if (val != null) {
-          final parsed =
-              num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
-          if (parsed != null) numbers.add(parsed);
-        }
-      }
-    } else if (_dataSource is LocalAiGridDataSource) {
-      final rawRows = (_dataSource as LocalAiGridDataSource).data;
-      for (final item in rawRows) {
-        final val = item[actualField];
-        if (val is num) {
-          numbers.add(val);
-        } else if (val != null) {
-          final parsed =
-              num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
-          if (parsed != null) numbers.add(parsed);
-        }
+    for (final row in rows) {
+      final val = row[actualField];
+      if (val is num) {
+        numbers.add(val);
+      } else if (val != null) {
+        final parsed = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+        if (parsed != null) numbers.add(parsed);
       }
     }
 
-    final stats = _computeStats(numbers, operation, trinaCol);
+    final stats = _computeStats(numbers, operation, targetColumn);
     return {
       'field': actualField,
       'columnTitle': columnTitle,
@@ -495,7 +403,7 @@ class AiGridController extends ChangeNotifier {
   Map<String, dynamic> _computeStats(
     List<num> numbers,
     String operation,
-    TrinaColumn? column,
+    AiGridColumn? column,
   ) {
     if (numbers.isEmpty) {
       return {'result': 0.0, 'formatted': '0', 'count': 0};
@@ -525,9 +433,11 @@ class AiGridController extends ChangeNotifier {
       result = sum / numbers.length;
     }
 
-    final formatted = column != null
-        ? column.formattedValueForDisplay(result)
-        : result.toStringAsFixed(2);
+    String formatted = result.toStringAsFixed(2);
+    if (column != null && column.type == AiGridColumnType.currency) {
+      formatted = '\$${result.toStringAsFixed(2)}';
+    }
+
     return {
       'result': double.parse(result.toStringAsFixed(2)),
       'formatted': formatted,
@@ -538,18 +448,7 @@ class AiGridController extends ChangeNotifier {
   /// Applies global text search across all columns.
   void search(String query) {
     _searchQuery = query;
-    if (_stateManager != null) {
-      if (query.trim().isEmpty) {
-        _stateManager!.setFilterWithFilterRows([]);
-      } else {
-        final filterRow = FilterHelper.createFilterRow(
-          columnField: FilterHelper.filterFieldAllColumns,
-          filterType: const TrinaFilterTypeContains(),
-          filterValue: query.trim(),
-        );
-        _stateManager!.setFilterWithFilterRows([filterRow]);
-      }
-    }
+    _fitController?.filter.query = query.trim();
     notifyListeners();
   }
 
@@ -561,17 +460,16 @@ class AiGridController extends ChangeNotifier {
   /// Applies column sorting.
   /// If [append] is true, appends this column as an additional sort level (multi-column sorting).
   void sort(String field, {bool descending = false, bool append = false}) {
-    if (_stateManager != null) {
-      final actual = _resolveField(field) ?? field;
-      final column = _stateManager!.columns.firstWhere(
-        (col) => col.field == actual,
-        orElse: () => _stateManager!.columns.first,
-      );
+    final actual = _resolveField(field) ?? field;
+    final dir = descending ? FitGridSortDirection.descending : FitGridSortDirection.ascending;
 
-      if (descending) {
-        _stateManager!.sortDescending(column, append: append);
+    if (_fitController != null) {
+      if (!append) {
+        _fitController!.setSort([FitGridSortKey(actual, dir)]);
       } else {
-        _stateManager!.sortAscending(column, append: append);
+        final existing = _fitController!.data.sortKeys.where((k) => k.columnId != actual).toList();
+        existing.add(FitGridSortKey(actual, dir));
+        _fitController!.setSort(existing);
       }
     }
 
@@ -586,44 +484,32 @@ class AiGridController extends ChangeNotifier {
 
   /// Applies multi-column sorting with a sequence of sort definitions.
   void multiSort(List<Map<String, dynamic>> sortConfigs) {
-    if (_stateManager == null || sortConfigs.isEmpty) return;
-    _stateManager!.clearSorting(notify: false);
+    if (sortConfigs.isEmpty) return;
 
-    for (int i = 0; i < sortConfigs.length; i++) {
-      final config = sortConfigs[i];
+    final keys = <FitGridSortKey>[];
+    for (final config in sortConfigs) {
       final field = (config['field'] ?? config['column']) as String?;
       if (field == null) continue;
       final actual = _resolveField(field) ?? field;
       final descending = (config['descending'] as bool?) ?? false;
-
-      final column = _stateManager!.columns.firstWhere(
-        (col) => col.field == actual,
-        orElse: () => _stateManager!.columns.first,
-      );
-
-      if (descending) {
-        _stateManager!.sortDescending(column, append: true, notify: false);
-      } else {
-        _stateManager!.sortAscending(column, append: true, notify: false);
-      }
+      keys.add(FitGridSortKey(actual, descending ? FitGridSortDirection.descending : FitGridSortDirection.ascending));
     }
 
-    _stateManager!.notifyListeners(true, _stateManager!.sortAscending.hashCode);
+    _fitController?.setSort(keys);
+
     if (sortConfigs.isNotEmpty) {
-      _activeSortColumn =
-          (sortConfigs.first['field'] ?? sortConfigs.first['column']) as String?;
-      _isSortDescending =
-          (sortConfigs.first['descending'] as bool?) ?? false;
+      _activeSortColumn = (sortConfigs.first['field'] ?? sortConfigs.first['column']) as String?;
+      _isSortDescending = (sortConfigs.first['descending'] as bool?) ?? false;
     }
     notifyListeners();
   }
 
-  /// Returns the current sorted columns in order of sort priority.
-  List<TrinaColumn> get sortedColumns => _stateManager?.sortedColumns ?? [];
+  /// Returns the current sorted keys.
+  List<FitGridSortKey> get sortedColumns => _fitController?.data.sortKeys ?? [];
 
   /// Clears column sorting.
   void clearSorting() {
-    _stateManager?.clearSorting();
+    _fitController?.clearSort();
     _activeSortColumn = null;
     _isSortDescending = false;
     notifyListeners();
@@ -637,15 +523,7 @@ class AiGridController extends ChangeNotifier {
     } else {
       _hiddenFields.add(actual);
     }
-
-    if (_stateManager != null) {
-      final col = _stateManager!.refColumns.originalList
-          .where((c) => c.field == actual)
-          .firstOrNull;
-      if (col != null) {
-        _stateManager!.hideColumn(col, !visible);
-      }
-    }
+    _fitController?.columns.setVisible(actual, visible);
     notifyListeners();
   }
 
@@ -655,23 +533,9 @@ class AiGridController extends ChangeNotifier {
     _hiddenFields.clear();
     _hiddenFields.addAll(_columns.map((c) => c.field).where((f) => !targetFields.contains(f)));
 
-    if (_stateManager != null) {
-      final toHide = <TrinaColumn>[];
-      final toShow = <TrinaColumn>[];
-
-      for (final col in _stateManager!.refColumns.originalList) {
-        if (targetFields.contains(col.field)) {
-          toShow.add(col);
-        } else {
-          toHide.add(col);
-        }
-      }
-
-      if (toHide.isNotEmpty) {
-        _stateManager!.hideColumns(toHide, true);
-      }
-      if (toShow.isNotEmpty) {
-        _stateManager!.hideColumns(toShow, false);
+    if (_fitController != null) {
+      for (final col in _columns) {
+        _fitController!.columns.setVisible(col.field, targetFields.contains(col.field));
       }
     }
     notifyListeners();
@@ -686,32 +550,7 @@ class AiGridController extends ChangeNotifier {
       } else {
         _hiddenFields.add(actual);
       }
-    }
-
-    if (_stateManager != null) {
-      final toHide = <TrinaColumn>[];
-      final toShow = <TrinaColumn>[];
-
-      for (final entry in visibilityMap.entries) {
-        final actual = _resolveField(entry.key) ?? entry.key;
-        final col = _stateManager!.refColumns.originalList
-            .where((c) => c.field == actual)
-            .firstOrNull;
-        if (col != null) {
-          if (entry.value) {
-            toShow.add(col);
-          } else {
-            toHide.add(col);
-          }
-        }
-      }
-
-      if (toHide.isNotEmpty) {
-        _stateManager!.hideColumns(toHide, true);
-      }
-      if (toShow.isNotEmpty) {
-        _stateManager!.hideColumns(toShow, false);
-      }
+      _fitController?.columns.setVisible(actual, entry.value);
     }
     notifyListeners();
   }
@@ -719,27 +558,22 @@ class AiGridController extends ChangeNotifier {
   /// Restores visibility of all columns.
   void showAllColumns() {
     _hiddenFields.clear();
-    if (_stateManager != null) {
-      _stateManager!.hideColumns(_stateManager!.refColumns.originalList, false);
-    }
+    _fitController?.columns.showAll();
     notifyListeners();
   }
 
   /// Returns the list of currently visible column fields.
   List<String> get visibleColumns {
-    if (_stateManager != null) {
-      return _stateManager!.columns.map((c) => c.field).toList();
+    if (_fitController != null) {
+      return _fitController!.columns.visible.map((c) => c.id).toList();
     }
     return _columns.map((c) => c.field).where((f) => !_hiddenFields.contains(f)).toList();
   }
 
   /// Returns the list of currently hidden column fields.
   List<String> get hiddenColumns {
-    if (_stateManager != null) {
-      return _stateManager!.refColumns.originalList
-          .where((c) => c.hide)
-          .map((c) => c.field)
-          .toList();
+    if (_fitController != null) {
+      return _fitController!.columns.columns.where((c) => !c.visible).map((c) => c.id).toList();
     }
     return _hiddenFields.toList();
   }
@@ -747,7 +581,6 @@ class AiGridController extends ChangeNotifier {
   /// Toggles visibility of the inline filter row.
   void toggleFilterRow() {
     _showColumnFilterRow = !_showColumnFilterRow;
-    _stateManager?.setShowColumnFilter(_showColumnFilterRow);
     notifyListeners();
   }
 
@@ -781,28 +614,18 @@ class AiGridController extends ChangeNotifier {
     showAllColumns();
   }
 
-
   /// Exports all current interactive grid settings to a Map.
-  ///
-  /// Persists:
-  /// - [visibleColumns]: ordered list of visible column field names
-  /// - [hiddenColumns]: list of hidden column field names
-  /// - [groupColumns]: hierarchical row group field names
-  /// - [sorts]: active sorting columns with directions and priority
-  /// - [filters]: active column filter criteria (field, operator, value)
-  /// - [showColumnFilterRow]: inline filter row toggle
   Map<String, dynamic> exportSettings() {
     return {
       'version': '1.0',
       'visibleColumns': visibleColumns,
       'hiddenColumns': hiddenColumns,
       'groupColumns': List<String>.from(activeGrouping),
-      'sorts': (_stateManager != null && sortedColumns.isNotEmpty)
-          ? sortedColumns
-              .map((c) => {
-                    'field': c.field,
-                    'descending': c.sort.isDescending,
-                    'priority': c.sortPriority,
+      'sorts': _fitController != null && _fitController!.data.sortKeys.isNotEmpty
+          ? _fitController!.data.sortKeys
+              .map((k) => {
+                    'field': k.columnId,
+                    'descending': k.direction == FitGridSortDirection.descending,
                   })
               .toList()
           : (_activeSortColumn != null
@@ -810,7 +633,6 @@ class AiGridController extends ChangeNotifier {
                   {
                     'field': _activeSortColumn,
                     'descending': _isSortDescending,
-                    'priority': 0,
                   }
                 ]
               : <Map<String, dynamic>>[]),
@@ -822,14 +644,12 @@ class AiGridController extends ChangeNotifier {
 
   /// Exports all current settings serialized as a JSON string.
   String exportSettingsJson({bool pretty = true}) {
-    final encoder =
-        pretty ? const JsonEncoder.withIndent('  ') : const JsonEncoder();
+    final encoder = pretty ? const JsonEncoder.withIndent('  ') : const JsonEncoder();
     return encoder.convert(exportSettings());
   }
 
   /// Restores grid state from a saved settings Map.
   void restoreSettings(Map<String, dynamic> settings) {
-
     // 1. Column visibility
     if (settings.containsKey('visibleColumns')) {
       final list = (settings['visibleColumns'] as List?)
@@ -879,14 +699,9 @@ class AiGridController extends ChangeNotifier {
 
     // 4. Sorts
     if (settings.containsKey('sorts')) {
-      final sorts =
-          (settings['sorts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final sorts = (settings['sorts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       if (sorts.isNotEmpty) {
-        final first = sorts.first;
-        final field = first['field']?.toString();
-        if (field != null) {
-          setSorting(field, descending: first['descending'] == true);
-        }
+        multiSort(sorts);
       } else {
         clearSorting();
       }
@@ -895,7 +710,6 @@ class AiGridController extends ChangeNotifier {
     // 5. Column filter row
     if (settings.containsKey('showColumnFilterRow')) {
       _showColumnFilterRow = settings['showColumnFilterRow'] == true;
-      _stateManager?.setShowColumnFilter(_showColumnFilterRow);
     }
 
     notifyListeners();
@@ -929,19 +743,13 @@ class AiGridController extends ChangeNotifier {
       'activeSortColumn': _activeSortColumn,
       'isSortDescending': _isSortDescending,
       'searchQuery': _searchQuery,
-      'filteredRowCount': _stateManager != null
-          ? (_stateManager!.refRows.hasRange
-              ? _stateManager!.refRows.filterOrOriginalList.length
-              : _stateManager!.refRows.length)
-          : (_dataSource?.totalRowCount ?? 0),
+      'filteredRowCount': _fitController?.data.length ?? (_dataSource?.totalRowCount ?? 0),
       'visibleColumns': visibleColumns,
       'hiddenColumns': hiddenColumns,
       'sortedColumns': sortedColumns
-          .map((c) => {
-                'field': c.field,
-                'title': c.title,
-                'descending': c.sort.isDescending,
-                'priority': c.sortPriority,
+          .map((k) => {
+                'field': k.columnId,
+                'descending': k.direction == FitGridSortDirection.descending,
               })
           .toList(),
     };
@@ -952,7 +760,8 @@ class AiGridController extends ChangeNotifier {
     if (_dataSource == null) return [];
     return _dataSource!.getSampleData(limit: limit);
   }
-  /// Exports current grid data to CSV or JSON and saves it via FileSaver.
+
+  /// Exports current grid data to CSV, TSV, XLSX, or JSON and saves it via FileSaver.
   Future<String> exportGrid({
     String format = 'csv',
     List<String>? columns,
@@ -960,20 +769,16 @@ class AiGridController extends ChangeNotifier {
     bool ignoreFixedRows = false,
     String separator = ',',
   }) async {
-    final sm = _stateManager;
-    if (sm == null) throw Exception('Grid is not attached yet');
+    final fc = _fitController;
+    if (fc == null) throw Exception('Grid is not attached yet');
 
     final fileName = 'grid_export_${DateTime.now().millisecondsSinceEpoch}';
     final fmt = format.toLowerCase().trim();
 
+    final exportData = fc.export(includeHeaders: includeHeaders);
+
     if (fmt == 'csv') {
-      final content = await TrinaGridExportCsv().export(
-        stateManager: sm,
-        columns: columns,
-        includeHeaders: includeHeaders,
-        separator: separator,
-        ignoreFixedRows: ignoreFixedRows,
-      );
+      final content = fitGridToCsv(exportData);
       final bytes = Uint8List.fromList(utf8.encode(content));
       return await FileSaver.instance.saveFile(
         name: fileName,
@@ -981,24 +786,35 @@ class AiGridController extends ChangeNotifier {
         fileExtension: 'csv',
         mimeType: MimeType.csv,
       );
-    } else if (fmt == 'json') {
-      final content = await TrinaGridExportJson().export(
-        stateManager: sm,
-        columns: columns,
-        includeHeaders: includeHeaders,
-        ignoreFixedRows: ignoreFixedRows,
-      );
+    } else if (fmt == 'tsv') {
+      final content = fitGridToTsv(exportData);
       final bytes = Uint8List.fromList(utf8.encode(content));
+      return await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: bytes,
+        fileExtension: 'tsv',
+        mimeType: MimeType.text,
+      );
+    } else if (fmt == 'xlsx') {
+      final bytes = fitGridToXlsx(exportData);
+      return await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: bytes,
+        fileExtension: 'xlsx',
+        mimeType: MimeType.microsoftExcel,
+      );
+    } else if (fmt == 'json') {
+      final rows = fc.data.view;
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(rows);
+      final bytes = Uint8List.fromList(utf8.encode(jsonStr));
       return await FileSaver.instance.saveFile(
         name: fileName,
         bytes: bytes,
         fileExtension: 'json',
         mimeType: MimeType.json,
       );
-
     } else {
       throw Exception('Unsupported export format: $format');
     }
   }
-
 }
