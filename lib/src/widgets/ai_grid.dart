@@ -57,6 +57,9 @@ class AiGrid extends StatefulWidget {
   /// Optional editing configuration supporting cell, row, and form (popup) editing modes.
   final AiGridEditingOptions? editingOptions;
 
+  /// Optional callback invoked when a row is double-tapped.
+  final void Function(Map<String, dynamic> row, int rowIndex)? onRowDoubleTap;
+
   const AiGrid({
     super.key,
     required this.dataSource,
@@ -76,6 +79,7 @@ class AiGrid extends StatefulWidget {
     this.initialSettings,
     this.onSettingsChanged,
     this.editingOptions,
+    this.onRowDoubleTap,
   });
 
   @override
@@ -448,6 +452,18 @@ class _AiGridState extends State<AiGrid> {
               multiSort: true,
               paginated: widget.enablePagination || widget.pageSize != null,
               pageSize: widget.pageSize ?? 40,
+              onRowDoubleTap: (row, rowIndex) {
+                if (widget.onRowDoubleTap != null) {
+                  widget.onRowDoubleTap!(row, rowIndex);
+                } else if (_controller.editingOptions.enabled &&
+                    _controller.editingOptions.allowUpdating) {
+                  if (_controller.editingOptions.mode == AiGridEditMode.form) {
+                    _controller.showEditDialog(context, rowIndex: rowIndex);
+                  } else if (_controller.editingOptions.mode == AiGridEditMode.row) {
+                    _controller.startEdit(rowIndex);
+                  }
+                }
+              },
             ),
           ),
         ],
@@ -535,6 +551,18 @@ class _AiGridState extends State<AiGrid> {
               multiSort: true,
               paginated: widget.enablePagination || widget.pageSize != null,
               pageSize: widget.pageSize ?? 40,
+              onRowDoubleTap: (row, rowIndex) {
+                if (widget.onRowDoubleTap != null) {
+                  widget.onRowDoubleTap!(row, rowIndex);
+                } else if (_controller.editingOptions.enabled &&
+                    _controller.editingOptions.allowUpdating) {
+                  if (_controller.editingOptions.mode == AiGridEditMode.form) {
+                    _controller.showEditDialog(context, rowIndex: rowIndex);
+                  } else if (_controller.editingOptions.mode == AiGridEditMode.row) {
+                    _controller.startEdit(rowIndex);
+                  }
+                }
+              },
             ),
           ),
         ],

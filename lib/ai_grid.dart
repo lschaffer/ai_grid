@@ -10,6 +10,7 @@ export 'src/widgets/ai_grid.dart';
 export 'src/widgets/ai_grid_toolbar.dart';
 export 'src/widgets/ai_grid_group_panel.dart';
 export 'src/widgets/ai_grid_assistant_panel.dart';
+export 'src/widgets/ai_grid_form_dialog.dart';
 export 'src/mcp/ai_grid_tools.dart';
 export 'src/config/ai_grid_settings_storage.dart';
 export 'package:file_saver/file_saver.dart';

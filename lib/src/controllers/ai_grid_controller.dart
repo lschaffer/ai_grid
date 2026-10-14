@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
+import '../widgets/ai_grid_form_dialog.dart';
 
 /// Controller coordinating grid state, grouping, filtering, sorting,
 /// column visibility, and introspection for AI Assistant tools.
@@ -81,6 +83,22 @@ class AiGridController extends ChangeNotifier {
     _validationErrors.clear();
     _draftRow = Map<String, dynamic>.from(rows[rowIndex]);
     notifyListeners();
+  }
+
+  /// Opens the modal popup [AiGridFormDialog] to add a new row (if [rowIndex] is null)
+  /// or edit an existing row at [rowIndex].
+  Future<bool?> showEditDialog(
+    BuildContext context, {
+    int? rowIndex,
+    Map<String, dynamic>? initialValues,
+    String? title,
+  }) {
+    if (rowIndex != null) {
+      startEdit(rowIndex);
+    } else {
+      startAdd(initialValues);
+    }
+    return AiGridFormDialog.show(context, controller: this, title: title);
   }
 
   /// Updates a single column's value in the active edit draft.

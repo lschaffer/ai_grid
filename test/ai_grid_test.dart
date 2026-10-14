@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart' as fm;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -713,6 +714,220 @@ void main() {
       expect(controller.fitController!.data.rows.length, 2);
       expect(deletedRow?['id'], 3);
     });
+
+    testWidgets('AiGridFormDialog renders editable fields respecting editorIndex order', (tester) async {
+      final cols = [
+        const AiGridColumn(
+          field: 'id',
+          title: 'ID',
+          type: AiGridColumnType.number,
+          editable: false,
+        ),
+        const AiGridColumn(
+          field: 'category',
+          title: 'Category',
+          type: AiGridColumnType.select,
+          editable: true,
+          editorIndex: 2,
+          selectOptions: ['Tech', 'Home', 'Auto'],
+        ),
+        const AiGridColumn(
+          field: 'name',
+          title: 'Item Name',
+          type: AiGridColumnType.text,
+          editable: true,
+          editorIndex: 1,
+        ),
+        const AiGridColumn(
+          field: 'inStock',
+          title: 'In Stock',
+          type: AiGridColumnType.boolean,
+          editable: true,
+          editorIndex: 3,
+        ),
+      ];
+
+      final ds = LocalAiGridDataSource(
+        columns: cols,
+        initialData: [
+          {'id': 1, 'name': 'Widget A', 'category': 'Tech', 'inStock': true},
+        ],
+      );
+
+      final controller = AiGridController();
+      controller.attach(columns: cols, dataSource: ds);
+      controller.setEditingOptions(const AiGridEditingOptions(
+        mode: AiGridEditMode.form,
+        allowUpdating: true,
+      ));
+
+      controller.startEdit(0);
+
+      await tester.pumpWidget(
+        fm.MaterialApp(
+          home: fm.Scaffold(
+            body: fm.Builder(
+              builder: (context) => fm.ElevatedButton(
+                onPressed: () => AiGridFormDialog.show(context, controller: controller),
+                child: const fm.Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // ID is not editable, should not appear as form input
+      expect(find.text('ID'), findsNothing);
+
+      // Name, Category, In Stock should be rendered
+      expect(find.text('Item Name'), findsOneWidget);
+      expect(find.text('Category'), findsOneWidget);
+      expect(find.text('In Stock'), findsOneWidget);
+
+      // Title defaults to Edit Record
+      expect(find.text('Edit Record'), findsOneWidget);
+
+      // Close dialog by tapping Cancel
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AiGridFormDialog), findsNothing);
+      expect(controller.isEditingRow, isFalse);
+    });
+
+    testWidgets('AiGridFormDialog validates input, displays errors, and saves on success', (tester) async {
+      final cols = [
+        AiGridColumn(
+          field: 'name',
+          title: 'Item Name',
+          type: AiGridColumnType.text,
+          editable: true,
+          validator: (val) => (val == null || val.toString().trim().isEmpty) ? 'Name required' : null,
+        ),
+        const AiGridColumn(
+          field: 'price',
+          title: 'Price',
+          type: AiGridColumnType.currency,
+          editable: true,
+        ),
+      ];
+
+      final ds = LocalAiGridDataSource(
+        columns: cols,
+        initialData: [
+          {'name': 'Item 1', 'price': 50.0},
+        ],
+      );
+
+      final controller = AiGridController();
+      controller.attach(columns: cols, dataSource: ds);
+      controller.setEditingOptions(const AiGridEditingOptions(
+        mode: AiGridEditMode.form,
+        allowUpdating: true,
+      ));
+
+      controller.startEdit(0);
+
+      await tester.pumpWidget(
+        fm.MaterialApp(
+          home: fm.Scaffold(
+            body: fm.Builder(
+              builder: (context) => fm.ElevatedButton(
+                onPressed: () => AiGridFormDialog.show(context, controller: controller),
+                child: const fm.Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // Enter empty name to trigger validator
+      await tester.enterText(find.widgetWithText(fm.TextFormField, 'Item Name'), '');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Name required'), findsOneWidget);
+      expect(find.byType(AiGridFormDialog), findsOneWidget);
+
+      // Enter valid name and save
+      await tester.enterText(find.widgetWithText(fm.TextFormField, 'Item Name'), 'Super Item');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AiGridFormDialog), findsNothing);
+      expect(controller.fitController!.data.rows[0]['name'], 'Super Item');
+    });
+
+    testWidgets('AiGridFormDialog supports wrap, grid, and custom form layouts', (tester) async {
+      final cols = [
+        const AiGridColumn(field: 'f1', title: 'Field 1', editable: true),
+        const AiGridColumn(field: 'f2', title: 'Field 2', editable: true),
+        const AiGridColumn(field: 'f3', title: 'Field 3', editable: true),
+      ];
+
+      final ds = LocalAiGridDataSource(
+        columns: cols,
+        initialData: [
+          {'f1': 'A', 'f2': 'B', 'f3': 'C'},
+        ],
+      );
+
+      final controller = AiGridController();
+      controller.attach(columns: cols, dataSource: ds);
+
+      // 1. Grid layout
+      controller.setEditingOptions(const AiGridEditingOptions(
+        mode: AiGridEditMode.form,
+        formLayout: AiGridFormLayout.grid(columns: 2),
+      ));
+      controller.startEdit(0);
+
+      await tester.pumpWidget(
+        fm.MaterialApp(
+          home: fm.Scaffold(
+            body: fm.Builder(
+              builder: (context) => fm.ElevatedButton(
+                onPressed: () => AiGridFormDialog.show(context, controller: controller),
+                child: const fm.Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AiGridFormDialog), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      // 2. Custom layout
+      controller.setEditingOptions(AiGridEditingOptions(
+        mode: AiGridEditMode.form,
+        formLayout: AiGridFormLayout.custom(
+          (context, draftValues, onChanged) => Container(
+            key: const ValueKey('custom-form-container'),
+            child: const Text('Custom Form Layout Content'),
+          ),
+        ),
+      ));
+      controller.startEdit(0);
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('custom-form-container')), findsOneWidget);
+      expect(find.text('Custom Form Layout Content'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+    });
   });
 }
+
+
 
