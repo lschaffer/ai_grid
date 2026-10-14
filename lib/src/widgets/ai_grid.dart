@@ -111,7 +111,7 @@ class _AiGridState extends State<AiGrid> {
       _internalController = true;
     }
     if (widget.editingOptions != null) {
-      _controller.setEditingOptions(widget.editingOptions!);
+      _controller.setEditingOptions(widget.editingOptions!, notify: false);
     }
 
     _lastEditMode = _controller.editingOptions.mode;
@@ -217,7 +217,7 @@ class _AiGridState extends State<AiGrid> {
       _loadData();
     }
     if (widget.editingOptions != oldWidget.editingOptions && widget.editingOptions != null) {
-      _controller.setEditingOptions(widget.editingOptions!);
+      _controller.setEditingOptions(widget.editingOptions!, notify: false);
       _fitController.columns.columns = _buildFitColumns();
     }
   }

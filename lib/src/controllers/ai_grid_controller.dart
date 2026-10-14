@@ -69,7 +69,8 @@ class AiGridController extends ChangeNotifier {
   Map<String, String> get validationErrors => Map.unmodifiable(_validationErrors);
 
   /// Updates the editing options and notifies listeners.
-  void setEditingOptions(AiGridEditingOptions options) {
+  void setEditingOptions(AiGridEditingOptions options, {bool notify = true}) {
+    if (_editingOptions == options) return;
     if (options.mode != _editingOptions.mode && isEditingRow) {
       _discardPendingRow();
       _editingRowIndex = null;
@@ -78,7 +79,9 @@ class AiGridController extends ChangeNotifier {
       _validationErrors.clear();
     }
     _editingOptions = options;
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   final List<AiGridEditEvent> _editEvents = [];
