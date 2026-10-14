@@ -95,6 +95,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
       allowDeleting: true,
       actionColumnPosition: AiGridActionColumnPosition.right,
       formLayout: const AiGridFormLayout.grid(columns: 2),
+      insertRowPosition: AiGridInsertRowPosition.top,
       popupTitle: 'Superstore Order Details',
       afterSave: (row) {
         if (mounted) {
@@ -198,13 +199,14 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           numberFormat: '#,###',
           width: 140,
           editable: true,
+          required: true,
           editorIndex: 0,
         ),
         const AiGridColumn(
           field: 'OrderDate',
           title: 'Order Date',
           type: AiGridColumnType.date,
-          editorType: AiGridEditorType.dateTime,
+          editorType: AiGridEditorType.date,
           width: 140,
           editable: true,
           editorIndex: 1,
@@ -213,7 +215,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           field: 'ShipDate',
           title: 'Ship Date',
           type: AiGridColumnType.date,
-          editorType: AiGridEditorType.dateTime,
+          editorType: AiGridEditorType.date,
           width: 140,
           editable: true,
           editorIndex: 2,

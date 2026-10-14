@@ -33,6 +33,22 @@ class AiGridController extends ChangeNotifier {
   bool _isAddingRow = false;
   final Map<String, String> _validationErrors = {};
 
+  /// Empty placeholder row shown in the grid while adding in row mode.
+  Map<String, dynamic>? _pendingNewRow;
+
+  /// Removes the row-mode placeholder row (if any) from the grid data.
+  /// Returns the view index it occupied, or -1.
+  int _discardPendingRow() {
+    final pending = _pendingNewRow;
+    _pendingNewRow = null;
+    if (pending == null || _fitController == null) return -1;
+    final viewIdx = _fitController!.data.view.indexOf(pending);
+    final allRows = List<Map<String, dynamic>>.from(_fitController!.data.rows)
+      ..remove(pending);
+    _fitController!.data.rows = allRows;
+    return viewIdx;
+  }
+
   /// Current editing options configured for this grid.
   AiGridEditingOptions get editingOptions => _editingOptions;
   set editingOptions(AiGridEditingOptions options) => setEditingOptions(options);
@@ -54,6 +70,13 @@ class AiGridController extends ChangeNotifier {
 
   /// Updates the editing options and notifies listeners.
   void setEditingOptions(AiGridEditingOptions options) {
+    if (options.mode != _editingOptions.mode && isEditingRow) {
+      _discardPendingRow();
+      _editingRowIndex = null;
+      _isAddingRow = false;
+      _draftRow = null;
+      _validationErrors.clear();
+    }
     _editingOptions = options;
     notifyListeners();
   }
@@ -80,6 +103,7 @@ class AiGridController extends ChangeNotifier {
 
   /// Starts adding a new row, initializing draft values with column defaults or [initialValues].
   void startAdd([Map<String, dynamic>? initialValues]) {
+    _discardPendingRow();
     _editingRowIndex = null;
     _isAddingRow = true;
     _validationErrors.clear();
@@ -91,6 +115,22 @@ class AiGridController extends ChangeNotifier {
         _draftRow![col.field] = null;
       }
     }
+
+    // Row mode: show an empty record inline at the configured position.
+    if (_editingOptions.mode == AiGridEditMode.row && _fitController != null) {
+      final placeholder = Map<String, dynamic>.from(_draftRow!);
+      final allRows = List<Map<String, dynamic>>.from(_fitController!.data.rows);
+      if (_editingOptions.insertRowPosition == AiGridInsertRowPosition.top) {
+        allRows.insert(0, placeholder);
+      } else {
+        allRows.add(placeholder);
+      }
+      _fitController!.data.rows = allRows;
+      _pendingNewRow = placeholder;
+      final idx = _fitController!.data.view.indexOf(placeholder);
+      _editingRowIndex = idx >= 0 ? idx : null;
+    }
+
     logEditEvent(AiGridEditEvent(
       action: 'startAdd',
       message: 'Started adding a new record',
@@ -102,6 +142,8 @@ class AiGridController extends ChangeNotifier {
   /// Starts editing an existing row at [rowIndex] in row or form mode.
   void startEdit(int rowIndex) {
     if (_fitController == null) return;
+    final removedAt = _discardPendingRow();
+    if (removedAt >= 0 && removedAt < rowIndex) rowIndex--;
     final rows = _fitController!.data.view;
     if (rowIndex < 0 || rowIndex >= rows.length) return;
     _editingRowIndex = rowIndex;
@@ -141,13 +183,14 @@ class AiGridController extends ChangeNotifier {
     final oldVal = _draftRow![column];
     _draftRow![column] = value;
     final col = _columns.where((c) => c.field == column).firstOrNull;
-    if (col != null && col.validator != null) {
-      final err = col.validator!(value);
+    if (col != null) {
+      final err = col.validate(value);
       if (err != null) {
         _validationErrors[column] = err;
       } else {
         _validationErrors.remove(column);
       }
+      col.onChanged?.call(value, _draftRow!);
     }
     logEditEvent(AiGridEditEvent(
       action: 'change',
@@ -164,6 +207,7 @@ class AiGridController extends ChangeNotifier {
   void cancelEdit() {
     final prevIdx = _editingRowIndex;
     final wasAdding = _isAddingRow;
+    _discardPendingRow();
     _editingRowIndex = null;
     _isAddingRow = false;
     _draftRow = null;
@@ -186,8 +230,8 @@ class AiGridController extends ChangeNotifier {
     // 1. Column-level validation
     _validationErrors.clear();
     for (final col in _columns) {
-      if (col.isEditable && col.validator != null) {
-        final err = col.validator!(_draftRow![col.field]);
+      if (col.isEditable) {
+        final err = col.validate(_draftRow![col.field]);
         if (err != null) {
           _validationErrors[col.field] = err;
         }
@@ -237,7 +281,18 @@ class AiGridController extends ChangeNotifier {
     // 4. Update data in FitGridController and AiGridDataSource
     final allRows = List<Map<String, dynamic>>.from(_fitController!.data.rows);
     if (_isAddingRow) {
-      allRows.insert(0, Map<String, dynamic>.from(_draftRow!));
+      final newRow = Map<String, dynamic>.from(_draftRow!);
+      final pendingIdx =
+          _pendingNewRow == null ? -1 : allRows.indexOf(_pendingNewRow!);
+      if (pendingIdx >= 0) {
+        allRows[pendingIdx] = newRow;
+      } else if (_editingOptions.insertRowPosition ==
+          AiGridInsertRowPosition.bottom) {
+        allRows.add(newRow);
+      } else {
+        allRows.insert(0, newRow);
+      }
+      _pendingNewRow = null;
     } else {
       final targetRow = _fitController!.data.view[_editingRowIndex!];
       final globalIndex = allRows.indexOf(targetRow);

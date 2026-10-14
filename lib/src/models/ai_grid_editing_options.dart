@@ -88,6 +88,15 @@ enum AiGridActionColumnPosition {
   right,
 }
 
+/// Where a newly added record is inserted (DevExtreme `newRowPosition`).
+enum AiGridInsertRowPosition {
+  /// Insert the new record as the first row.
+  top,
+
+  /// Insert the new record as the last row.
+  bottom,
+}
+
 /// Explicit input control type for editing a column cell or form field.
 enum AiGridEditorType {
   text,
@@ -122,6 +131,9 @@ class AiGridEditingOptions {
   /// Layout structure when editing in [AiGridEditMode.form].
   final AiGridFormLayout formLayout;
 
+  /// Where new records are inserted in row and form mode (defaults to [AiGridInsertRowPosition.top]).
+  final AiGridInsertRowPosition insertRowPosition;
+
   /// Optional custom title for the popup edit/add form dialog.
   final String? popupTitle;
 
@@ -155,6 +167,7 @@ class AiGridEditingOptions {
     this.allowDeleting = false,
     this.actionColumnPosition = AiGridActionColumnPosition.right,
     this.formLayout = const AiGridFormLayout.row(),
+    this.insertRowPosition = AiGridInsertRowPosition.top,
     this.popupTitle,
     this.popupWidth = 560.0,
     this.popupHeight,
@@ -174,6 +187,7 @@ class AiGridEditingOptions {
     bool? allowDeleting,
     AiGridActionColumnPosition? actionColumnPosition,
     AiGridFormLayout? formLayout,
+    AiGridInsertRowPosition? insertRowPosition,
     String? popupTitle,
     double? popupWidth,
     double? popupHeight,
@@ -191,6 +205,7 @@ class AiGridEditingOptions {
       allowDeleting: allowDeleting ?? this.allowDeleting,
       actionColumnPosition: actionColumnPosition ?? this.actionColumnPosition,
       formLayout: formLayout ?? this.formLayout,
+      insertRowPosition: insertRowPosition ?? this.insertRowPosition,
       popupTitle: popupTitle ?? this.popupTitle,
       popupWidth: popupWidth ?? this.popupWidth,
       popupHeight: popupHeight ?? this.popupHeight,

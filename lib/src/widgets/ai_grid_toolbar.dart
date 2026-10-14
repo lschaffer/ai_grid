@@ -166,7 +166,8 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
           },
           itemBuilder: (context) => [
             if (widget.controller.editingOptions.enabled &&
-                widget.controller.editingOptions.allowAdding) ...[
+                widget.controller.editingOptions.allowAdding &&
+                widget.controller.editingOptions.mode != AiGridEditMode.cell) ...[
               const PopupMenuItem(
                 value: 'add',
                 child: Row(
@@ -297,7 +298,8 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
     return Row(
       children: [
         if (widget.controller.editingOptions.enabled &&
-            widget.controller.editingOptions.allowAdding) ...[
+            widget.controller.editingOptions.allowAdding &&
+            widget.controller.editingOptions.mode != AiGridEditMode.cell) ...[
           IconButton(
             icon: Icon(
               Icons.add,

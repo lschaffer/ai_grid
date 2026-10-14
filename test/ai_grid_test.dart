@@ -607,13 +607,16 @@ void main() {
         editorIndex: 1,
         editorType: AiGridEditorType.text,
         validator: (v) => v == null || v.toString().isEmpty ? 'Required' : null,
+        required: true,
       );
 
       expect(col.isEditable, isTrue);
+      expect(col.required, isTrue);
       expect(col.editorIndex, 1);
       expect(col.editorType, AiGridEditorType.text);
-      expect(col.validator!(''), 'Required');
-      expect(col.validator!('Valid'), isNull);
+      expect(col.validate(''), 'Title is required');
+      expect(col.validate(null), 'Title is required');
+      expect(col.validate('Valid'), isNull);
 
       final controller = AiGridController();
       controller.setEditingOptions(const AiGridEditingOptions(
@@ -622,6 +625,7 @@ void main() {
         allowUpdating: true,
         allowDeleting: true,
         actionColumnPosition: AiGridActionColumnPosition.left,
+        insertRowPosition: AiGridInsertRowPosition.bottom,
         formLayout: AiGridFormLayout.grid(columns: 3),
       ));
 
@@ -629,6 +633,7 @@ void main() {
       expect(controller.editingOptions.allowAdding, isTrue);
       expect(controller.editingOptions.allowDeleting, isTrue);
       expect(controller.editingOptions.actionColumnPosition, AiGridActionColumnPosition.left);
+      expect(controller.editingOptions.insertRowPosition, AiGridInsertRowPosition.bottom);
       expect(controller.editingOptions.formLayout.mode, AiGridFormLayoutMode.grid);
       expect(controller.editingOptions.formLayout.columns, 3);
     });

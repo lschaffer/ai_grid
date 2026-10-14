@@ -56,6 +56,12 @@ class AiGridColumn {
   /// Validation function that returns an error message if [value] is invalid, or null if valid.
   final String? Function(dynamic value)? validator;
 
+  /// Whether a value is mandatory. Empty values fail with "`title` is required".
+  final bool required;
+
+  /// Called whenever the value of this column changes during editing.
+  final void Function(dynamic value, Map<String, dynamic> draftRow)? onChanged;
+
   /// Bespoke editor widget builder for custom input controls.
   final Widget Function(
     BuildContext context,
@@ -88,6 +94,8 @@ class AiGridColumn {
     this.editorType,
     this.editorOptions,
     this.validator,
+    this.required = false,
+    this.onChanged,
     this.editorBuilder,
     this.aggregateType = AiGridAggregateType.none,
     this.numberFormat,
@@ -97,6 +105,15 @@ class AiGridColumn {
 
   /// Whether this column can be edited.
   bool get isEditable => editable ?? enableEditingMode;
+
+  /// Runs the [required] check, then [validator]. Returns an error or null.
+  String? validate(dynamic value) {
+    if (required &&
+        (value == null || (value is String && value.trim().isEmpty))) {
+      return '$title is required';
+    }
+    return validator?.call(value);
+  }
 
   /// Converts this [AiGridColumn] into a [FitGridColumn] used by the underlying engine.
   FitGridColumn<Map<String, dynamic>> toFitGridColumn() {
@@ -188,7 +205,9 @@ class AiGridColumn {
     FitGridEditor<Map<String, dynamic>>? editor;
     if (isEditable) {
       editor = FitGridEditor<Map<String, dynamic>>(
-        validator: validator != null ? (row, text) => validator!(text) : null,
+        validator: (validator != null || required)
+            ? (row, text) => validate(text)
+            : null,
         builder: editorBuilder != null
             ? (context, session) => editorBuilder!(
                   context,
@@ -206,6 +225,7 @@ class AiGridColumn {
           } else {
             row[field] = text;
           }
+          onChanged?.call(row[field], row);
         },
       );
     }
