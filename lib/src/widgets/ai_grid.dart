@@ -142,6 +142,7 @@ class _AiGridState extends State<AiGrid> {
       fitController: _fitController,
       columns: widget.dataSource.columns,
       dataSource: widget.dataSource,
+      notify: false,
     );
 
     _draggableWindowController = DraggableWindowController(
@@ -213,6 +214,7 @@ class _AiGridState extends State<AiGrid> {
         fitController: _fitController,
         columns: widget.dataSource.columns,
         dataSource: widget.dataSource,
+        notify: false,
       );
       _loadData();
     }
@@ -675,7 +677,9 @@ class _AiGridState extends State<AiGrid> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    if (!_isLoading && mounted) {
+      setState(() => _isLoading = true);
+    }
     final rows = await widget.dataSource.fetchRows();
     if (mounted) {
       setState(() {

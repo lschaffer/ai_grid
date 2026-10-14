@@ -443,6 +443,7 @@ class AiGridController extends ChangeNotifier {
     FitGridController<Map<String, dynamic>>? fitController,
     required List<AiGridColumn> columns,
     required AiGridDataSource dataSource,
+    bool notify = false,
   }) {
     if (_fitController != null && _fitController != fitController && fitController != null) {
       _fitController!.data.removeListener(_onFitControllerChanged);
@@ -490,7 +491,9 @@ class AiGridController extends ChangeNotifier {
       }
     }
 
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   @override
