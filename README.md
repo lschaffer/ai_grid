@@ -27,9 +27,14 @@
 * **Aggregate Footers**: Auto-computed sum, average, min, max, and count summary rows.
 
 ### 2. ✍️ DevExtreme-Style DataGrid Editing (Cell, Row & Form Modes)
+
+| Modal Form Editing Dialog | Inline Row Editing |
+| :---: | :---: |
+| ![Modal Form Editing](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_form_edit.png) | ![Inline Row Editing](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_row_edit.png) |
+
 * **Three Editing Modes (`AiGridEditMode`)**:
   * `cell`: Direct in-place cell editing.
-  * `row`: Inline row editing with committed draft states and standard Material action icons (`check` to save, `close` to cancel, `edit_outlined`, `delete_outline`).
+  * `row`: Inline row editing with committed draft states, full-cell inputs, and standard Material action icons (`check` to save, `close` to cancel, `edit_outlined`, `delete_outline`).
   * `form`: Modal Material 3 popup form dialog editing all editable fields in a structured layout.
 * **Pinned Action Column (`AiGridActionColumnPosition`)**: Automatically pinned to `left` or `right` with compact, overflow-free action buttons.
 * **Modal Popup Form (`AiGridFormDialog`)**:
@@ -38,11 +43,13 @@
   * Form field ordering driven by `editorIndex`.
 * **Column-Level Editing Rules (`AiGridColumn`)**:
   * `editable`: Explicitly enable or disable editing per column.
+  * `required`: Mandatory field validation with inline error border indicators and tooltips.
   * `editorType`: Control type (`text`, `number`, `currency`, `date`, `dateTime`, `select`, `boolean`).
   * `validator`: Field-level validation callbacks.
   * `editorBuilder`: Custom inline or form field widget builders.
-* **Complete CRUD Lifecycle**:
-  * Validation pipeline via `beforeSave` and `beforeDelete`.
+* **Complete CRUD Lifecycle & Validation Pipeline**:
+  * **Vertical Validation Errors Dialog**: Summary dialog on save listing all errors vertically.
+  * **Delete Confirmation Dialog**: Built-in confirmation before deleting rows (`beforeDelete`).
   * Persistence hooks via `commit`, `afterSave`, and `afterDelete`.
 
 ### 3. 🧠 Native AI Assistant & Model Context Protocol (MCP)
