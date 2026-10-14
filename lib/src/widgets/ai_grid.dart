@@ -414,6 +414,8 @@ class _AiGridState extends State<AiGrid> {
       builder: (context, _) {
         final val = _controller.draftRow?[col.field];
         final error = _controller.validationErrors[col.field] ?? col.validate(val);
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
 
         Widget editor;
 
@@ -423,33 +425,15 @@ class _AiGridState extends State<AiGrid> {
             val,
             (newVal) => _controller.updateDraftValue(col.field, newVal),
           );
-          editor = Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: error != null ? Colors.redAccent : Colors.transparent,
-                width: error != null ? 1.5 : 1.0,
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: custom,
-          );
+          editor = custom;
         } else if (col.editorType == AiGridEditorType.boolean ||
             col.type == AiGridColumnType.boolean) {
           final boolVal = val == true;
-          editor = Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: error != null ? Colors.redAccent : Colors.transparent,
-                width: error != null ? 1.5 : 1.0,
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Center(
-              child: Checkbox(
-                value: boolVal,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                onChanged: (v) => _controller.updateDraftValue(col.field, v),
-              ),
+          editor = Center(
+            child: Checkbox(
+              value: boolVal,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onChanged: (v) => _controller.updateDraftValue(col.field, v),
             ),
           );
         } else if (col.editorType == AiGridEditorType.select ||
@@ -465,24 +449,23 @@ class _AiGridState extends State<AiGrid> {
           final currentStr = val?.toString();
           final effectiveVal = options.contains(currentStr) ? currentStr : null;
 
-          editor = Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: error != null ? Colors.redAccent : Colors.grey.shade400,
-                width: error != null ? 1.5 : 1.0,
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          editor = DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               isDense: true,
               isExpanded: true,
-              underline: const SizedBox(),
               value: effectiveVal,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
               items: options
                   .map((opt) => DropdownMenuItem(
                         value: opt,
-                        child: Text(opt, style: const TextStyle(fontSize: 12)),
+                        child: Text(
+                          opt,
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ))
                   .toList(),
               onChanged: (v) => _controller.updateDraftValue(col.field, v),
@@ -502,71 +485,65 @@ class _AiGridState extends State<AiGrid> {
             dateStr = currentVal.toString();
           }
 
-          editor = Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: error != null ? Colors.redAccent : Colors.grey.shade400,
-                width: error != null ? 1.5 : 1.0,
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: InkWell(
-              onTap: () async {
-                DateTime initDate = DateTime.now();
-                if (currentVal is DateTime) {
-                  initDate = currentVal;
-                } else if (currentVal != null) {
-                  final p = DateTime.tryParse(currentVal.toString());
-                  if (p != null) initDate = p;
+          editor = InkWell(
+            onTap: () async {
+              DateTime initDate = DateTime.now();
+              if (currentVal is DateTime) {
+                initDate = currentVal;
+              } else if (currentVal != null) {
+                final p = DateTime.tryParse(currentVal.toString());
+                if (p != null) initDate = p;
+              }
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: initDate,
+                firstDate: DateTime(1900),
+                lastDate: DateTime(2100),
+              );
+              if (picked != null) {
+                if (isDateTime) {
+                  if (!context.mounted) return;
+                  final pickedTime = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.fromDateTime(initDate),
+                  );
+                  final dt = DateTime(
+                    picked.year,
+                    picked.month,
+                    picked.day,
+                    pickedTime?.hour ?? 0,
+                    pickedTime?.minute ?? 0,
+                  );
+                  final formatted = DateFormat('yyyy-MM-dd HH:mm').format(dt);
+                  _controller.updateDraftValue(col.field, formatted);
+                } else {
+                  final formatted = DateFormat('yyyy-MM-dd').format(picked);
+                  _controller.updateDraftValue(col.field, formatted);
                 }
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: initDate,
-                  firstDate: DateTime(1900),
-                  lastDate: DateTime(2100),
-                );
-                if (picked != null) {
-                  if (isDateTime) {
-                    if (!context.mounted) return;
-                    final pickedTime = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(initDate),
-                    );
-                    final dt = DateTime(
-                      picked.year,
-                      picked.month,
-                      picked.day,
-                      pickedTime?.hour ?? 0,
-                      pickedTime?.minute ?? 0,
-                    );
-                    final formatted = DateFormat('yyyy-MM-dd HH:mm').format(dt);
-                    _controller.updateDraftValue(col.field, formatted);
-                  } else {
-                    final formatted = DateFormat('yyyy-MM-dd').format(picked);
-                    _controller.updateDraftValue(col.field, formatted);
-                  }
-                }
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isDateTime
-                        ? Icons.access_time_outlined
-                        : Icons.calendar_today_outlined,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      dateStr.isNotEmpty ? dateStr : 'Select',
-                      style: const TextStyle(fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
+              }
+            },
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    dateStr.isNotEmpty ? dateStr : 'Select date',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: dateStr.isNotEmpty
+                          ? (isDark ? Colors.white : Colors.black87)
+                          : theme.hintColor,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
+                ),
+                Icon(
+                  isDateTime
+                      ? Icons.access_time_outlined
+                      : Icons.calendar_today_outlined,
+                  size: 15,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
             ),
           );
         } else {
@@ -581,36 +558,28 @@ class _AiGridState extends State<AiGrid> {
           editor = TextFormField(
             key: ValueKey('inline_${col.field}_${_controller.editingRowIndex}'),
             initialValue: initial,
-            style: const TextStyle(fontSize: 12),
+            autofocus: _controller.editingRowIndex != null &&
+                widget.dataSource.columns.indexWhere((c) => c.isEditable) ==
+                    widget.dataSource.columns.indexOf(col),
+            showCursor: true,
+            cursorColor: theme.colorScheme.primary,
+            cursorWidth: 1.5,
+            cursorRadius: const Radius.circular(1),
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
             keyboardType: isNum
                 ? const TextInputType.numberWithOptions(decimal: true, signed: true)
                 : TextInputType.text,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              border: OutlineInputBorder(
-                borderRadius: const BorderRadius.all(Radius.circular(4)),
-                borderSide: BorderSide(
-                  color: error != null ? Colors.redAccent : Colors.grey.shade400,
-                  width: error != null ? 1.5 : 1.0,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: const BorderRadius.all(Radius.circular(4)),
-                borderSide: BorderSide(
-                  color: error != null ? Colors.redAccent : Colors.grey.shade400,
-                  width: error != null ? 1.5 : 1.0,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: const BorderRadius.all(Radius.circular(4)),
-                borderSide: BorderSide(
-                  color: error != null
-                      ? Colors.redAccent
-                      : Theme.of(context).colorScheme.primary,
-                  width: 1.5,
-                ),
-              ),
+              contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
             ),
             onChanged: (newText) {
               if (isNum) {
@@ -623,6 +592,41 @@ class _AiGridState extends State<AiGrid> {
           );
         }
 
+        final cellBackground = error != null
+            ? Colors.red.withValues(alpha: isDark ? 0.2 : 0.08)
+            : (isDark
+                ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6)
+                : const Color(0xFFFBFDFF));
+
+        Widget styledCell = Focus(
+          child: Builder(
+            builder: (focusCtx) {
+              final isFocused = Focus.of(focusCtx).hasFocus;
+              final borderSideColor = error != null
+                  ? Colors.redAccent
+                  : isFocused
+                      ? theme.colorScheme.primary
+                      : (isDark ? Colors.white24 : Colors.grey.shade300);
+
+              return Container(
+                width: double.infinity,
+                height: double.infinity,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cellBackground,
+                  border: Border.all(
+                    color: borderSideColor,
+                    width: error != null || isFocused ? 1.5 : 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: editor,
+              );
+            },
+          ),
+        );
+
         if (error != null) {
           return Tooltip(
             message: error,
@@ -633,11 +637,11 @@ class _AiGridState extends State<AiGrid> {
               borderRadius: BorderRadius.circular(4),
             ),
             textStyle: const TextStyle(color: Colors.white, fontSize: 11),
-            child: editor,
+            child: styledCell,
           );
         }
 
-        return editor;
+        return styledCell;
       },
     );
   }
