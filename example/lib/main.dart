@@ -492,6 +492,217 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
     );
   }
 
+  void _showEditingEventLogDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final events = _controller.editEvents.reversed.toList();
+            final theme = Theme.of(context);
+            final colorScheme = theme.colorScheme;
+
+            Color getActionColor(String action) {
+              switch (action) {
+                case 'save':
+                  return Colors.green;
+                case 'startEdit':
+                  return Colors.blue;
+                case 'startAdd':
+                  return Colors.teal;
+                case 'change':
+                  return Colors.purple;
+                case 'delete':
+                  return Colors.red;
+                case 'cancel':
+                  return Colors.orange;
+                case 'error':
+                  return Colors.redAccent;
+                default:
+                  return colorScheme.primary;
+              }
+            }
+
+            IconData getActionIcon(String action) {
+              switch (action) {
+                case 'save':
+                  return Icons.check_circle_outline;
+                case 'startEdit':
+                  return Icons.edit_outlined;
+                case 'startAdd':
+                  return Icons.add_circle_outline;
+                case 'change':
+                  return Icons.sync_alt;
+                case 'delete':
+                  return Icons.delete_outline;
+                case 'cancel':
+                  return Icons.cancel_outlined;
+                case 'error':
+                  return Icons.error_outline;
+                default:
+                  return Icons.info_outline;
+              }
+            }
+
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.receipt_long, size: 20, color: colorScheme.onPrimaryContainer),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Editing Event Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${events.length} events',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 620,
+                height: 460,
+                child: events.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.history_outlined, size: 48, color: colorScheme.outlineVariant),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No editing events recorded yet',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Edit a row, change cell values, or delete/add records to see live event logs here.',
+                              style: TextStyle(fontSize: 12, color: colorScheme.outline),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: events.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final event = events[index];
+                          final actionColor = getActionColor(event.action);
+                          final timeStr =
+                              '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}';
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: actionColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: actionColor.withValues(alpha: 0.4)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(getActionIcon(event.action), size: 12, color: actionColor),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        event.action.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: actionColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        event.message,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                      ),
+                                      if (event.data != null && event.data!.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            event.data!.entries
+                                                .take(4)
+                                                .map((e) => '${e.key}: ${e.value}')
+                                                .join(' • '),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontFamily: 'monospace',
+                                              color: colorScheme.onSurfaceVariant,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  timeStr,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: colorScheme.outline,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              actions: [
+                if (events.isNotEmpty)
+                  TextButton.icon(
+                    icon: const Icon(Icons.delete_sweep_outlined, size: 16),
+                    label: const Text('Clear Log'),
+                    onPressed: () {
+                      _controller.clearEditEvents();
+                      setDialogState(() {});
+                    },
+                  ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -601,6 +812,21 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                 },
               ),
             ),
+          ),
+          ListenableBuilder(
+            listenable: _controller,
+            builder: (context, _) {
+              final count = _controller.editEvents.length;
+              return IconButton(
+                icon: Badge(
+                  isLabelVisible: count > 0,
+                  label: Text(count > 99 ? '99+' : '$count'),
+                  child: const Icon(Icons.receipt_long_outlined),
+                ),
+                tooltip: 'Editing Events Log ($count)',
+                onPressed: () => _showEditingEventLogDialog(context),
+              );
+            },
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.tune_outlined),

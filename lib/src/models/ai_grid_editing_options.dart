@@ -202,3 +202,65 @@ class AiGridEditingOptions {
     );
   }
 }
+
+/// Represents an event that occurred during a DataGrid editing session.
+class AiGridEditEvent {
+  final DateTime timestamp;
+
+  /// The category of editing action:
+  /// - `startAdd`
+  /// - `startEdit`
+  /// - `change`
+  /// - `save`
+  /// - `cancel`
+  /// - `delete`
+  /// - `error`
+  final String action;
+
+  /// Index of the row being edited or deleted, or null if adding a new row.
+  final int? rowIndex;
+
+  /// Column field name if this event relates to a specific field change.
+  final String? field;
+
+  /// Previous value before modification.
+  final dynamic oldValue;
+
+  /// New value after modification.
+  final dynamic newValue;
+
+  /// User-friendly description of the editing event.
+  final String message;
+
+  /// Optional contextual data or changes map.
+  final Map<String, dynamic>? data;
+
+  AiGridEditEvent({
+    DateTime? timestamp,
+    required this.action,
+    this.rowIndex,
+    this.field,
+    this.oldValue,
+    this.newValue,
+    required this.message,
+    this.data,
+  }) : timestamp = timestamp ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+        'timestamp': timestamp.toIso8601String(),
+        'action': action,
+        if (rowIndex != null) 'rowIndex': rowIndex,
+        if (field != null) 'field': field,
+        if (oldValue != null) 'oldValue': oldValue,
+        if (newValue != null) 'newValue': newValue,
+        'message': message,
+        if (data != null) 'data': data,
+      };
+
+  @override
+  String toString() {
+    final timeStr =
+        '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}';
+    return '[$timeStr] $action: $message';
+  }
+}

@@ -848,7 +848,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Enter empty name to trigger validator
-      await tester.enterText(find.widgetWithText(fm.TextFormField, 'Item Name'), '');
+      await tester.enterText(find.widgetWithText(TextFormField, 'Item Name'), '');
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 
@@ -856,7 +856,7 @@ void main() {
       expect(find.byType(AiGridFormDialog), findsOneWidget);
 
       // Enter valid name and save
-      await tester.enterText(find.widgetWithText(fm.TextFormField, 'Item Name'), 'Super Item');
+      await tester.enterText(find.widgetWithText(TextFormField, 'Item Name'), 'Super Item');
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 
@@ -980,6 +980,37 @@ void main() {
 
       expect(find.byIcon(Icons.check), findsNothing);
       expect(find.byIcon(Icons.close), findsNothing);
+    });
+
+    test('AiGridController logs editing events and supports clearEditEvents', () async {
+      final controller = AiGridController();
+      final ds = LocalAiGridDataSource(
+        columns: [const AiGridColumn(field: 'id', title: 'ID', editable: true)],
+        initialData: [{'id': 1}, {'id': 2}],
+      );
+      controller.attach(columns: ds.columns, dataSource: ds);
+
+      expect(controller.editEvents, isEmpty);
+
+      controller.startEdit(0);
+      expect(controller.editEvents.length, 1);
+      expect(controller.editEvents.last.action, 'startEdit');
+
+      controller.updateDraftValue('id', 99);
+      expect(controller.editEvents.length, 2);
+      expect(controller.editEvents.last.action, 'change');
+      expect(controller.editEvents.last.newValue, 99);
+
+      await controller.saveEdit();
+      expect(controller.editEvents.length, 3);
+      expect(controller.editEvents.last.action, 'save');
+
+      await controller.deleteRow(0);
+      expect(controller.editEvents.length, 4);
+      expect(controller.editEvents.last.action, 'delete');
+
+      controller.clearEditEvents();
+      expect(controller.editEvents, isEmpty);
     });
   });
 }

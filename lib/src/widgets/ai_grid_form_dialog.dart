@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:material_ui/material_ui.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_editing_options.dart';
@@ -32,13 +32,47 @@ class AiGridFormDialog extends StatefulWidget {
     required AiGridController controller,
     String? title,
   }) {
-    return showDialog<bool>(
+    return showGeneralDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AiGridFormDialog(
-        controller: controller,
-        title: title,
-      ),
+      barrierLabel: 'Dismiss',
+      barrierColor: const Color(0x80000000),
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        Widget content = AiGridFormDialog(
+          controller: controller,
+          title: title,
+        );
+
+        final hasLoc = Localizations.of<MaterialLocalizations>(
+                dialogContext, MaterialLocalizations) !=
+            null;
+        if (!hasLoc) {
+          content = Localizations(
+            locale: const Locale('en', 'US'),
+            delegates: const [
+              DefaultMaterialLocalizations.delegate,
+              DefaultWidgetsLocalizations.delegate,
+            ],
+            child: content,
+          );
+        }
+
+        return SafeArea(
+          child: content,
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+        );
+      },
     );
   }
 

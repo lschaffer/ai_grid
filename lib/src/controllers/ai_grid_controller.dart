@@ -58,6 +58,26 @@ class AiGridController extends ChangeNotifier {
     notifyListeners();
   }
 
+  final List<AiGridEditEvent> _editEvents = [];
+
+  /// Historical log of editing events.
+  List<AiGridEditEvent> get editEvents => List.unmodifiable(_editEvents);
+
+  /// Records an editing event in the event history.
+  void logEditEvent(AiGridEditEvent event) {
+    _editEvents.add(event);
+    if (_editEvents.length > 500) {
+      _editEvents.removeAt(0);
+    }
+    notifyListeners();
+  }
+
+  /// Clears all recorded editing events.
+  void clearEditEvents() {
+    _editEvents.clear();
+    notifyListeners();
+  }
+
   /// Starts adding a new row, initializing draft values with column defaults or [initialValues].
   void startAdd([Map<String, dynamic>? initialValues]) {
     _editingRowIndex = null;
@@ -71,6 +91,11 @@ class AiGridController extends ChangeNotifier {
         _draftRow![col.field] = null;
       }
     }
+    logEditEvent(AiGridEditEvent(
+      action: 'startAdd',
+      message: 'Started adding a new record',
+      data: initialValues,
+    ));
     notifyListeners();
   }
 
@@ -82,7 +107,15 @@ class AiGridController extends ChangeNotifier {
     _editingRowIndex = rowIndex;
     _isAddingRow = false;
     _validationErrors.clear();
-    _draftRow = Map<String, dynamic>.from(rows[rowIndex]);
+    final row = rows[rowIndex];
+    _draftRow = Map<String, dynamic>.from(row);
+    final idVal = row['OrderID'] ?? row['id'] ?? row['ID'] ?? '#$rowIndex';
+    logEditEvent(AiGridEditEvent(
+      action: 'startEdit',
+      rowIndex: rowIndex,
+      message: 'Started editing row #$rowIndex ($idVal)',
+      data: row,
+    ));
     notifyListeners();
   }
 
@@ -105,6 +138,7 @@ class AiGridController extends ChangeNotifier {
   /// Updates a single column's value in the active edit draft.
   void updateDraftValue(String column, dynamic value) {
     if (_draftRow == null) return;
+    final oldVal = _draftRow![column];
     _draftRow![column] = value;
     final col = _columns.where((c) => c.field == column).firstOrNull;
     if (col != null && col.validator != null) {
@@ -115,15 +149,32 @@ class AiGridController extends ChangeNotifier {
         _validationErrors.remove(column);
       }
     }
+    logEditEvent(AiGridEditEvent(
+      action: 'change',
+      rowIndex: _editingRowIndex,
+      field: column,
+      oldValue: oldVal,
+      newValue: value,
+      message: 'Updated field "$column": ${oldVal ?? "null"} → ${value ?? "null"}',
+    ));
     notifyListeners();
   }
 
   /// Cancels the active editing or adding session and discards draft changes.
   void cancelEdit() {
+    final prevIdx = _editingRowIndex;
+    final wasAdding = _isAddingRow;
     _editingRowIndex = null;
     _isAddingRow = false;
     _draftRow = null;
     _validationErrors.clear();
+    logEditEvent(AiGridEditEvent(
+      action: 'cancel',
+      rowIndex: prevIdx,
+      message: wasAdding
+          ? 'Cancelled adding new record'
+          : 'Cancelled editing row #${prevIdx ?? "unknown"}',
+    ));
     notifyListeners();
   }
 
@@ -143,8 +194,14 @@ class AiGridController extends ChangeNotifier {
       }
     }
     if (_validationErrors.isNotEmpty) {
+      final err = _validationErrors.values.first;
+      logEditEvent(AiGridEditEvent(
+        action: 'error',
+        rowIndex: _editingRowIndex,
+        message: 'Validation failed: $err',
+      ));
       notifyListeners();
-      return _validationErrors.values.first;
+      return err;
     }
 
     final originalRow = _isAddingRow
@@ -155,6 +212,11 @@ class AiGridController extends ChangeNotifier {
     if (_editingOptions.beforeSave != null) {
       final err = await _editingOptions.beforeSave!(originalRow, _draftRow!);
       if (err != null) {
+        logEditEvent(AiGridEditEvent(
+          action: 'error',
+          rowIndex: _editingRowIndex,
+          message: 'beforeSave rejected: $err',
+        ));
         notifyListeners();
         return err;
       }
@@ -168,6 +230,9 @@ class AiGridController extends ChangeNotifier {
         }
       }
     }
+
+    final isAdding = _isAddingRow;
+    final targetIndex = _editingRowIndex;
 
     // 4. Update data in FitGridController and AiGridDataSource
     final allRows = List<Map<String, dynamic>>.from(_fitController!.data.rows);
@@ -192,6 +257,15 @@ class AiGridController extends ChangeNotifier {
     _isAddingRow = false;
     _draftRow = null;
     _validationErrors.clear();
+
+    logEditEvent(AiGridEditEvent(
+      action: 'save',
+      rowIndex: targetIndex,
+      message: isAdding
+          ? 'Successfully added new record'
+          : 'Successfully saved row #${targetIndex ?? 0}',
+      data: savedRow,
+    ));
 
     // 5. afterSave lifecycle hook
     _editingOptions.afterSave?.call(savedRow);
@@ -221,6 +295,14 @@ class AiGridController extends ChangeNotifier {
     if (_dataSource is LocalAiGridDataSource) {
       (_dataSource as LocalAiGridDataSource).setData(allRows);
     }
+
+    final idVal = targetRow['OrderID'] ?? targetRow['id'] ?? targetRow['ID'] ?? '#$rowIndex';
+    logEditEvent(AiGridEditEvent(
+      action: 'delete',
+      rowIndex: rowIndex,
+      message: 'Deleted row #$rowIndex ($idVal)',
+      data: targetRow,
+    ));
 
     // 3. afterDelete hook
     _editingOptions.afterDelete?.call(targetRow);
