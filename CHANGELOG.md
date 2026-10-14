@@ -28,13 +28,18 @@ Comprehensive DevExtreme-style DataGrid Editing support across cell, row, and mo
   * `validator`: Custom validator callback returning an error string or null.
   * `editorBuilder`: Completely custom in-place editor builder for inline cells or form fields.
 * **CRUD Lifecycle & Validation Pipeline**:
-  * `beforeSave`: Async callback to validate or reject pending edits before saving.
+  * `required`: Built-in mandatory field validation with inline error borders and error tooltips.
+  * `validator`: Custom column-level validation rules with dynamic error messages.
+  * **Vertical Validation Errors Dialog**: Clicking save with errors displays a clean, vertical modal popup dialog summarizing all field errors with field titles and error reasons.
+  * **Delete Confirmation Dialog**: Material confirmation dialog prior to deleting rows (`beforeDelete`).
   * `commit`: Per-field persistence callback for committing values to backend or state.
   * `afterSave`: Callback invoked on successful row update or add.
-  * `beforeDelete`: Confirmation callback prior to row deletion.
   * `afterDelete`: Callback invoked after row deletion.
+* **DevExtreme-Style In-Place Row Editing**:
+  * Full-cell editor integration without row gaps, seamless border indicators, and blinking cursor on active inputs.
 * **Toolbar Add Action**:
   * Integrated `+ Add` button in desktop and mobile toolbars when `allowAdding: true`.
+  * Configurable new record insertion position (`top` or `bottom`).
   * Automatically routes to `showEditDialog` in `form` mode or `startAdd` in `row`/`cell` mode.
 
 ## 0.1.0
