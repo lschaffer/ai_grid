@@ -248,7 +248,11 @@ class _AiGridState extends State<AiGrid> {
       _lastActionPos = opts.actionColumnPosition;
       _lastAllowUpdating = opts.allowUpdating;
       _lastAllowDeleting = opts.allowDeleting;
-      _fitController.columns.columns = _buildFitColumns();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _fitController.columns.columns = _buildFitColumns();
+        }
+      });
     }
   }
 

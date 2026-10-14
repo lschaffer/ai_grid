@@ -57,7 +57,7 @@ class _FitGridCellEditorState<T> extends State<FitGridCellEditor<T>> {
         extentOffset: _text.text.length,
       );
     }
-    _validate();
+    _error = widget.editor.validator?.call(widget.session.row, _text.text);
     _text.addListener(_validate);
     _focus = FocusNode(debugLabel: 'FitGridCellEditor');
     _focus.addListener(_onFocusChanged);
@@ -124,32 +124,31 @@ class _FitGridCellEditorState<T> extends State<FitGridCellEditor<T>> {
 
   @override
   Widget build(BuildContext context) {
-    final custom = widget.editor.builder;
-    if (custom != null) {
-      final child = custom(context, widget.session);
-      if (_error != null) {
-        return Tooltip(
-          message: _error!,
-          preferBelow: false,
-          waitDuration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            color: Colors.red.shade900,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          textStyle: const TextStyle(color: Colors.white, fontSize: 11),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.redAccent, width: 2),
-            ),
-            child: child,
-          ),
-        );
-      }
-      return child;
-    }
-
     final theme = widget.theme;
     final padding = theme.effectiveCellPadding;
+    final custom = widget.editor.builder;
+
+    final Widget editorContent = custom != null
+        ? custom(context, widget.session)
+        : Padding(
+            padding: EdgeInsets.symmetric(horizontal: padding.left - 2),
+            child: Center(
+              child: TextField(
+                controller: _text,
+                focusNode: _focus,
+                style: theme.cellTextStyle,
+                textAlign: widget.editor.textAlign ?? widget.alignment,
+                keyboardType: widget.editor.keyboardType,
+                inputFormatters: widget.editor.inputFormatters,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                onSubmitted: (_) => _commit(),
+              ),
+            ),
+          );
 
     final editorBox = DecoratedBox(
       decoration: BoxDecoration(
@@ -159,25 +158,7 @@ class _FitGridCellEditorState<T> extends State<FitGridCellEditor<T>> {
           width: 2,
         ),
       ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: padding.left - 2),
-        child: Center(
-          child: TextField(
-            controller: _text,
-            focusNode: _focus,
-            style: theme.cellTextStyle,
-            textAlign: widget.editor.textAlign ?? widget.alignment,
-            keyboardType: widget.editor.keyboardType,
-            inputFormatters: widget.editor.inputFormatters,
-            decoration: const InputDecoration(
-              isDense: true,
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-            ),
-            onSubmitted: (_) => _commit(),
-          ),
-        ),
-      ),
+      child: editorContent,
     );
 
     final content = _error != null

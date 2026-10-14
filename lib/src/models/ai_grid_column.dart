@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import '../fitgrid/fitgrid_table.dart';
 import 'ai_grid_editing_options.dart';
@@ -204,22 +204,172 @@ class AiGridColumn {
 
     FitGridEditor<Map<String, dynamic>>? editor;
     if (isEditable) {
+      FitGridEditorBuilder<Map<String, dynamic>>? effectiveBuilder =
+          editorBuilder != null
+              ? (context, session) => editorBuilder!(
+                    context,
+                    session.row[field] ?? session.initialText,
+                    (val) {
+                      session.commit(val?.toString() ?? '');
+                    },
+                  )
+              : null;
+
+      if (effectiveBuilder == null) {
+        if (editorType == AiGridEditorType.boolean ||
+            type == AiGridColumnType.boolean) {
+          effectiveBuilder = (context, session) {
+            final raw = session.row[field];
+            final boolVal =
+                raw == true || raw?.toString().toLowerCase() == 'true';
+            return Center(
+              child: Checkbox(
+                value: boolVal,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onChanged: (v) {
+                  session.commit(v.toString());
+                },
+              ),
+            );
+          };
+        } else if (editorType == AiGridEditorType.select ||
+            type == AiGridColumnType.select) {
+          final options = <String>[];
+          if (selectOptions != null) {
+            options.addAll(selectOptions!);
+          } else if (editorOptions?['items'] is List) {
+            for (final item in editorOptions!['items'] as List) {
+              options.add(item.toString());
+            }
+          }
+
+          if (options.isNotEmpty) {
+            effectiveBuilder = (context, session) {
+              final currentStr =
+                  session.row[field]?.toString() ?? session.initialText;
+              final effectiveVal =
+                  options.contains(currentStr) ? currentStr : null;
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                alignment: Alignment.centerLeft,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isDense: true,
+                    isExpanded: true,
+                    value: effectiveVal,
+                    items: options
+                        .map((opt) => DropdownMenuItem(
+                              value: opt,
+                              child: Text(opt,
+                                  style: const TextStyle(fontSize: 12)),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        session.commit(v);
+                      }
+                    },
+                  ),
+                ),
+              );
+            };
+          }
+        } else if (editorType == AiGridEditorType.date ||
+            editorType == AiGridEditorType.dateTime ||
+            type == AiGridColumnType.date) {
+          final isDateTime = editorType == AiGridEditorType.dateTime;
+          effectiveBuilder = (context, session) {
+            final currentVal = session.row[field];
+            String dateStr = '';
+            if (currentVal is DateTime) {
+              dateStr = isDateTime
+                  ? DateFormat('yyyy-MM-dd HH:mm').format(currentVal)
+                  : DateFormat('yyyy-MM-dd').format(currentVal);
+            } else if (currentVal != null && currentVal.toString().isNotEmpty) {
+              dateStr = currentVal.toString();
+            } else if (session.initialText.isNotEmpty) {
+              dateStr = session.initialText;
+            }
+
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              alignment: Alignment.centerLeft,
+              child: InkWell(
+                onTap: () async {
+                  DateTime initDate = DateTime.now();
+                  if (currentVal is DateTime) {
+                    initDate = currentVal;
+                  } else if (currentVal != null) {
+                    final p = DateTime.tryParse(currentVal.toString());
+                    if (p != null) initDate = p;
+                  }
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initDate,
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    if (isDateTime) {
+                      if (!context.mounted) return;
+                      final pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(initDate),
+                      );
+                      final dt = DateTime(
+                        picked.year,
+                        picked.month,
+                        picked.day,
+                        pickedTime?.hour ?? 0,
+                        pickedTime?.minute ?? 0,
+                      );
+                      final formatted =
+                          DateFormat('yyyy-MM-dd HH:mm').format(dt);
+                      session.commit(formatted);
+                    } else {
+                      final formatted =
+                          DateFormat('yyyy-MM-dd').format(picked);
+                      session.commit(formatted);
+                    }
+                  }
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isDateTime
+                          ? Icons.access_time_outlined
+                          : Icons.calendar_today_outlined,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        dateStr.isNotEmpty ? dateStr : 'Select',
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          };
+        }
+      }
+
       editor = FitGridEditor<Map<String, dynamic>>(
+        initialText: (row) => row[field]?.toString() ?? '',
         validator: (validator != null || required)
             ? (row, text) => validate(text)
             : null,
-        builder: editorBuilder != null
-            ? (context, session) => editorBuilder!(
-                  context,
-                  session.row[field] ?? session.initialText,
-                  (val) {
-                    session.commit(val?.toString() ?? '');
-                  },
-                )
-            : null,
+        builder: effectiveBuilder,
         onCommit: (row, index, text) {
-          if (type == AiGridColumnType.number || type == AiGridColumnType.currency) {
-            row[field] = num.tryParse(text.replaceAll(RegExp(r'[^0-9.-]'), '')) ?? text;
+          if (type == AiGridColumnType.number ||
+              type == AiGridColumnType.currency) {
+            row[field] =
+                num.tryParse(text.replaceAll(RegExp(r'[^0-9.-]'), '')) ?? text;
           } else if (type == AiGridColumnType.boolean) {
             row[field] = text.toLowerCase() == 'true';
           } else {
