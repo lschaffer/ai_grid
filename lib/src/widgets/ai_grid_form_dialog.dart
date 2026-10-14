@@ -395,6 +395,7 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
         return _buildSelectField(context, col, value, errorText);
 
       case AiGridEditorType.date:
+      case AiGridEditorType.dateTime:
         return _buildDateField(context, col, value, errorText);
 
       case AiGridEditorType.currency:
@@ -516,6 +517,7 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
     String? errorText,
   ) {
     final controller = _textControllers[col.field]!;
+    final isDateTime = col.editorType == AiGridEditorType.dateTime;
 
     return TextFormField(
       controller: controller,
@@ -531,15 +533,20 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
             if (controller.text.isNotEmpty)
               IconButton(
                 icon: const Icon(Icons.clear, size: 18),
-                tooltip: 'Clear Date',
+                tooltip: 'Clear',
                 onPressed: () {
                   controller.clear();
                   widget.controller.updateDraftValue(col.field, null);
                 },
               ),
             IconButton(
-              icon: const Icon(Icons.calendar_today_outlined, size: 18),
-              tooltip: 'Select Date',
+              icon: Icon(
+                isDateTime
+                    ? Icons.access_time_outlined
+                    : Icons.calendar_today_outlined,
+                size: 18,
+              ),
+              tooltip: isDateTime ? 'Select Date & Time' : 'Select Date',
               onPressed: () => _pickDate(context, col, controller),
             ),
           ],
@@ -571,9 +578,27 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
     );
 
     if (picked != null) {
-      final formatted = DateFormat('yyyy-MM-dd').format(picked);
-      controller.text = formatted;
-      widget.controller.updateDraftValue(col.field, formatted);
+      if (col.editorType == AiGridEditorType.dateTime) {
+        if (!context.mounted) return;
+        final pickedTime = await showTimePicker(
+          context: context,
+          initialTime: TimeOfDay.fromDateTime(initialDate),
+        );
+        final dt = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          pickedTime?.hour ?? 0,
+          pickedTime?.minute ?? 0,
+        );
+        final formatted = DateFormat('yyyy-MM-dd HH:mm').format(dt);
+        controller.text = formatted;
+        widget.controller.updateDraftValue(col.field, formatted);
+      } else {
+        final formatted = DateFormat('yyyy-MM-dd').format(picked);
+        controller.text = formatted;
+        widget.controller.updateDraftValue(col.field, formatted);
+      }
     }
   }
 

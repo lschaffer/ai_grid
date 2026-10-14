@@ -1,9 +1,11 @@
+import 'package:intl/intl.dart';
 import 'package:draggable_overlay_window/draggable_overlay_window.dart';
 import 'package:material_ui/material_ui.dart';
 import '../config/ai_grid_config.dart';
 import '../config/ai_grid_settings_storage.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../fitgrid/fitgrid_table.dart';
+import '../models/ai_grid_column.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../theme/ai_grid_theme.dart';
@@ -93,6 +95,12 @@ class _AiGridState extends State<AiGrid> {
   bool _internalController = false;
   bool _isLoading = true;
 
+  AiGridEditMode? _lastEditMode;
+  int? _lastEditingRowIndex;
+  AiGridActionColumnPosition? _lastActionPos;
+  bool? _lastAllowUpdating;
+  bool? _lastAllowDeleting;
+
   @override
   void initState() {
     super.initState();
@@ -106,7 +114,13 @@ class _AiGridState extends State<AiGrid> {
       _controller.setEditingOptions(widget.editingOptions!);
     }
 
-    final fitColumns = widget.dataSource.columns.map((c) => c.toFitGridColumn()).toList();
+    _lastEditMode = _controller.editingOptions.mode;
+    _lastEditingRowIndex = _controller.editingRowIndex;
+    _lastActionPos = _controller.editingOptions.actionColumnPosition;
+    _lastAllowUpdating = _controller.editingOptions.allowUpdating;
+    _lastAllowDeleting = _controller.editingOptions.allowDeleting;
+
+    final fitColumns = _buildFitColumns();
     _fitController = FitGridController<Map<String, dynamic>>(
       columns: fitColumns,
       rows: const [],
@@ -137,6 +151,7 @@ class _AiGridState extends State<AiGrid> {
 
     _controller.addListener(_syncAiAssistantWindowState);
     _controller.addListener(_onControllerStateChangedForAutoSave);
+    _controller.addListener(_onControllerChangedForEditing);
     if (_controller.showAiAssistant && widget.enableAiAssistant) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _draggableWindowController.show();
@@ -193,8 +208,7 @@ class _AiGridState extends State<AiGrid> {
     if (widget.dataSource != oldWidget.dataSource) {
       oldWidget.dataSource.removeListener(_onDataSourceChanged);
       widget.dataSource.addListener(_onDataSourceChanged);
-      _fitController.columns.columns =
-          widget.dataSource.columns.map((c) => c.toFitGridColumn()).toList();
+      _fitController.columns.columns = _buildFitColumns();
       _controller.attach(
         fitController: _fitController,
         columns: widget.dataSource.columns,
@@ -204,6 +218,7 @@ class _AiGridState extends State<AiGrid> {
     }
     if (widget.editingOptions != oldWidget.editingOptions && widget.editingOptions != null) {
       _controller.setEditingOptions(widget.editingOptions!);
+      _fitController.columns.columns = _buildFitColumns();
     }
   }
 
@@ -212,12 +227,331 @@ class _AiGridState extends State<AiGrid> {
     widget.dataSource.removeListener(_onDataSourceChanged);
     _controller.removeListener(_syncAiAssistantWindowState);
     _controller.removeListener(_onControllerStateChangedForAutoSave);
+    _controller.removeListener(_onControllerChangedForEditing);
     _draggableWindowController.dispose();
     _fitController.dispose();
     if (_internalController) {
       _controller.dispose();
     }
     super.dispose();
+  }
+
+  void _onControllerChangedForEditing() {
+    final opts = _controller.editingOptions;
+    if (_lastEditMode != opts.mode ||
+        _lastEditingRowIndex != _controller.editingRowIndex ||
+        _lastActionPos != opts.actionColumnPosition ||
+        _lastAllowUpdating != opts.allowUpdating ||
+        _lastAllowDeleting != opts.allowDeleting) {
+      _lastEditMode = opts.mode;
+      _lastEditingRowIndex = _controller.editingRowIndex;
+      _lastActionPos = opts.actionColumnPosition;
+      _lastAllowUpdating = opts.allowUpdating;
+      _lastAllowDeleting = opts.allowDeleting;
+      _fitController.columns.columns = _buildFitColumns();
+    }
+  }
+
+  List<FitGridColumn<Map<String, dynamic>>> _buildFitColumns() {
+    final opts = _controller.editingOptions;
+    final isRowMode = opts.enabled && opts.mode == AiGridEditMode.row;
+    final isFormMode = opts.enabled && opts.mode == AiGridEditMode.form;
+
+    final columns = widget.dataSource.columns.map((c) {
+      if (isRowMode && c.isEditable) {
+        return _buildRowEditableColumn(c);
+      }
+      return c.toFitGridColumn();
+    }).toList();
+
+    if ((isRowMode || isFormMode) &&
+        (opts.allowUpdating || opts.allowDeleting)) {
+      final actionCol = _buildActionColumn();
+      if (opts.actionColumnPosition == AiGridActionColumnPosition.left) {
+        columns.insert(0, actionCol);
+      } else {
+        columns.add(actionCol);
+      }
+    }
+
+    return columns;
+  }
+
+  FitGridColumn<Map<String, dynamic>> _buildActionColumn() {
+    final isLeft = _controller.editingOptions.actionColumnPosition ==
+        AiGridActionColumnPosition.left;
+
+    return FitGridColumn<Map<String, dynamic>>(
+      id: '__actions__',
+      label: 'Actions',
+      width: const FitGridColumnWidth.fixed(100.0),
+      freeze: isLeft ? FitGridFreeze.start : FitGridFreeze.end,
+      resizable: false,
+      sortable: false,
+      reorderable: false,
+      hideable: false,
+      searchable: false,
+      alignment: FitGridAlignment.center,
+      value: (_) => '',
+      cellBuilder: (context, row, rowIndex) {
+        final isEditing =
+            _controller.isEditingRow && _controller.editingRowIndex == rowIndex;
+
+        if (isEditing) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Tooltip(
+                message: 'Save',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(4),
+                  onTap: () async {
+                    await _controller.saveEdit();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.check, size: 18, color: Colors.green),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Tooltip(
+                message: 'Cancel',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(4),
+                  onTap: () {
+                    _controller.cancelEdit();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.close, size: 18, color: Colors.red),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_controller.editingOptions.allowUpdating)
+              Tooltip(
+                message: 'Edit',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(4),
+                  onTap: () {
+                    if (_controller.editingOptions.mode ==
+                        AiGridEditMode.form) {
+                      _controller.showEditDialog(context, rowIndex: rowIndex);
+                    } else {
+                      _controller.startEdit(rowIndex);
+                    }
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.edit_outlined, size: 18),
+                  ),
+                ),
+              ),
+            if (_controller.editingOptions.allowUpdating &&
+                _controller.editingOptions.allowDeleting)
+              const SizedBox(width: 6),
+            if (_controller.editingOptions.allowDeleting)
+              Tooltip(
+                message: 'Delete',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(4),
+                  onTap: () async {
+                    await _controller.deleteRow(rowIndex);
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.delete_outline,
+                        size: 18, color: Colors.redAccent),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  FitGridColumn<Map<String, dynamic>> _buildRowEditableColumn(AiGridColumn col) {
+    final base = col.toFitGridColumn();
+    return base.copyWith(
+      cellBuilder: (context, row, rowIndex) {
+        final isEditingThisRow =
+            _controller.isEditingRow && _controller.editingRowIndex == rowIndex;
+        if (isEditingThisRow) {
+          return _buildInlineCellEditor(context, col);
+        }
+        if (col.cellBuilder != null) {
+          return col.cellBuilder!(context, row, rowIndex);
+        }
+        return Text(
+          col.formatDisplayValue(row[col.field]),
+          overflow: TextOverflow.ellipsis,
+        );
+      },
+    );
+  }
+
+  Widget _buildInlineCellEditor(BuildContext context, AiGridColumn col) {
+    if (col.editorBuilder != null) {
+      return col.editorBuilder!(
+        context,
+        _controller.draftRow?[col.field],
+        (newVal) => _controller.updateDraftValue(col.field, newVal),
+      );
+    }
+
+    if (col.editorType == AiGridEditorType.boolean ||
+        col.type == AiGridColumnType.boolean) {
+      final boolVal = _controller.draftRow?[col.field] == true;
+      return Center(
+        child: Checkbox(
+          value: boolVal,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          onChanged: (v) => _controller.updateDraftValue(col.field, v),
+        ),
+      );
+    }
+
+    if (col.editorType == AiGridEditorType.select ||
+        col.type == AiGridColumnType.select) {
+      final options = <String>[];
+      if (col.selectOptions != null) {
+        options.addAll(col.selectOptions!);
+      } else if (col.editorOptions?['items'] is List) {
+        for (final item in col.editorOptions!['items'] as List) {
+          options.add(item.toString());
+        }
+      }
+      final currentStr = _controller.draftRow?[col.field]?.toString();
+      final effectiveVal = options.contains(currentStr) ? currentStr : null;
+
+      return DropdownButton<String>(
+        isDense: true,
+        isExpanded: true,
+        underline: const SizedBox(),
+        value: effectiveVal,
+        items: options
+            .map((opt) => DropdownMenuItem(
+                  value: opt,
+                  child: Text(opt, style: const TextStyle(fontSize: 12)),
+                ))
+            .toList(),
+        onChanged: (v) => _controller.updateDraftValue(col.field, v),
+      );
+    }
+
+    if (col.editorType == AiGridEditorType.date ||
+        col.editorType == AiGridEditorType.dateTime ||
+        col.type == AiGridColumnType.date) {
+      final currentVal = _controller.draftRow?[col.field];
+      final isDateTime = col.editorType == AiGridEditorType.dateTime;
+      String dateStr = '';
+      if (currentVal is DateTime) {
+        dateStr = isDateTime
+            ? DateFormat('yyyy-MM-dd HH:mm').format(currentVal)
+            : DateFormat('yyyy-MM-dd').format(currentVal);
+      } else if (currentVal != null) {
+        dateStr = currentVal.toString();
+      }
+
+      return InkWell(
+        onTap: () async {
+          DateTime initDate = DateTime.now();
+          if (currentVal is DateTime) {
+            initDate = currentVal;
+          } else if (currentVal != null) {
+            final p = DateTime.tryParse(currentVal.toString());
+            if (p != null) initDate = p;
+          }
+          final picked = await showDatePicker(
+            context: context,
+            initialDate: initDate,
+            firstDate: DateTime(1900),
+            lastDate: DateTime(2100),
+          );
+          if (picked != null) {
+            if (isDateTime) {
+              if (!context.mounted) return;
+              final pickedTime = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.fromDateTime(initDate),
+              );
+              final dt = DateTime(
+                picked.year,
+                picked.month,
+                picked.day,
+                pickedTime?.hour ?? 0,
+                pickedTime?.minute ?? 0,
+              );
+              final formatted = DateFormat('yyyy-MM-dd HH:mm').format(dt);
+              _controller.updateDraftValue(col.field, formatted);
+            } else {
+              final formatted = DateFormat('yyyy-MM-dd').format(picked);
+              _controller.updateDraftValue(col.field, formatted);
+            }
+          }
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isDateTime
+                  ? Icons.access_time_outlined
+                  : Icons.calendar_today_outlined,
+              size: 14,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                dateStr.isNotEmpty ? dateStr : 'Select',
+                style: const TextStyle(fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Text / Number / Currency
+    final isNum = col.editorType == AiGridEditorType.number ||
+        col.type == AiGridColumnType.number ||
+        col.editorType == AiGridEditorType.currency ||
+        col.type == AiGridColumnType.currency;
+
+    final initial = _controller.draftRow?[col.field]?.toString() ?? '';
+
+    return TextFormField(
+      initialValue: initial,
+      style: const TextStyle(fontSize: 12),
+      keyboardType: isNum
+          ? const TextInputType.numberWithOptions(decimal: true, signed: true)
+          : TextInputType.text,
+      decoration: const InputDecoration(
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(4)),
+        ),
+      ),
+      onChanged: (val) {
+        if (isNum) {
+          final parsed = num.tryParse(val.replaceAll(RegExp(r'[^0-9.-]'), ''));
+          _controller.updateDraftValue(col.field, parsed ?? (val.isEmpty ? null : val));
+        } else {
+          _controller.updateDraftValue(col.field, val.isEmpty ? null : val);
+        }
+      },
+    );
   }
 
   void _onDataSourceChanged() {
@@ -575,6 +909,9 @@ class _AiGridState extends State<AiGrid> {
     FitGridColumn<Map<String, dynamic>> column,
     List<PopupMenuEntry<void>> defaults,
   ) {
+    if (column.id == '__actions__') {
+      return const [];
+    }
     final isGrouped = _controller.activeGrouping.contains(column.id);
     final groupItem = PopupMenuItem<void>(
       onTap: () {

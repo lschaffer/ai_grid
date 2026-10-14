@@ -926,6 +926,61 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
     });
+
+    testWidgets('AiGrid in row edit mode injects action column and toggles inline editing', (tester) async {
+      final sample = [
+        {'id': 1, 'name': 'Item A', 'price': 100.0},
+        {'id': 2, 'name': 'Item B', 'price': 200.0},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text, editable: true),
+        const AiGridColumn(field: 'price', title: 'Price', type: AiGridColumnType.number, editable: true),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final controller = AiGridController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 500,
+              child: AiGrid(
+                controller: controller,
+                dataSource: ds,
+                editingOptions: const AiGridEditingOptions(
+                  mode: AiGridEditMode.row,
+                  allowUpdating: true,
+                  allowDeleting: true,
+                  actionColumnPosition: AiGridActionColumnPosition.right,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Check edit and delete icons are rendered
+      expect(find.byIcon(Icons.edit_outlined), findsWidgets);
+      expect(find.byIcon(Icons.delete_outline), findsWidgets);
+
+      // Start editing first row
+      controller.startEdit(0);
+      await tester.pumpAndSettle();
+
+      // Now check and close icons are rendered for row 0
+      expect(find.byIcon(Icons.check), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsOneWidget);
+
+      // Cancel editing
+      controller.cancelEdit();
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.check), findsNothing);
+      expect(find.byIcon(Icons.close), findsNothing);
+    });
   });
 }
 

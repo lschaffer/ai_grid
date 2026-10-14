@@ -67,6 +67,9 @@ class AiGridColumn {
   final String? numberFormat;
   final List<String>? selectOptions;
 
+  /// Optional custom widget cell builder.
+  final FitGridCellBuilder<Map<String, dynamic>>? cellBuilder;
+
   const AiGridColumn({
     required this.field,
     required this.title,
@@ -89,6 +92,7 @@ class AiGridColumn {
     this.aggregateType = AiGridAggregateType.none,
     this.numberFormat,
     this.selectOptions,
+    this.cellBuilder,
   });
 
   /// Whether this column can be edited.
@@ -224,8 +228,12 @@ class AiGridColumn {
       aggregate: aggregateFunc,
       footerLabel: footLabel,
       editor: editor,
+      cellBuilder: cellBuilder,
     );
   }
+
+  /// Formats a raw field value into human-readable text according to column type and numberFormat.
+  String formatDisplayValue(dynamic raw) => _formatDisplayValue(raw);
 
   String _formatDisplayValue(dynamic raw) {
     if (raw == null) return '';

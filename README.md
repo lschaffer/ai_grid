@@ -1,6 +1,6 @@
 # AI Grid (`ai_grid`)
 
-[![pub version](https://img.shields.io/badge/pub-v0.1.0-blue.svg)](https://pub.dev/packages/ai_grid)
+[![pub version](https://img.shields.io/badge/pub-v0.2.0-blue.svg)](https://pub.dev/packages/ai_grid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.24.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![WASM Ready](https://img.shields.io/badge/WebAssembly-WASM%20Compatible-success.svg)](https://flutter.dev/to/wasm)
@@ -26,7 +26,26 @@
 * **Inline Column Filtering**: Individual column filter row supporting contains, equals, starts with, ends with, and comparison operators.
 * **Aggregate Footers**: Auto-computed sum, average, min, max, and count summary rows.
 
-### 2. 🧠 Native AI Assistant & Model Context Protocol (MCP)
+### 2. ✍️ DevExtreme-Style DataGrid Editing (Cell, Row & Form Modes)
+* **Three Editing Modes (`AiGridEditMode`)**:
+  * `cell`: Direct in-place cell editing.
+  * `row`: Inline row editing with committed draft states and standard Material action icons (`check` to save, `close` to cancel, `edit_outlined`, `delete_outline`).
+  * `form`: Modal Material 3 popup form dialog editing all editable fields in a structured layout.
+* **Pinned Action Column (`AiGridActionColumnPosition`)**: Automatically pinned to `left` or `right` with compact, overflow-free action buttons.
+* **Modal Popup Form (`AiGridFormDialog`)**:
+  * Configurable layouts via `AiGridFormLayout`: `row` (vertical scrollable list), `wrap` (horizontal flow), `grid` (multi-column grid), or `custom` (`formBuilder`).
+  * Standard Material 3 controls for text, numbers, currency, date & datetime pickers, dropdown selects, and toggle switches.
+  * Form field ordering driven by `editorIndex`.
+* **Column-Level Editing Rules (`AiGridColumn`)**:
+  * `editable`: Explicitly enable or disable editing per column.
+  * `editorType`: Control type (`text`, `number`, `currency`, `date`, `dateTime`, `select`, `boolean`).
+  * `validator`: Field-level validation callbacks.
+  * `editorBuilder`: Custom inline or form field widget builders.
+* **Complete CRUD Lifecycle**:
+  * Validation pipeline via `beforeSave` and `beforeDelete`.
+  * Persistence hooks via `commit`, `afterSave`, and `afterDelete`.
+
+### 3. 🧠 Native AI Assistant & Model Context Protocol (MCP)
 * **Embedded AI Chat**: Conversational interface that understands your tabular schema, column types, and data distributions.
 * **Hallucination-Free Math Engine (`grid_calculate`)**: Calculations (sum, average, minimum, maximum, count, median) are executed strictly inside the Dart engine—ensuring 100% mathematical accuracy without LLM arithmetic errors.
 * **Multi-Column AND Filtering**: Seamlessly parses and applies complex queries across multiple columns simultaneously (e.g. *"filter region East and category Furniture"*).
@@ -166,6 +185,13 @@ class _SalesGridPageState extends State<SalesGridPage> {
   void initState() {
     super.initState();
     _controller = AiGridController();
+    _controller.editingOptions = const AiGridEditingOptions(
+      enabled: true,
+      mode: AiGridEditMode.row, // .cell, .row, or .form
+      allowAdding: true,
+      allowUpdating: true,
+      allowDeleting: true,
+    );
 
     final columns = [
       const AiGridColumn(
@@ -173,18 +199,22 @@ class _SalesGridPageState extends State<SalesGridPage> {
         title: 'Order ID',
         type: AiGridColumnType.text,
         aggregateType: AiGridAggregateType.count,
+        editable: true,
         width: 140,
       ),
       const AiGridColumn(
         field: 'customer',
         title: 'Customer Name',
         type: AiGridColumnType.text,
+        editable: true,
         width: 180,
       ),
       const AiGridColumn(
         field: 'category',
         title: 'Category',
-        type: AiGridColumnType.text,
+        type: AiGridColumnType.select,
+        selectOptions: ['Furniture', 'Technology', 'Office Supplies'],
+        editable: true,
         width: 140,
       ),
       const AiGridColumn(
@@ -192,6 +222,7 @@ class _SalesGridPageState extends State<SalesGridPage> {
         title: 'Sales Amount',
         type: AiGridColumnType.currency,
         aggregateType: AiGridAggregateType.sum,
+        editable: false,
         width: 140,
       ),
     ];

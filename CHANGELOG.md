@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.2.0
+
+Comprehensive DevExtreme-style DataGrid Editing support across cell, row, and modal form modes with full CRUD lifecycle validation and action column orchestration.
+
+### DevExtreme-Style DataGrid Editing
+* **Three Editing Modes (`AiGridEditMode`)**:
+  * `cell`: Default direct in-cell editing.
+  * `row`: Inline row editing with committed draft states and standard Material action icons (`check` to save, `close` to cancel, `edit_outlined` to edit, `delete_outline` to delete).
+  * `form`: Modal Material 3 popup dialog editing all editable fields in a structured layout.
+* **Pinned Action Column (`AiGridActionColumnPosition`)**:
+  * Pinned to `start` (`left`) or `end` (`right`) of the grid.
+  * Compact, overflow-free action buttons with tooltips for editing, deleting, saving, and cancelling.
+* **Modal Popup Form (`AiGridFormDialog`)**:
+  * Flexible layout engine (`AiGridFormLayout`) supporting:
+    * `row`: Vertical scrollable list with one field per row.
+    * `wrap`: Adaptive horizontal flow wrapping left-to-right.
+    * `grid`: Multi-column grid layout (e.g. 2, 3, or 4 columns).
+    * `custom`: Fully custom widget builder (`formBuilder`).
+  * Field ordering based on column `editorIndex`.
+  * Standard Material form controls: text input, numeric input, currency with customizable prefix, date/dateTime pickers, dropdown selects, and toggle switches.
+* **Column-Level Editing Specifications (`AiGridColumn`)**:
+  * `editable`: Explicitly enable or disable editing per column.
+  * `editorIndex`: Sort order of the column's field in the edit form.
+  * `editorType`: Explicit control type (`text`, `number`, `currency`, `date`, `dateTime`, `select`, `boolean`).
+  * `editorOptions`: Options map for placeholders, prefixes, and dropdown items.
+  * `validator`: Custom validator callback returning an error string or null.
+  * `editorBuilder`: Completely custom in-place editor builder for inline cells or form fields.
+* **CRUD Lifecycle & Validation Pipeline**:
+  * `beforeSave`: Async callback to validate or reject pending edits before saving.
+  * `commit`: Per-field persistence callback for committing values to backend or state.
+  * `afterSave`: Callback invoked on successful row update or add.
+  * `beforeDelete`: Confirmation callback prior to row deletion.
+  * `afterDelete`: Callback invoked after row deletion.
+* **Toolbar Add Action**:
+  * Integrated `+ Add` button in desktop and mobile toolbars when `allowAdding: true`.
+  * Automatically routes to `showEditDialog` in `form` mode or `startAdd` in `row`/`cell` mode.
+
 ## 0.1.0
 
 Initial feature-complete release of **AI Grid**: An intelligent, ultra-high-performance DataGrid for Flutter with native AI Assistant and Model Context Protocol (MCP) skill control.

@@ -35,6 +35,7 @@ class AiGridController extends ChangeNotifier {
 
   /// Current editing options configured for this grid.
   AiGridEditingOptions get editingOptions => _editingOptions;
+  set editingOptions(AiGridEditingOptions options) => setEditingOptions(options);
 
   /// Index of the row currently being edited in row/form mode, or null.
   int? get editingRowIndex => _editingRowIndex;

@@ -94,6 +94,7 @@ enum AiGridEditorType {
   number,
   currency,
   date,
+  dateTime,
   boolean,
   select,
 }
@@ -163,4 +164,41 @@ class AiGridEditingOptions {
     this.beforeDelete,
     this.afterDelete,
   });
+
+  /// Creates a copy of this [AiGridEditingOptions] with specified values updated.
+  AiGridEditingOptions copyWith({
+    bool? enabled,
+    AiGridEditMode? mode,
+    bool? allowAdding,
+    bool? allowUpdating,
+    bool? allowDeleting,
+    AiGridActionColumnPosition? actionColumnPosition,
+    AiGridFormLayout? formLayout,
+    String? popupTitle,
+    double? popupWidth,
+    double? popupHeight,
+    FutureOr<String?> Function(Map<String, dynamic> row, Map<String, dynamic> changes)? beforeSave,
+    void Function(String column, dynamic value)? commit,
+    void Function(Map<String, dynamic> row)? afterSave,
+    FutureOr<bool> Function(Map<String, dynamic> row)? beforeDelete,
+    void Function(Map<String, dynamic> row)? afterDelete,
+  }) {
+    return AiGridEditingOptions(
+      enabled: enabled ?? this.enabled,
+      mode: mode ?? this.mode,
+      allowAdding: allowAdding ?? this.allowAdding,
+      allowUpdating: allowUpdating ?? this.allowUpdating,
+      allowDeleting: allowDeleting ?? this.allowDeleting,
+      actionColumnPosition: actionColumnPosition ?? this.actionColumnPosition,
+      formLayout: formLayout ?? this.formLayout,
+      popupTitle: popupTitle ?? this.popupTitle,
+      popupWidth: popupWidth ?? this.popupWidth,
+      popupHeight: popupHeight ?? this.popupHeight,
+      beforeSave: beforeSave ?? this.beforeSave,
+      commit: commit ?? this.commit,
+      afterSave: afterSave ?? this.afterSave,
+      beforeDelete: beforeDelete ?? this.beforeDelete,
+      afterDelete: afterDelete ?? this.afterDelete,
+    );
+  }
 }

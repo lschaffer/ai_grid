@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import '../controllers/ai_grid_controller.dart';
+import '../models/ai_grid_editing_options.dart';
 import '../theme/ai_grid_theme.dart';
 
 /// Top Toolbar for [AiGrid], providing search, filter toggle, group toggle,
@@ -154,9 +155,30 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
               case 'export':
                 _handleExport(context);
                 break;
+              case 'add':
+                if (widget.controller.editingOptions.mode == AiGridEditMode.form) {
+                  widget.controller.showEditDialog(context);
+                } else {
+                  widget.controller.startAdd();
+                }
+                break;
             }
           },
           itemBuilder: (context) => [
+            if (widget.controller.editingOptions.enabled &&
+                widget.controller.editingOptions.allowAdding) ...[
+              const PopupMenuItem(
+                value: 'add',
+                child: Row(
+                  children: [
+                    Icon(Icons.add, size: 18),
+                    SizedBox(width: 10),
+                    Text('Add Record', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+            ],
             PopupMenuItem(
               value: 'group',
               child: Row(
@@ -274,6 +296,24 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
   ) {
     return Row(
       children: [
+        if (widget.controller.editingOptions.enabled &&
+            widget.controller.editingOptions.allowAdding) ...[
+          IconButton(
+            icon: Icon(
+              Icons.add,
+              size: 20,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            tooltip: 'Add Record',
+            onPressed: () {
+              if (widget.controller.editingOptions.mode == AiGridEditMode.form) {
+                widget.controller.showEditDialog(context);
+              } else {
+                widget.controller.startAdd();
+              }
+            },
+          ),
+        ],
         IconButton(
           icon: Icon(
             Icons.layers_outlined,

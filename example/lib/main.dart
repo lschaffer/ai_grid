@@ -75,6 +75,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
   AiGridConfig? _aiConfig;
   bool _isLoading = true;
   String? _errorMessage;
+  AiGridEditMode _editMode = AiGridEditMode.row;
 
   @override
   void initState() {
@@ -84,6 +85,41 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
     // Configure LLM from .env or fallback
     final llmConfig = AiGridEnvLoader.createLlmConfigFromEnv();
     _aiConfig = AiGridConfig(llmConfig: llmConfig);
+
+    // Configure DevExtreme-style editing features
+    _controller.editingOptions = AiGridEditingOptions(
+      enabled: true,
+      mode: _editMode,
+      allowAdding: true,
+      allowUpdating: true,
+      allowDeleting: true,
+      actionColumnPosition: AiGridActionColumnPosition.right,
+      formLayout: const AiGridFormLayout.grid(columns: 2),
+      popupTitle: 'Superstore Order Details',
+      afterSave: (row) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Order ${row['OrderID'] ?? ''} saved successfully!'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.green.shade700,
+            ),
+          );
+        }
+      },
+      afterDelete: (row) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Order ${row['OrderID'] ?? ''} deleted.'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+    );
 
     _loadSuperstoreJson();
   }
@@ -95,6 +131,64 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
       final List<dynamic> decoded = jsonDecode(jsonString);
       final records = decoded.cast<Map<String, dynamic>>();
 
+      // Extract distinct sorted values for select/dropdown fields
+      final shipModes = records
+          .map((r) => r['ShipMode']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      final segments = records
+          .map((r) => r['Segment']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      final countries = records
+          .map((r) => r['Country']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      final cities = records
+          .map((r) => r['City']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      final states = records
+          .map((r) => r['State']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      final regions = records
+          .map((r) => r['Region']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      final categories = records
+          .map((r) => r['Category']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      final subCategories = records
+          .map((r) => r['SubCategory']?.toString())
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+
       final columns = [
         const AiGridColumn(
           field: 'OrderID',
@@ -103,96 +197,138 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           aggregateType: AiGridAggregateType.count,
           numberFormat: '#,###',
           width: 140,
+          editable: true,
+          editorIndex: 0,
         ),
         const AiGridColumn(
           field: 'OrderDate',
           title: 'Order Date',
           type: AiGridColumnType.date,
-          width: 120,
+          editorType: AiGridEditorType.dateTime,
+          width: 140,
+          editable: true,
+          editorIndex: 1,
         ),
         const AiGridColumn(
           field: 'ShipDate',
           title: 'Ship Date',
           type: AiGridColumnType.date,
-          width: 120,
+          editorType: AiGridEditorType.dateTime,
+          width: 140,
+          editable: true,
+          editorIndex: 2,
         ),
-        const AiGridColumn(
+        AiGridColumn(
           field: 'ShipMode',
           title: 'Ship Mode',
-          type: AiGridColumnType.text,
+          type: AiGridColumnType.select,
+          selectOptions: shipModes,
           width: 130,
+          editable: true,
+          editorIndex: 3,
         ),
         const AiGridColumn(
           field: 'CustomerID',
           title: 'Customer ID',
           type: AiGridColumnType.text,
           width: 120,
+          editable: true,
+          editorIndex: 4,
         ),
         const AiGridColumn(
           field: 'CustomerName',
           title: 'Customer Name',
           type: AiGridColumnType.text,
           width: 160,
+          editable: true,
+          editorIndex: 5,
         ),
-        const AiGridColumn(
+        AiGridColumn(
           field: 'Segment',
           title: 'Segment',
-          type: AiGridColumnType.text,
+          type: AiGridColumnType.select,
+          selectOptions: segments,
           width: 120,
+          editable: true,
+          editorIndex: 6,
         ),
-        const AiGridColumn(
+        AiGridColumn(
           field: 'Country',
           title: 'Country',
-          type: AiGridColumnType.text,
+          type: AiGridColumnType.select,
+          selectOptions: countries,
           width: 120,
+          editable: true,
+          editorIndex: 7,
         ),
-        const AiGridColumn(
+        AiGridColumn(
           field: 'City',
           title: 'City',
-          type: AiGridColumnType.text,
+          type: AiGridColumnType.select,
+          selectOptions: cities,
           width: 140,
+          editable: true,
+          editorIndex: 8,
         ),
-        const AiGridColumn(
+        AiGridColumn(
           field: 'State',
           title: 'State',
-          type: AiGridColumnType.text,
+          type: AiGridColumnType.select,
+          selectOptions: states,
           width: 130,
+          editable: true,
+          editorIndex: 9,
         ),
         const AiGridColumn(
           field: 'PostalCode',
           title: 'Postal Code',
           type: AiGridColumnType.number,
           width: 110,
+          editable: true,
+          editorIndex: 10,
         ),
-        const AiGridColumn(
+        AiGridColumn(
           field: 'Region',
           title: 'Region',
-          type: AiGridColumnType.text,
+          type: AiGridColumnType.select,
+          selectOptions: regions,
           width: 110,
+          editable: true,
+          editorIndex: 11,
         ),
         const AiGridColumn(
           field: 'ProductID',
           title: 'Product ID',
           type: AiGridColumnType.text,
           width: 150,
+          editable: true,
+          editorIndex: 12,
         ),
-        const AiGridColumn(
+        AiGridColumn(
           field: 'Category',
           title: 'Category',
-          type: AiGridColumnType.text,
+          type: AiGridColumnType.select,
+          selectOptions: categories,
           width: 130,
+          editable: true,
+          editorIndex: 13,
         ),
-        const AiGridColumn(
+        AiGridColumn(
           field: 'SubCategory',
           title: 'Sub-Category',
-          type: AiGridColumnType.text,
+          type: AiGridColumnType.select,
+          selectOptions: subCategories,
           width: 140,
+          editable: true,
+          editorIndex: 14,
         ),
         const AiGridColumn(
           field: 'ProductName',
           title: 'Product Name',
           type: AiGridColumnType.text,
           width: 260,
+          editable: true,
+          editorIndex: 15,
         ),
         const AiGridColumn(
           field: 'Sales',
@@ -200,6 +336,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           type: AiGridColumnType.currency,
           aggregateType: AiGridAggregateType.sum,
           width: 130,
+          editable: false,
         ),
         const AiGridColumn(
           field: 'Quantity',
@@ -207,6 +344,8 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           type: AiGridColumnType.number,
           aggregateType: AiGridAggregateType.sum,
           width: 100,
+          editable: true,
+          editorIndex: 16,
         ),
         const AiGridColumn(
           field: 'Discount',
@@ -214,6 +353,8 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           type: AiGridColumnType.number,
           aggregateType: AiGridAggregateType.average,
           width: 110,
+          editable: true,
+          editorIndex: 17,
         ),
         const AiGridColumn(
           field: 'Profit',
@@ -221,6 +362,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
           type: AiGridColumnType.currency,
           aggregateType: AiGridAggregateType.sum,
           width: 130,
+          editable: false,
         ),
       ];
 
@@ -393,6 +535,73 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
         actions: [
+          // Top bar switch among editing modes (Row, Cell, Form)
+          Container(
+            height: 36,
+            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<AiGridEditMode>(
+                value: _editMode,
+                icon: const Icon(Icons.arrow_drop_down, size: 18),
+                borderRadius: BorderRadius.circular(8),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: AiGridEditMode.row,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.edit_note, size: 16),
+                        SizedBox(width: 6),
+                        Text('Row Edit Mode'),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: AiGridEditMode.cell,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.grid_on, size: 16),
+                        SizedBox(width: 6),
+                        Text('Cell Edit Mode'),
+                      ],
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: AiGridEditMode.form,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.dynamic_form_outlined, size: 16),
+                        SizedBox(width: 6),
+                        Text('Form (Popup) Mode'),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (mode) {
+                  if (mode != null) {
+                    setState(() {
+                      _editMode = mode;
+                      _controller.editingOptions =
+                          _controller.editingOptions.copyWith(mode: mode);
+                    });
+                  }
+                },
+              ),
+            ),
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.tune_outlined),
             tooltip: 'Layout Presets & Settings',
@@ -588,6 +797,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                     dataSource: _dataSource!,
                     controller: _controller,
                     aiConfig: _aiConfig,
+                    editingOptions: _controller.editingOptions,
                     enableAiAssistant: true,
                     enablePagination: false,
                     autoSave: true,
