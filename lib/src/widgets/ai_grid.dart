@@ -209,18 +209,25 @@ class _AiGridState extends State<AiGrid> {
     if (widget.dataSource != oldWidget.dataSource) {
       oldWidget.dataSource.removeListener(_onDataSourceChanged);
       widget.dataSource.addListener(_onDataSourceChanged);
-      _fitController.columns.columns = _buildFitColumns();
-      _controller.attach(
-        fitController: _fitController,
-        columns: widget.dataSource.columns,
-        dataSource: widget.dataSource,
-        notify: false,
-      );
-      _loadData();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _fitController.columns.columns = _buildFitColumns();
+        _controller.attach(
+          fitController: _fitController,
+          columns: widget.dataSource.columns,
+          dataSource: widget.dataSource,
+          notify: false,
+        );
+        _loadData();
+      });
     }
     if (widget.editingOptions != oldWidget.editingOptions && widget.editingOptions != null) {
       _controller.setEditingOptions(widget.editingOptions!, notify: false);
-      _fitController.columns.columns = _buildFitColumns();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _fitController.columns.columns = _buildFitColumns();
+        }
+      });
     }
   }
 

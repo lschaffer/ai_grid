@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
@@ -435,7 +436,17 @@ class AiGridController extends ChangeNotifier {
   }
 
   void _onFitControllerChanged() {
-    notifyListeners();
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed) {
+          notifyListeners();
+        }
+      });
+    } else {
+      notifyListeners();
+    }
   }
 
   /// Attaches the controller to the rendered grid controller and data source.
@@ -496,8 +507,11 @@ class AiGridController extends ChangeNotifier {
     }
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _fitController?.data.removeListener(_onFitControllerChanged);
     _fitController?.columns.removeListener(_onFitControllerChanged);
     _fitController?.filter.removeListener(_onFitFilterChanged);
@@ -517,7 +531,17 @@ class AiGridController extends ChangeNotifier {
         if (entry.value.values.isNotEmpty) 'values': entry.value.values.toList(),
       };
     }
-    notifyListeners();
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed) {
+          notifyListeners();
+        }
+      });
+    } else {
+      notifyListeners();
+    }
   }
 
   /// Resolves field name flexibly (case-insensitive or title).
