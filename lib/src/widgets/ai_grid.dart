@@ -313,7 +313,10 @@ class _AiGridState extends State<AiGrid> {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(4),
                   onTap: () async {
-                    await _controller.saveEdit();
+                    final err = await _controller.saveEdit();
+                    if (err != null && context.mounted) {
+                      _showValidationErrorsDialog(context);
+                    }
                   },
                   child: const Padding(
                     padding: EdgeInsets.all(4),
@@ -655,6 +658,127 @@ class _AiGridState extends State<AiGrid> {
     return opts.enabled && opts.allowUpdating && opts.mode == AiGridEditMode.cell
         ? FitGridEditTrigger.singleTap
         : FitGridEditTrigger.programmatic;
+  }
+
+  Future<void> _showValidationErrorsDialog(BuildContext context) async {
+    final errors = _controller.validationErrors;
+    if (errors.isEmpty) return;
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 22),
+            const SizedBox(width: 10),
+            Text(
+              'Validation Errors (${errors.length})',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Please resolve the following errors before saving:',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: errors.entries.map((entry) {
+                      final col = widget.dataSource.columns.firstWhere(
+                        (c) => c.field == entry.key,
+                        orElse: () => AiGridColumn(field: entry.key, title: entry.key),
+                      );
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.red.withValues(alpha: 0.15)
+                              : const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.redAccent.withValues(alpha: 0.3)
+                                : const Color(0xFFFECACA),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Icon(Icons.close_rounded,
+                                  size: 14, color: Colors.redAccent),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? Colors.white : Colors.black87,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: '${col.title}: ',
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                    ),
+                                    TextSpan(
+                                      text: entry.value,
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? Colors.red.shade200
+                                            : Colors.red.shade800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<bool> _confirmDelete(BuildContext context) async {
