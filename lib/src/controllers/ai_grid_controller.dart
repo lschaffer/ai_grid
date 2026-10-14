@@ -55,6 +55,161 @@ class AiGridController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Starts adding a new row, initializing draft values with column defaults or [initialValues].
+  void startAdd([Map<String, dynamic>? initialValues]) {
+    _editingRowIndex = null;
+    _isAddingRow = true;
+    _validationErrors.clear();
+    _draftRow = <String, dynamic>{};
+    for (final col in _columns) {
+      if (initialValues != null && initialValues.containsKey(col.field)) {
+        _draftRow![col.field] = initialValues[col.field];
+      } else {
+        _draftRow![col.field] = null;
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Starts editing an existing row at [rowIndex] in row or form mode.
+  void startEdit(int rowIndex) {
+    if (_fitController == null) return;
+    final rows = _fitController!.data.view;
+    if (rowIndex < 0 || rowIndex >= rows.length) return;
+    _editingRowIndex = rowIndex;
+    _isAddingRow = false;
+    _validationErrors.clear();
+    _draftRow = Map<String, dynamic>.from(rows[rowIndex]);
+    notifyListeners();
+  }
+
+  /// Updates a single column's value in the active edit draft.
+  void updateDraftValue(String column, dynamic value) {
+    if (_draftRow == null) return;
+    _draftRow![column] = value;
+    final col = _columns.where((c) => c.field == column).firstOrNull;
+    if (col != null && col.validator != null) {
+      final err = col.validator!(value);
+      if (err != null) {
+        _validationErrors[column] = err;
+      } else {
+        _validationErrors.remove(column);
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Cancels the active editing or adding session and discards draft changes.
+  void cancelEdit() {
+    _editingRowIndex = null;
+    _isAddingRow = false;
+    _draftRow = null;
+    _validationErrors.clear();
+    notifyListeners();
+  }
+
+  /// Validates and saves the active edit or added row.
+  /// Returns null on success, or an error message on validation failure.
+  Future<String?> saveEdit() async {
+    if (_draftRow == null || _fitController == null) return null;
+
+    // 1. Column-level validation
+    _validationErrors.clear();
+    for (final col in _columns) {
+      if (col.isEditable && col.validator != null) {
+        final err = col.validator!(_draftRow![col.field]);
+        if (err != null) {
+          _validationErrors[col.field] = err;
+        }
+      }
+    }
+    if (_validationErrors.isNotEmpty) {
+      notifyListeners();
+      return _validationErrors.values.first;
+    }
+
+    final originalRow = _isAddingRow
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(_fitController!.data.view[_editingRowIndex!]);
+
+    // 2. beforeSave lifecycle hook
+    if (_editingOptions.beforeSave != null) {
+      final err = await _editingOptions.beforeSave!(originalRow, _draftRow!);
+      if (err != null) {
+        notifyListeners();
+        return err;
+      }
+    }
+
+    // 3. Commit modified fields via options.commit
+    if (_editingOptions.commit != null) {
+      for (final entry in _draftRow!.entries) {
+        if (_isAddingRow || entry.value != originalRow[entry.key]) {
+          _editingOptions.commit!(entry.key, entry.value);
+        }
+      }
+    }
+
+    // 4. Update data in FitGridController and AiGridDataSource
+    final allRows = List<Map<String, dynamic>>.from(_fitController!.data.rows);
+    if (_isAddingRow) {
+      allRows.insert(0, Map<String, dynamic>.from(_draftRow!));
+    } else {
+      final targetRow = _fitController!.data.view[_editingRowIndex!];
+      final globalIndex = allRows.indexOf(targetRow);
+      if (globalIndex != -1) {
+        allRows[globalIndex] = Map<String, dynamic>.from(_draftRow!);
+      }
+    }
+    _fitController!.data.rows = allRows;
+    if (_dataSource is LocalAiGridDataSource) {
+      (_dataSource as LocalAiGridDataSource).setData(allRows);
+    }
+
+    final savedRow = Map<String, dynamic>.from(_draftRow!);
+
+    // Reset edit state
+    _editingRowIndex = null;
+    _isAddingRow = false;
+    _draftRow = null;
+    _validationErrors.clear();
+
+    // 5. afterSave lifecycle hook
+    _editingOptions.afterSave?.call(savedRow);
+
+    notifyListeners();
+    return null;
+  }
+
+  /// Deletes a row at [rowIndex] after running beforeDelete guard.
+  Future<bool> deleteRow(int rowIndex) async {
+    if (_fitController == null) return false;
+    final viewRows = _fitController!.data.view;
+    if (rowIndex < 0 || rowIndex >= viewRows.length) return false;
+
+    final targetRow = viewRows[rowIndex];
+
+    // 1. beforeDelete hook
+    if (_editingOptions.beforeDelete != null) {
+      final proceed = await _editingOptions.beforeDelete!(targetRow);
+      if (!proceed) return false;
+    }
+
+    // 2. Remove row from dataset
+    final allRows = List<Map<String, dynamic>>.from(_fitController!.data.rows);
+    allRows.remove(targetRow);
+    _fitController!.data.rows = allRows;
+    if (_dataSource is LocalAiGridDataSource) {
+      (_dataSource as LocalAiGridDataSource).setData(allRows);
+    }
+
+    // 3. afterDelete hook
+    _editingOptions.afterDelete?.call(targetRow);
+
+    notifyListeners();
+    return true;
+  }
+
   /// Underlying FitGridController if attached.
   FitGridController<Map<String, dynamic>>? get fitController => _fitController;
 

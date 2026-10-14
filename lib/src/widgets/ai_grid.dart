@@ -198,11 +198,6 @@ class _AiGridState extends State<AiGrid> {
       );
       _loadData();
     }
-  }
-
-  @override
-  void didUpdateWidget(covariant AiGrid oldWidget) {
-    super.didUpdateWidget(oldWidget);
     if (widget.editingOptions != oldWidget.editingOptions && widget.editingOptions != null) {
       _controller.setEditingOptions(widget.editingOptions!);
     }

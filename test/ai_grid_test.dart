@@ -631,6 +631,88 @@ void main() {
       expect(controller.editingOptions.formLayout.mode, AiGridFormLayoutMode.grid);
       expect(controller.editingOptions.formLayout.columns, 3);
     });
+
+    test('AiGridController CRUD pipeline executes validation, commit, afterSave, and delete', () async {
+      final sample = [
+        {'id': 1, 'name': 'Item 1', 'price': 10.0},
+        {'id': 2, 'name': 'Item 2', 'price': 20.0},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
+        AiGridColumn(
+          field: 'name',
+          title: 'Name',
+          type: AiGridColumnType.text,
+          editable: true,
+          validator: (v) => v == null || v.toString().trim().isEmpty ? 'Name cannot be empty' : null,
+        ),
+        const AiGridColumn(field: 'price', title: 'Price', type: AiGridColumnType.number, editable: true),
+      ];
+
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final controller = AiGridController();
+      controller.attach(columns: cols, dataSource: ds);
+
+      final committedFields = <String, dynamic>{};
+      Map<String, dynamic>? savedRowResult;
+
+      controller.setEditingOptions(AiGridEditingOptions(
+        mode: AiGridEditMode.row,
+        allowAdding: true,
+        allowUpdating: true,
+        allowDeleting: true,
+        commit: (col, val) => committedFields[col] = val,
+        afterSave: (row) => savedRowResult = row,
+      ));
+
+      // 1. Test startEdit & updateDraftValue
+      controller.startEdit(0);
+      expect(controller.isEditingRow, isTrue);
+      expect(controller.editingRowIndex, 0);
+      expect(controller.draftRow?['name'], 'Item 1');
+
+      controller.updateDraftValue('name', 'Updated Item 1');
+      expect(controller.draftRow?['name'], 'Updated Item 1');
+
+      // 2. Test saveEdit
+      final err = await controller.saveEdit();
+      expect(err, isNull);
+      expect(controller.isEditingRow, isFalse);
+      expect(controller.fitController!.data.rows[0]['name'], 'Updated Item 1');
+      expect(committedFields['name'], 'Updated Item 1');
+      expect(savedRowResult?['name'], 'Updated Item 1');
+
+      // 3. Test validation failure on empty name
+      controller.startEdit(0);
+      controller.updateDraftValue('name', '');
+      final valErr = await controller.saveEdit();
+      expect(valErr, 'Name cannot be empty');
+      expect(controller.isEditingRow, isTrue); // Keeps editor open
+      expect(controller.validationErrors['name'], 'Name cannot be empty');
+
+      controller.cancelEdit();
+      expect(controller.isEditingRow, isFalse);
+      expect(controller.validationErrors.isEmpty, isTrue);
+
+      // 4. Test startAdd & save
+      committedFields.clear();
+      controller.startAdd({'id': 3, 'name': 'Item 3', 'price': 30.0});
+      expect(controller.isAddingRow, isTrue);
+      final addErr = await controller.saveEdit();
+      expect(addErr, isNull);
+      expect(controller.fitController!.data.rows.length, 3);
+      expect(controller.fitController!.data.rows[0]['id'], 3);
+
+      // 5. Test deleteRow
+      Map<String, dynamic>? deletedRow;
+      controller.setEditingOptions(AiGridEditingOptions(
+        afterDelete: (r) => deletedRow = r,
+      ));
+      final delSuccess = await controller.deleteRow(0);
+      expect(delSuccess, isTrue);
+      expect(controller.fitController!.data.rows.length, 2);
+      expect(deletedRow?['id'], 3);
+    });
   });
 }
 
