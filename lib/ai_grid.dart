@@ -1,5 +1,6 @@
 export 'src/fitgrid/fitgrid_table.dart';
 export 'src/models/ai_grid_column.dart';
+export 'src/models/ai_grid_editing_options.dart';
 export 'src/models/ai_grid_data_source.dart';
 export 'src/controllers/ai_grid_controller.dart';
 export 'src/config/ai_grid_config.dart';

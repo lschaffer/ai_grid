@@ -5,6 +5,7 @@ import '../config/ai_grid_settings_storage.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_data_source.dart';
+import '../models/ai_grid_editing_options.dart';
 import '../theme/ai_grid_theme.dart';
 import 'ai_grid_assistant_panel.dart';
 import 'ai_grid_group_panel.dart';
@@ -53,6 +54,9 @@ class AiGrid extends StatefulWidget {
   /// Callback triggered whenever grid settings change.
   final void Function(Map<String, dynamic> settings)? onSettingsChanged;
 
+  /// Optional editing configuration supporting cell, row, and form (popup) editing modes.
+  final AiGridEditingOptions? editingOptions;
+
   const AiGrid({
     super.key,
     required this.dataSource,
@@ -71,6 +75,7 @@ class AiGrid extends StatefulWidget {
     this.persistenceKey = 'ai_grid_default_settings',
     this.initialSettings,
     this.onSettingsChanged,
+    this.editingOptions,
   });
 
   @override
@@ -92,6 +97,9 @@ class _AiGridState extends State<AiGrid> {
     } else {
       _controller = AiGridController();
       _internalController = true;
+    }
+    if (widget.editingOptions != null) {
+      _controller.setEditingOptions(widget.editingOptions!);
     }
 
     final fitColumns = widget.dataSource.columns.map((c) => c.toFitGridColumn()).toList();
@@ -189,6 +197,14 @@ class _AiGridState extends State<AiGrid> {
         dataSource: widget.dataSource,
       );
       _loadData();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AiGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.editingOptions != oldWidget.editingOptions && widget.editingOptions != null) {
+      _controller.setEditingOptions(widget.editingOptions!);
     }
   }
 

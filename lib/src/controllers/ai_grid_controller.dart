@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_data_source.dart';
+import '../models/ai_grid_editing_options.dart';
 
 /// Controller coordinating grid state, grouping, filtering, sorting,
 /// column visibility, and introspection for AI Assistant tools.
@@ -23,6 +24,36 @@ class AiGridController extends ChangeNotifier {
   bool _showGroupPanel = true;
   bool _showAiAssistant = false;
   bool _isApplyingFilters = false;
+
+  AiGridEditingOptions _editingOptions = const AiGridEditingOptions();
+  int? _editingRowIndex;
+  Map<String, dynamic>? _draftRow;
+  bool _isAddingRow = false;
+  final Map<String, String> _validationErrors = {};
+
+  /// Current editing options configured for this grid.
+  AiGridEditingOptions get editingOptions => _editingOptions;
+
+  /// Index of the row currently being edited in row/form mode, or null.
+  int? get editingRowIndex => _editingRowIndex;
+
+  /// In-progress draft values for the currently edited or added row.
+  Map<String, dynamic>? get draftRow => _draftRow;
+
+  /// Whether a brand-new row is currently being added.
+  bool get isAddingRow => _isAddingRow;
+
+  /// Whether any row is currently in an active edit or add session.
+  bool get isEditingRow => _editingRowIndex != null || _isAddingRow;
+
+  /// Validation error messages keyed by column field name.
+  Map<String, String> get validationErrors => Map.unmodifiable(_validationErrors);
+
+  /// Updates the editing options and notifies listeners.
+  void setEditingOptions(AiGridEditingOptions options) {
+    _editingOptions = options;
+    notifyListeners();
+  }
 
   /// Underlying FitGridController if attached.
   FitGridController<Map<String, dynamic>>? get fitController => _fitController;

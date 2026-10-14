@@ -1,6 +1,8 @@
 import 'dart:math' as math;
+import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import '../fitgrid/fitgrid_table.dart';
+import 'ai_grid_editing_options.dart';
 
 /// Data type of an AiGrid column.
 enum AiGridColumnType {
@@ -35,7 +37,32 @@ class AiGridColumn {
   final bool isGroupable;
   final bool isSortable;
   final bool isFilterable;
+
+  /// Whether this column is editable. If omitted, falls back to [enableEditingMode].
+  final bool? editable;
+
+  /// Legacy property for editing. Prefer using [editable].
   final bool enableEditingMode;
+
+  /// Layout order of this column in [AiGridEditMode.form]. Columns with lower indices appear first.
+  final int? editorIndex;
+
+  /// Explicit input widget type to use when editing this column. Defaults to matching [type].
+  final AiGridEditorType? editorType;
+
+  /// Optional parameters for the editor (e.g. min, max, step, placeholder, or custom options).
+  final Map<String, dynamic>? editorOptions;
+
+  /// Validation function that returns an error message if [value] is invalid, or null if valid.
+  final String? Function(dynamic value)? validator;
+
+  /// Bespoke editor widget builder for custom input controls.
+  final Widget Function(
+    BuildContext context,
+    dynamic value,
+    ValueChanged<dynamic> onChanged,
+  )? editorBuilder;
+
   final AiGridAggregateType aggregateType;
   final String? numberFormat;
   final List<String>? selectOptions;
@@ -52,11 +79,20 @@ class AiGridColumn {
     this.isGroupable = true,
     this.isSortable = true,
     this.isFilterable = true,
+    this.editable,
     this.enableEditingMode = false,
+    this.editorIndex,
+    this.editorType,
+    this.editorOptions,
+    this.validator,
+    this.editorBuilder,
     this.aggregateType = AiGridAggregateType.none,
     this.numberFormat,
     this.selectOptions,
   });
+
+  /// Whether this column can be edited.
+  bool get isEditable => editable ?? enableEditingMode;
 
   /// Converts this [AiGridColumn] into a [FitGridColumn] used by the underlying engine.
   FitGridColumn<Map<String, dynamic>> toFitGridColumn() {
@@ -146,8 +182,18 @@ class AiGridColumn {
     }
 
     FitGridEditor<Map<String, dynamic>>? editor;
-    if (enableEditingMode) {
+    if (isEditable) {
       editor = FitGridEditor<Map<String, dynamic>>(
+        validator: validator != null ? (row, text) => validator!(text) : null,
+        builder: editorBuilder != null
+            ? (context, session) => editorBuilder!(
+                  context,
+                  session.row[field] ?? session.initialText,
+                  (val) {
+                    session.commit(val?.toString() ?? '');
+                  },
+                )
+            : null,
         onCommit: (row, index, text) {
           if (type == AiGridColumnType.number || type == AiGridColumnType.currency) {
             row[field] = num.tryParse(text.replaceAll(RegExp(r'[^0-9.-]'), '')) ?? text;
@@ -234,6 +280,8 @@ class AiGridColumn {
         'isGroupable': isGroupable,
         'isSortable': isSortable,
         'isFilterable': isFilterable,
+        'editable': isEditable,
+        'editorIndex': editorIndex,
         'aggregateType': aggregateType.name,
       };
 }
