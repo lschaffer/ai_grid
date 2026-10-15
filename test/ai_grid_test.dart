@@ -1216,6 +1216,50 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.isPivotActive, isFalse);
     });
+
+    testWidgets('AiGridPivotChooserDialog opens safely without MaterialLocalizations errors', (tester) async {
+      final controller = AiGridController();
+      final sample = [
+        {'category': 'Furniture', 'sales': 500.0},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'category', title: 'Category'),
+        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1200,
+              height: 800,
+              child: AiGrid(
+                dataSource: ds,
+                controller: controller,
+                enableAiAssistant: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap on Pivot Table button in toolbar
+      final pivotBtn = find.byTooltip('Pivot Table (Field Chooser)...');
+      expect(pivotBtn, findsOneWidget);
+      await tester.tap(pivotBtn);
+      await tester.pumpAndSettle();
+
+      // Dialog is displayed
+      expect(find.byType(AiGridPivotChooserDialog), findsOneWidget);
+      expect(find.text('Pivot Table Field Chooser'), findsOneWidget);
+
+      // Close dialog
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AiGridPivotChooserDialog), findsNothing);
+    });
   });
 }
 

@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../models/ai_grid_pivot.dart';
 
 /// Data bundle for rendering a pivot chart.

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_pivot.dart';
@@ -20,10 +20,44 @@ class AiGridPivotChooserDialog extends StatefulWidget {
 
   /// Shows the dialog.
   static Future<void> show(BuildContext context, AiGridController controller) {
-    return showDialog<void>(
+    return showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (context) => AiGridPivotChooserDialog(controller: controller),
+      barrierLabel: 'Dismiss',
+      barrierColor: const Color(0x80000000),
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        Widget content = AiGridPivotChooserDialog(controller: controller);
+
+        final hasLoc = Localizations.of<MaterialLocalizations>(
+                dialogContext, MaterialLocalizations) !=
+            null;
+        if (!hasLoc) {
+          content = Localizations(
+            locale: const Locale('en', 'US'),
+            delegates: const [
+              DefaultMaterialLocalizations.delegate,
+              DefaultWidgetsLocalizations.delegate,
+            ],
+            child: content,
+          );
+        }
+
+        return SafeArea(
+          child: content,
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic),
+            ),
+            child: child,
+          ),
+        );
+      },
     );
   }
 
@@ -296,14 +330,24 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
                           const Divider(),
 
                           // Options Row: Chart & Totals
-                          Row(
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Checkbox(
-                                value: _showChart,
-                                onChanged: (v) => setState(() => _showChart = v ?? false),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value: _showChart,
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    onChanged: (v) => setState(() => _showChart = v ?? false),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text('Auto-create Chart', style: TextStyle(fontSize: 12)),
+                                ],
                               ),
-                              const Text('Auto-create Chart', style: TextStyle(fontSize: 12)),
-                              const SizedBox(width: 8),
                               if (_showChart)
                                 DropdownButton<AiGridPivotChartType>(
                                   value: _chartType,
@@ -323,12 +367,19 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
                                     if (t != null) setState(() => _chartType = t);
                                   },
                                 ),
-                              const Spacer(),
-                              Checkbox(
-                                value: _showColumnTotals,
-                                onChanged: (v) => setState(() => _showColumnTotals = v ?? true),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value: _showColumnTotals,
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    onChanged: (v) => setState(() => _showColumnTotals = v ?? true),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text('Grand Totals', style: TextStyle(fontSize: 12)),
+                                ],
                               ),
-                              const Text('Grand Totals', style: TextStyle(fontSize: 12)),
                             ],
                           ),
                         ],
@@ -400,9 +451,12 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
             children: [
               Icon(icon, size: 15, color: color),
               const SizedBox(width: 6),
-              Text(
-                title,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+              Expanded(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+                ),
               ),
             ],
           ),
@@ -450,12 +504,15 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
             children: [
               Icon(Icons.calculate, size: 15, color: Colors.teal.shade700),
               const SizedBox(width: 6),
-              Text(
-                'Data Fields / Measures (Aggregated Values)',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal.shade700,
+              Expanded(
+                child: Text(
+                  'Data Fields / Measures (Aggregated Values)',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal.shade700,
+                  ),
                 ),
               ),
             ],
