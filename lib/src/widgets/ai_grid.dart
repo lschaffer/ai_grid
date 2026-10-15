@@ -96,6 +96,9 @@ class _AiGridState extends State<AiGrid> {
   bool _internalController = false;
   bool _isLoading = true;
   double _pivotSplitRatio = 0.60;
+  double? _splitDragStartPos;
+  double? _splitDragStartRatio;
+  bool _isDraggingSplitter = false;
 
   AiGridEditMode? _lastEditMode;
   int? _lastEditingRowIndex;
@@ -1152,13 +1155,24 @@ class _AiGridState extends State<AiGrid> {
       return LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 720;
-          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final theme = Theme.of(context);
+          final isDark = theme.brightness == Brightness.dark;
 
           if (isWide) {
             final totalWidth = constraints.maxWidth;
             const splitterWidth = 8.0;
             final availableWidth = (totalWidth - splitterWidth).clamp(0.0, double.infinity);
-            final gridWidth = (availableWidth * _pivotSplitRatio).clamp(240.0, (availableWidth - 240.0).clamp(240.0, availableWidth));
+            final minGridWidth = 200.0;
+            final minChartWidth = 200.0;
+            final minRatio = availableWidth > (minGridWidth + minChartWidth)
+                ? (minGridWidth / availableWidth)
+                : 0.20;
+            final maxRatio = availableWidth > (minGridWidth + minChartWidth)
+                ? ((availableWidth - minChartWidth) / availableWidth)
+                : 0.80;
+
+            final effectiveRatio = _pivotSplitRatio.clamp(minRatio, maxRatio);
+            final gridWidth = availableWidth * effectiveRatio;
             final chartWidth = (availableWidth - gridWidth).clamp(0.0, availableWidth);
 
             return Row(
@@ -1172,24 +1186,52 @@ class _AiGridState extends State<AiGrid> {
                   cursor: SystemMouseCursors.resizeColumn,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onHorizontalDragUpdate: (details) {
+                    onHorizontalDragStart: (details) {
                       setState(() {
-                        final newGridWidth = gridWidth + details.delta.dx;
-                        if (availableWidth > 0) {
-                          _pivotSplitRatio = (newGridWidth / availableWidth).clamp(0.20, 0.80);
-                        }
+                        _isDraggingSplitter = true;
+                        _splitDragStartPos = details.globalPosition.dx;
+                        _splitDragStartRatio = effectiveRatio;
+                      });
+                    },
+                    onHorizontalDragUpdate: (details) {
+                      if (_splitDragStartPos != null && _splitDragStartRatio != null && availableWidth > 0) {
+                        final dx = details.globalPosition.dx - _splitDragStartPos!;
+                        final newRatio = (_splitDragStartRatio! + (dx / availableWidth)).clamp(minRatio, maxRatio);
+                        setState(() {
+                          _pivotSplitRatio = newRatio;
+                        });
+                      }
+                    },
+                    onHorizontalDragEnd: (_) {
+                      setState(() {
+                        _isDraggingSplitter = false;
+                        _splitDragStartPos = null;
+                        _splitDragStartRatio = null;
+                      });
+                    },
+                    onHorizontalDragCancel: () {
+                      setState(() {
+                        _isDraggingSplitter = false;
+                        _splitDragStartPos = null;
+                        _splitDragStartRatio = null;
                       });
                     },
                     child: Container(
                       width: splitterWidth,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
+                        color: _isDraggingSplitter
+                            ? (isDark ? const Color(0xFF37373D) : const Color(0xFFE2E8F0))
+                            : (isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9)),
                         border: Border(
                           left: BorderSide(
-                            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                            color: _isDraggingSplitter
+                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                                : (isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
                           ),
                           right: BorderSide(
-                            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                            color: _isDraggingSplitter
+                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                                : (isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
                           ),
                         ),
                       ),
@@ -1198,7 +1240,9 @@ class _AiGridState extends State<AiGrid> {
                           width: 2,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                            color: _isDraggingSplitter
+                                ? theme.colorScheme.primary
+                                : (isDark ? Colors.grey[600] : Colors.grey[400]),
                             borderRadius: BorderRadius.circular(1),
                           ),
                         ),
@@ -1222,7 +1266,17 @@ class _AiGridState extends State<AiGrid> {
             final totalHeight = constraints.maxHeight;
             const splitterHeight = 8.0;
             final availableHeight = (totalHeight - splitterHeight).clamp(0.0, double.infinity);
-            final gridHeight = (availableHeight * _pivotSplitRatio).clamp(160.0, (availableHeight - 160.0).clamp(160.0, availableHeight));
+            final minGridHeight = 140.0;
+            final minChartHeight = 140.0;
+            final minRatio = availableHeight > (minGridHeight + minChartHeight)
+                ? (minGridHeight / availableHeight)
+                : 0.20;
+            final maxRatio = availableHeight > (minGridHeight + minChartHeight)
+                ? ((availableHeight - minChartHeight) / availableHeight)
+                : 0.80;
+
+            final effectiveRatio = _pivotSplitRatio.clamp(minRatio, maxRatio);
+            final gridHeight = availableHeight * effectiveRatio;
             final chartHeight = (availableHeight - gridHeight).clamp(0.0, availableHeight);
 
             return Column(
@@ -1236,24 +1290,52 @@ class _AiGridState extends State<AiGrid> {
                   cursor: SystemMouseCursors.resizeRow,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onVerticalDragUpdate: (details) {
+                    onVerticalDragStart: (details) {
                       setState(() {
-                        final newGridHeight = gridHeight + details.delta.dy;
-                        if (availableHeight > 0) {
-                          _pivotSplitRatio = (newGridHeight / availableHeight).clamp(0.20, 0.80);
-                        }
+                        _isDraggingSplitter = true;
+                        _splitDragStartPos = details.globalPosition.dy;
+                        _splitDragStartRatio = effectiveRatio;
+                      });
+                    },
+                    onVerticalDragUpdate: (details) {
+                      if (_splitDragStartPos != null && _splitDragStartRatio != null && availableHeight > 0) {
+                        final dy = details.globalPosition.dy - _splitDragStartPos!;
+                        final newRatio = (_splitDragStartRatio! + (dy / availableHeight)).clamp(minRatio, maxRatio);
+                        setState(() {
+                          _pivotSplitRatio = newRatio;
+                        });
+                      }
+                    },
+                    onVerticalDragEnd: (_) {
+                      setState(() {
+                        _isDraggingSplitter = false;
+                        _splitDragStartPos = null;
+                        _splitDragStartRatio = null;
+                      });
+                    },
+                    onVerticalDragCancel: () {
+                      setState(() {
+                        _isDraggingSplitter = false;
+                        _splitDragStartPos = null;
+                        _splitDragStartRatio = null;
                       });
                     },
                     child: Container(
                       height: splitterHeight,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
+                        color: _isDraggingSplitter
+                            ? (isDark ? const Color(0xFF37373D) : const Color(0xFFE2E8F0))
+                            : (isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9)),
                         border: Border(
                           top: BorderSide(
-                            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                            color: _isDraggingSplitter
+                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                                : (isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
                           ),
                           bottom: BorderSide(
-                            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                            color: _isDraggingSplitter
+                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                                : (isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
                           ),
                         ),
                       ),
@@ -1262,7 +1344,9 @@ class _AiGridState extends State<AiGrid> {
                           width: 36,
                           height: 2,
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                            color: _isDraggingSplitter
+                                ? theme.colorScheme.primary
+                                : (isDark ? Colors.grey[600] : Colors.grey[400]),
                             borderRadius: BorderRadius.circular(1),
                           ),
                         ),
