@@ -1017,6 +1017,205 @@ void main() {
       controller.clearEditEvents();
       expect(controller.editEvents, isEmpty);
     });
+
+    test('AiGridPivotConfig models serialize to/from JSON and support aggregations', () {
+      const valConfig = AiGridPivotValueConfig(
+        columnId: 'sales',
+        aggregation: AiGridPivotAggregation.average,
+        label: 'Avg Sales',
+      );
+      expect(valConfig.effectiveLabel('Sales'), 'Avg Sales');
+      expect(valConfig.aggregation.displayName, 'Average');
+      expect(valConfig.aggregation.toFitGrid(), FitGridAggregation.average);
+
+      final jsonVal = valConfig.toJson();
+      final parsedVal = AiGridPivotValueConfig.fromJson(jsonVal);
+      expect(parsedVal.columnId, 'sales');
+      expect(parsedVal.aggregation, AiGridPivotAggregation.average);
+
+      const pivotConfig = AiGridPivotConfig(
+        rowFieldIds: ['region', 'category'],
+        columnFieldIds: ['segment'],
+        values: [valConfig],
+        showChart: true,
+        chartType: AiGridPivotChartType.pie,
+      );
+
+      final jsonPivot = pivotConfig.toJson();
+      final parsedPivot = AiGridPivotConfig.fromJson(jsonPivot);
+      expect(parsedPivot.rowFieldIds, ['region', 'category']);
+      expect(parsedPivot.columnFieldIds, ['segment']);
+      expect(parsedPivot.values.length, 1);
+      expect(parsedPivot.showChart, isTrue);
+      expect(parsedPivot.chartType, AiGridPivotChartType.pie);
+    });
+
+    test('AiGridController creates pivot table, generates chart data, and restores normal table', () {
+      final controller = AiGridController();
+      final sample = [
+        {'region': 'East', 'category': 'Tech', 'sales': 100.0, 'profit': 20.0},
+        {'region': 'East', 'category': 'Office', 'sales': 50.0, 'profit': 10.0},
+        {'region': 'West', 'category': 'Tech', 'sales': 200.0, 'profit': 40.0},
+        {'region': 'West', 'category': 'Office', 'sales': 80.0, 'profit': 15.0},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'region', title: 'Region', type: AiGridColumnType.text),
+        const AiGridColumn(field: 'category', title: 'Category', type: AiGridColumnType.text),
+        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'profit', title: 'Profit', type: AiGridColumnType.number),
+      ];
+
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final fitCtrl = FitGridController<Map<String, dynamic>>(
+        rows: sample,
+        columns: cols.map((c) => c.toFitGridColumn()).toList(),
+      );
+      controller.attach(columns: cols, dataSource: ds, fitController: fitCtrl);
+
+      expect(controller.isPivotActive, isFalse);
+
+      // Set Pivot: Rows: region, Columns: category, Measures: sales (sum) & profit (average)
+      controller.setPivot(const AiGridPivotConfig(
+        rowFieldIds: ['region'],
+        columnFieldIds: ['category'],
+        values: [
+          AiGridPivotValueConfig(columnId: 'sales', aggregation: AiGridPivotAggregation.sum),
+          AiGridPivotValueConfig(columnId: 'profit', aggregation: AiGridPivotAggregation.average),
+        ],
+        showChart: true,
+        chartType: AiGridPivotChartType.groupedBar,
+      ));
+
+      expect(controller.isPivotActive, isTrue);
+      expect(controller.pivotConfig, isNotNull);
+      // There are 2 regions (East, West)
+      expect(controller.fitController!.data.rows.length, 2);
+      expect(controller.columns.length, greaterThanOrEqualTo(3));
+
+      // Chart data generated
+      final chartData = controller.pivotChartData;
+      expect(chartData, isNotNull);
+      expect(chartData!.categories, containsAll(['East', 'West']));
+      expect(chartData.seriesNames.isNotEmpty, isTrue);
+
+      // Toggle chart & change type
+      controller.togglePivotChart(false);
+      expect(controller.pivotConfig!.showChart, isFalse);
+      controller.togglePivotChart(true);
+      expect(controller.pivotConfig!.showChart, isTrue);
+
+      controller.setPivotChartType(AiGridPivotChartType.line);
+      expect(controller.pivotConfig!.chartType, AiGridPivotChartType.line);
+
+      // Clear Pivot (Switch back to normal table mode)
+      controller.clearPivot();
+      expect(controller.isPivotActive, isFalse);
+      expect(controller.fitController!.data.rows.length, 4);
+      expect(controller.columns.length, 4);
+    });
+
+    test('MCP GridCreatePivotTableTool and GridResetPivotTableTool execute correctly', () async {
+      final controller = AiGridController();
+      final sample = [
+        {'region': 'North', 'sales': 120.0},
+        {'region': 'South', 'sales': 250.0},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'region', title: 'Region'),
+        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final fitCtrl = FitGridController<Map<String, dynamic>>(
+        rows: sample,
+        columns: cols.map((c) => c.toFitGridColumn()).toList(),
+      );
+      controller.attach(columns: cols, dataSource: ds, fitController: fitCtrl);
+
+      final createTool = GridCreatePivotTableTool(controller);
+      final resetTool = GridResetPivotTableTool(controller);
+
+      final result = await createTool.execute({
+        'rows': ['region'],
+        'data': [
+          {'column': 'sales', 'aggregation': 'sum'},
+        ],
+        'showChart': true,
+        'chartType': 'column',
+      });
+
+      expect(result.isError, isFalse);
+      expect(result.content.first.text, contains('Pivot Table created successfully'));
+      expect(controller.isPivotActive, isTrue);
+      expect(controller.pivotConfig!.chartType, AiGridPivotChartType.column);
+
+      // Reset
+      final resetResult = await resetTool.execute({});
+      expect(resetResult.isError, isFalse);
+      expect(resetResult.content.first.text, contains('Pivot mode deactivated'));
+      expect(controller.isPivotActive, isFalse);
+    });
+
+    testWidgets('AiGrid renders Pivot Table and side-by-side Chart in pivot mode', (tester) async {
+      final controller = AiGridController();
+      final sample = [
+        {'category': 'Furniture', 'sales': 500.0},
+        {'category': 'Office', 'sales': 300.0},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'category', title: 'Category'),
+        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1200,
+              height: 800,
+              child: AiGrid(
+                dataSource: ds,
+                controller: controller,
+                enableAiAssistant: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Normal table mode
+      expect(find.byType(AiGridPivotChart), findsNothing);
+
+      // Activate Pivot with Chart
+      controller.setPivot(const AiGridPivotConfig(
+        rowFieldIds: ['category'],
+        values: [
+          AiGridPivotValueConfig(columnId: 'sales', aggregation: AiGridPivotAggregation.sum),
+        ],
+        showChart: true,
+      ));
+      await tester.pumpAndSettle();
+
+      // Pivot Chart is rendered beside table
+      expect(find.byType(AiGridPivotChart), findsOneWidget);
+      expect(find.text('Pivot Chart'), findsOneWidget);
+
+      // Close chart via chart close button
+      await tester.tap(find.byTooltip('Hide Chart'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AiGridPivotChart), findsNothing);
+
+      // Clear pivot
+      controller.clearPivot();
+      await tester.pumpAndSettle();
+      expect(controller.isPivotActive, isFalse);
+    });
   });
 }
 

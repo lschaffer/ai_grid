@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../theme/ai_grid_theme.dart';
+import 'ai_grid_pivot_chooser_dialog.dart';
 
 /// Top Toolbar for [AiGrid], providing search, filter toggle, group toggle,
 /// refresh, export, and AI Assistant controls with responsive desktop/mobile layouts.
@@ -155,6 +156,9 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
               case 'export':
                 _handleExport(context);
                 break;
+              case 'pivot':
+                AiGridPivotChooserDialog.show(context, widget.controller);
+                break;
               case 'add':
                 if (widget.controller.editingOptions.mode == AiGridEditMode.form) {
                   widget.controller.showEditDialog(context);
@@ -229,6 +233,29 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
                   Icon(Icons.file_download_outlined, size: 18),
                   SizedBox(width: 10),
                   Text('Export to Excel', style: TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'pivot',
+              child: Row(
+                children: [
+                  Icon(
+                    widget.controller.isPivotActive
+                        ? Icons.pivot_table_chart
+                        : Icons.pivot_table_chart_outlined,
+                    size: 18,
+                    color: widget.controller.isPivotActive
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    widget.controller.isPivotActive
+                        ? 'Configure Pivot Table'
+                        : 'Pivot Table...',
+                    style: const TextStyle(fontSize: 13),
+                  ),
                 ],
               ),
             ),
@@ -360,6 +387,41 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
           tooltip: 'Export to Excel (.xlsx)',
           onPressed: () => _handleExport(context),
         ),
+        IconButton(
+          icon: Icon(
+            widget.controller.isPivotActive
+                ? Icons.pivot_table_chart
+                : Icons.pivot_table_chart_outlined,
+            size: 20,
+            color: widget.controller.isPivotActive
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
+          ),
+          tooltip: widget.controller.isPivotActive
+              ? 'Configure Pivot Table'
+              : 'Pivot Table (Field Chooser)...',
+          onPressed: () => AiGridPivotChooserDialog.show(context, widget.controller),
+        ),
+        if (widget.controller.isPivotActive) ...[
+          IconButton(
+            icon: Icon(
+              widget.controller.pivotConfig?.showChart == true
+                  ? Icons.bar_chart
+                  : Icons.bar_chart_outlined,
+              size: 20,
+              color: widget.controller.pivotConfig?.showChart == true
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+            tooltip: 'Toggle Pivot Chart',
+            onPressed: widget.controller.togglePivotChart,
+          ),
+          IconButton(
+            icon: const Icon(Icons.undo, size: 20, color: Colors.redAccent),
+            tooltip: 'Exit Pivot (Return to Table)',
+            onPressed: widget.controller.clearPivot,
+          ),
+        ],
         const Spacer(),
         // Global Search Box
         SizedBox(

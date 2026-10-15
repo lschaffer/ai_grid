@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../controllers/ai_grid_controller.dart';
+import '../models/ai_grid_pivot.dart';
 
 /// Exposes all local tools and skill manifest for [AiGrid] control via MCP.
 class AiGridSkill {
@@ -30,6 +31,8 @@ class AiGridSkill {
       GridGetPaginationTool(controller),
       GridExportSettingsTool(controller),
       GridRestoreSettingsTool(controller),
+      GridCreatePivotTableTool(controller),
+      GridResetPivotTableTool(controller),
     ];
   }
 
@@ -61,6 +64,15 @@ IMPORTANT RULES FOR COLUMN VISIBILITY:
   Use `grid_set_column_visibility` with `showOnly: ["X", "Y", "Z"]`. This will automatically HIDE all other columns and display only the requested ones!
 • When the user asks to hide specific columns (e.g. "hide column X"), use `hideColumns: ["X"]` or `column: "X", visible: false`.
 • When the user asks to restore or show all columns, use `grid_reset`.
+
+IMPORTANT RULES FOR PIVOT TABLES:
+• When the user asks to create, build, or convert into a pivot table (e.g. "create a pivot table - rows (order id, order date), columns country, city, segment, data (sales - type: sum, discount - type avg)" or "pivot by category with sum of profit"):
+  ALWAYS use the `grid_create_pivot_table` tool!
+  - Map requested row dimensions to `rows: ["..."]`
+  - Map requested column dimensions to `columns: ["..."]`
+  - Map numeric metrics to `data: [{"column": "sales", "aggregation": "sum"}, {"column": "discount", "aggregation": "average"}]`
+  - Set `showChart: true` to auto-create a chart beside the table.
+• When the user asks to exit, close, or switch back from pivot mode to the normal table (e.g. "switch back to normal table mode", "exit pivot"), use `grid_reset_pivot_table`.
 
 Confirm the actions and calculations clearly and concisely to the user. Do not append extra explanatory notes like "(active filters joined by AND)" or "(joined by AND)".
 ''';
@@ -1056,5 +1068,218 @@ class GridRestoreSettingsTool extends McpLocalTool {
         ],
       );
     }
+  }
+}
+
+class GridCreatePivotTableTool extends McpLocalTool {
+  final AiGridController controller;
+  GridCreatePivotTableTool(this.controller);
+
+  @override
+  String get name => 'grid_create_pivot_table';
+
+  @override
+  String get description =>
+      'Transforms the table into an aggregated Pivot Table on the fly with optional side-by-side Chart. Define row dimensions, column dimensions, and measure metrics (sum, count, average, min, max).';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'rows': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                'Field names or column titles to use as vertical row dimensions (e.g. ["order_id", "order_date"] or ["category", "sub_category"]).',
+          },
+          'columns': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                'Optional field names or column titles to expand as horizontal columns (e.g. ["country", "city", "segment"] or ["region"]).',
+          },
+          'data': {
+            'type': 'array',
+            'items': {
+              'type': 'object',
+              'properties': {
+                'column': {
+                  'type': 'string',
+                  'description': 'Field name or column title'
+                },
+                'aggregation': {
+                  'type': 'string',
+                  'enum': ['sum', 'count', 'average', 'min', 'max'],
+                  'description':
+                      'Aggregation type: sum (default), count, average (avg), min, or max',
+                },
+                'label': {'type': 'string', 'description': 'Optional custom label'},
+              },
+              'required': ['column'],
+            },
+            'description': 'Numeric measure fields to aggregate in cells.',
+          },
+          'values': {
+            'type': 'array',
+            'items': {'type': 'object'},
+            'description': 'Alias for data.',
+          },
+          'showChart': {
+            'type': 'boolean',
+            'description':
+                'Whether to display the side-by-side pivot chart (default true).',
+          },
+          'chartType': {
+            'type': 'string',
+            'enum': ['groupedBar', 'column', 'line', 'pie'],
+            'description':
+                'Chart visualization type: groupedBar (default), column, line, or pie.',
+          },
+          'showTotals': {
+            'type': 'boolean',
+            'description': 'Whether to display grand totals (default true).',
+          },
+        },
+        'required': ['rows'],
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final rawRows = (arguments['rows'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    final rawCols = (arguments['columns'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    final rawData = (arguments['data'] as List<dynamic>?) ??
+        (arguments['values'] as List<dynamic>?) ??
+        [];
+
+    if (rawRows.isEmpty) {
+      return MCPToolResult(
+        isError: true,
+        content: [
+          MCPContent(
+            type: 'text',
+            text: 'Please specify at least one row dimension field.',
+          ),
+        ],
+      );
+    }
+
+    final valueConfigs = <AiGridPivotValueConfig>[];
+    for (final item in rawData) {
+      if (item is Map<String, dynamic>) {
+        final colName =
+            (item['column'] ?? item['field'] ?? item['id'])?.toString();
+        if (colName != null && colName.isNotEmpty) {
+          final aggStr = (item['aggregation'] ?? item['type'])?.toString();
+          valueConfigs.add(
+            AiGridPivotValueConfig(
+              columnId: colName,
+              aggregation: AiGridPivotAggregation.fromString(aggStr),
+              label: item['label']?.toString(),
+            ),
+          );
+        }
+      }
+    }
+
+    if (valueConfigs.isEmpty) {
+      valueConfigs.add(
+        const AiGridPivotValueConfig(
+          columnId: 'count',
+          aggregation: AiGridPivotAggregation.count,
+        ),
+      );
+    }
+
+    final showChart = arguments['showChart'] as bool? ?? true;
+    final chartType =
+        AiGridPivotChartType.fromString(arguments['chartType'] as String?);
+    final showTotals = arguments['showTotals'] as bool? ?? true;
+
+    final config = AiGridPivotConfig(
+      rowFieldIds: rawRows,
+      columnFieldIds: rawCols,
+      values: valueConfigs,
+      showColumnTotals: showTotals,
+      showChart: showChart,
+      chartType: chartType,
+    );
+
+    try {
+      controller.setPivot(config);
+      final colCount = controller.columns.length;
+      final rowCount = controller.fitController?.data.rows.length ?? 0;
+
+      final colsSummary = rawCols.isNotEmpty ? '; Columns: ${rawCols.join(", ")}' : '';
+      final measuresSummary = valueConfigs.map((v) => '${v.columnId} (${v.aggregation.displayName})').join(', ');
+      final chartSummary = showChart ? ' Pivot chart (${chartType.displayName}) is enabled.' : '';
+
+      return MCPToolResult(
+        content: [
+          MCPContent(
+            type: 'text',
+            text:
+                'Pivot Table created successfully: $rowCount summary rows across $colCount columns (Rows: ${rawRows.join(", ")}$colsSummary; Measures: $measuresSummary).$chartSummary',
+          ),
+        ],
+      );
+    } catch (e) {
+      return MCPToolResult(
+        isError: true,
+        content: [
+          MCPContent(
+            type: 'text',
+            text: 'Failed to create pivot table: $e',
+          ),
+        ],
+      );
+    }
+  }
+}
+
+class GridResetPivotTableTool extends McpLocalTool {
+  final AiGridController controller;
+  GridResetPivotTableTool(this.controller);
+
+  @override
+  String get name => 'grid_reset_pivot_table';
+
+  @override
+  String get description =>
+      'Exits pivot mode and returns the grid to the original standard editable table view.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    if (!controller.isPivotActive) {
+      return MCPToolResult(
+        content: [
+          MCPContent(
+            type: 'text',
+            text: 'Grid is already in standard table mode.',
+          ),
+        ],
+      );
+    }
+
+    controller.clearPivot();
+    return MCPToolResult(
+      content: [
+        MCPContent(
+          type: 'text',
+          text: 'Pivot mode deactivated. Restored standard editable table view.',
+        ),
+      ],
+    );
   }
 }

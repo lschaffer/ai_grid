@@ -835,7 +835,45 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
             tooltip: 'Layout Presets & Settings',
             constraints: const BoxConstraints(minWidth: 340, maxWidth: 400),
             onSelected: (val) async {
-              if (val == 'preset_grouping') {
+              if (val == 'preset_pivot_category_region') {
+                _controller.setPivot(const AiGridPivotConfig(
+                  rowFieldIds: ['Category', 'SubCategory'],
+                  columnFieldIds: ['Region'],
+                  values: [
+                    AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
+                    AiGridPivotValueConfig(columnId: 'Profit', aggregation: AiGridPivotAggregation.average),
+                  ],
+                  showChart: true,
+                  chartType: AiGridPivotChartType.column,
+                  showRowTotals: true,
+                  showColumnTotals: true,
+                ));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Applied Pivot: Category & Sub-Category by Region (Sales Sum, Profit Avg) + Chart'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else if (val == 'preset_pivot_segment_ship') {
+                _controller.setPivot(const AiGridPivotConfig(
+                  rowFieldIds: ['Segment'],
+                  columnFieldIds: ['ShipMode'],
+                  values: [
+                    AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
+                    AiGridPivotValueConfig(columnId: 'OrderID', aggregation: AiGridPivotAggregation.count),
+                  ],
+                  showChart: true,
+                  chartType: AiGridPivotChartType.groupedBar,
+                  showRowTotals: true,
+                  showColumnTotals: true,
+                ));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Applied Pivot: Segment by Ship Mode (Sales Sum, Order Count) + Chart'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else if (val == 'preset_grouping') {
                 _controller.restoreSettings({
                   'groupColumns': ['Category', 'Region'],
                   'sort': [
@@ -902,6 +940,27 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
               }
             },
             itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'preset_pivot_category_region',
+                child: Row(
+                  children: [
+                    Icon(Icons.pivot_table_chart, size: 18, color: Color(0xFF0078D4)),
+                    SizedBox(width: 8),
+                    Flexible(child: Text('Pivot: Category x Region + Chart')),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'preset_pivot_segment_ship',
+                child: Row(
+                  children: [
+                    Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFF107C41)),
+                    SizedBox(width: 8),
+                    Flexible(child: Text('Pivot: Segment x Ship Mode')),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
               const PopupMenuItem(
                 value: 'preset_grouping',
                 child: Row(

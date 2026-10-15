@@ -1,6 +1,7 @@
 export 'src/fitgrid/fitgrid_table.dart';
 export 'src/models/ai_grid_column.dart';
 export 'src/models/ai_grid_editing_options.dart';
+export 'src/models/ai_grid_pivot.dart';
 export 'src/models/ai_grid_data_source.dart';
 export 'src/controllers/ai_grid_controller.dart';
 export 'src/config/ai_grid_config.dart';
@@ -11,6 +12,8 @@ export 'src/widgets/ai_grid_toolbar.dart';
 export 'src/widgets/ai_grid_group_panel.dart';
 export 'src/widgets/ai_grid_assistant_panel.dart';
 export 'src/widgets/ai_grid_form_dialog.dart';
+export 'src/widgets/ai_grid_pivot_chart.dart';
+export 'src/widgets/ai_grid_pivot_chooser_dialog.dart';
 export 'src/mcp/ai_grid_tools.dart';
 export 'src/config/ai_grid_settings_storage.dart';
 export 'package:file_saver/file_saver.dart';

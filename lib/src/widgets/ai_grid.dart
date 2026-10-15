@@ -12,6 +12,7 @@ import '../theme/ai_grid_theme.dart';
 import 'ai_grid_assistant_panel.dart';
 import 'ai_grid_group_panel.dart';
 import 'ai_grid_toolbar.dart';
+import 'ai_grid_pivot_chart.dart';
 
 /// An intelligent DataGrid widget for Flutter powered by [FitGrid].
 ///
@@ -1029,32 +1030,7 @@ class _AiGridState extends State<AiGrid> {
         else ...[
           AiGridGroupPanel(controller: _controller),
           Expanded(
-            child: FitGrid<Map<String, dynamic>>(
-              controller: _fitController,
-              theme: gridTheme,
-              showFilterRow: _controller.showColumnFilterRow,
-              showColumnMenu: true,
-              columnMenuBuilder: (context, column, defaults) =>
-                  _buildColumnMenu(context, column, defaults),
-              reorderableColumns: true,
-              resizableColumns: true,
-              multiSort: true,
-              editTrigger: _editTrigger,
-              paginated: widget.enablePagination || widget.pageSize != null,
-              pageSize: widget.pageSize ?? 40,
-              onRowDoubleTap: (row, rowIndex) {
-                if (widget.onRowDoubleTap != null) {
-                  widget.onRowDoubleTap!(row, rowIndex);
-                } else if (_controller.editingOptions.enabled &&
-                    _controller.editingOptions.allowUpdating) {
-                  if (_controller.editingOptions.mode == AiGridEditMode.form) {
-                    _controller.showEditDialog(context, rowIndex: rowIndex);
-                  } else if (_controller.editingOptions.mode == AiGridEditMode.row) {
-                    _controller.startEdit(rowIndex);
-                  }
-                }
-              },
-            ),
+            child: _buildGrid(context, gridTheme),
           ),
         ],
       ],
@@ -1129,36 +1105,98 @@ class _AiGridState extends State<AiGrid> {
             ),
           AiGridGroupPanel(controller: _controller),
           Expanded(
-            child: FitGrid<Map<String, dynamic>>(
-              controller: _fitController,
-              theme: gridTheme,
-              showFilterRow: _controller.showColumnFilterRow,
-              showColumnMenu: true,
-              columnMenuBuilder: (context, column, defaults) =>
-                  _buildColumnMenu(context, column, defaults),
-              reorderableColumns: true,
-              resizableColumns: true,
-              multiSort: true,
-              editTrigger: _editTrigger,
-              paginated: widget.enablePagination || widget.pageSize != null,
-              pageSize: widget.pageSize ?? 40,
-              onRowDoubleTap: (row, rowIndex) {
-                if (widget.onRowDoubleTap != null) {
-                  widget.onRowDoubleTap!(row, rowIndex);
-                } else if (_controller.editingOptions.enabled &&
-                    _controller.editingOptions.allowUpdating) {
-                  if (_controller.editingOptions.mode == AiGridEditMode.form) {
-                    _controller.showEditDialog(context, rowIndex: rowIndex);
-                  } else if (_controller.editingOptions.mode == AiGridEditMode.row) {
-                    _controller.startEdit(rowIndex);
-                  }
-                }
-              },
-            ),
+            child: _buildGrid(context, gridTheme),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildGrid(BuildContext context, FitGridThemeData gridTheme) {
+    final effectiveEditTrigger = _controller.isPivotActive
+        ? FitGridEditTrigger.programmatic
+        : _editTrigger;
+
+    final gridWidget = FitGrid<Map<String, dynamic>>(
+      controller: _fitController,
+      theme: gridTheme,
+      showFilterRow: !_controller.isPivotActive && _controller.showColumnFilterRow,
+      showColumnMenu: true,
+      columnMenuBuilder: (context, column, defaults) =>
+          _buildColumnMenu(context, column, defaults),
+      reorderableColumns: true,
+      resizableColumns: true,
+      multiSort: true,
+      editTrigger: effectiveEditTrigger,
+      paginated: widget.enablePagination || widget.pageSize != null,
+      pageSize: widget.pageSize ?? 40,
+      onRowDoubleTap: (row, rowIndex) {
+        if (_controller.isPivotActive) return;
+        if (widget.onRowDoubleTap != null) {
+          widget.onRowDoubleTap!(row, rowIndex);
+        } else if (_controller.editingOptions.enabled &&
+            _controller.editingOptions.allowUpdating) {
+          if (_controller.editingOptions.mode == AiGridEditMode.form) {
+            _controller.showEditDialog(context, rowIndex: rowIndex);
+          } else if (_controller.editingOptions.mode == AiGridEditMode.row) {
+            _controller.startEdit(rowIndex);
+          }
+        }
+      },
+    );
+
+    if (_controller.isPivotActive &&
+        _controller.pivotConfig?.showChart == true &&
+        _controller.pivotChartData != null) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 720;
+          if (isWide) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: gridWidget,
+                ),
+                Expanded(
+                  flex: 2,
+                  child: AiGridPivotChart(
+                    data: _controller.pivotChartData!,
+                    chartType: _controller.pivotConfig!.chartType,
+                    onChartTypeChanged: (type) =>
+                        _controller.setPivotChartType(type),
+                    onClose: () => _controller.togglePivotChart(false),
+                  ),
+                ),
+              ],
+            );
+          } else {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: gridWidget,
+                ),
+                Expanded(
+                  flex: 2,
+                  child: AiGridPivotChart(
+                    data: _controller.pivotChartData!,
+                    chartType: _controller.pivotConfig!.chartType,
+                    onChartTypeChanged: (type) =>
+                        _controller.setPivotChartType(type),
+                    onClose: () => _controller.togglePivotChart(false),
+                  ),
+                ),
+              ],
+            );
+          }
+        },
+      );
+    }
+
+    return gridWidget;
   }
 
   List<PopupMenuEntry<void>> _buildColumnMenu(

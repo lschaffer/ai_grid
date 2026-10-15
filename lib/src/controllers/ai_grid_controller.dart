@@ -8,7 +8,9 @@ import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
+import '../models/ai_grid_pivot.dart';
 import '../widgets/ai_grid_form_dialog.dart';
+import '../widgets/ai_grid_pivot_chart.dart';
 
 /// Controller coordinating grid state, grouping, filtering, sorting,
 /// column visibility, and introspection for AI Assistant tools.
@@ -893,6 +895,238 @@ class AiGridController extends ChangeNotifier {
       'formatted': formatted,
       'count': numbers.length,
     };
+  }
+
+  // ===========================================================================
+  // Pivot Table Support
+  // ===========================================================================
+
+  AiGridPivotConfig? _pivotConfig;
+  List<Map<String, dynamic>>? _prePivotRows;
+  List<AiGridColumn>? _prePivotColumns;
+  PivotChartData? _pivotChartData;
+
+  /// Whether the grid is currently displaying in aggregated Pivot Mode.
+  bool get isPivotActive => _pivotConfig != null;
+
+  /// Active pivot configuration, or null if in standard grid mode.
+  AiGridPivotConfig? get pivotConfig => _pivotConfig;
+
+  /// Computed chart series data derived from the active pivot.
+  PivotChartData? get pivotChartData => _pivotChartData;
+
+  /// Transforms the grid on-the-fly into an aggregated Pivot Table.
+  void setPivot(AiGridPivotConfig config) {
+    if (config.rowFieldIds.isEmpty || config.values.isEmpty) {
+      throw ArgumentError('Pivot requires at least one row field and one value field.');
+    }
+
+    final sourceRows = _prePivotRows ??
+        List<Map<String, dynamic>>.from(
+          _fitController?.data.rows ??
+              (_dataSource is LocalAiGridDataSource
+                  ? (_dataSource as LocalAiGridDataSource).data
+                  : const <Map<String, dynamic>>[]),
+        );
+    if (sourceRows.isEmpty) return;
+
+    _prePivotRows ??= sourceRows;
+    _prePivotColumns ??= List<AiGridColumn>.from(_columns);
+
+    // Resolve column fields
+    final resolvedRowIds = config.rowFieldIds
+        .map((f) => _resolveField(f) ?? f)
+        .toList();
+    final resolvedColIds = config.columnFieldIds
+        .map((f) => _resolveField(f) ?? f)
+        .toList();
+
+    // 1. Build row dimensions
+    final rowDimensions = <FitGridPivotDimension<Map<String, dynamic>>>[
+      for (final id in resolvedRowIds)
+        FitGridPivotDimension<Map<String, dynamic>>(
+          id: id,
+          label: _columns.where((c) => c.field == id).firstOrNull?.title ?? id,
+          keyOf: (row) => row[id]?.toString() ?? '(blank)',
+        ),
+    ];
+
+    // 2. Build column dimension (single or composite)
+    FitGridPivotDimension<Map<String, dynamic>>? colDimension;
+    if (resolvedColIds.length == 1) {
+      final colId = resolvedColIds.first;
+      colDimension = FitGridPivotDimension<Map<String, dynamic>>(
+        id: colId,
+        label: _columns.where((c) => c.field == colId).firstOrNull?.title ?? colId,
+        keyOf: (row) => row[colId]?.toString() ?? '(blank)',
+      );
+    } else if (resolvedColIds.length > 1) {
+      final compId = resolvedColIds.join('__');
+      final compLabel = resolvedColIds
+          .map((id) => _columns.where((c) => c.field == id).firstOrNull?.title ?? id)
+          .join(' / ');
+      colDimension = FitGridPivotDimension<Map<String, dynamic>>(
+        id: compId,
+        label: compLabel,
+        keyOf: (row) => resolvedColIds
+            .map((id) => row[id]?.toString() ?? '(blank)')
+            .join(' / '),
+      );
+    }
+
+    // 3. Build value metrics
+    final valueDimensions = <FitGridPivotValue<Map<String, dynamic>>>[
+      for (final v in config.values) ...[
+        () {
+          final actualField = _resolveField(v.columnId) ?? v.columnId;
+          final col = _columns.where((c) => c.field == actualField).firstOrNull;
+          final title = col?.title ?? actualField;
+          final effectiveLbl = v.effectiveLabel(title);
+
+          return FitGridPivotValue<Map<String, dynamic>>(
+            id: actualField,
+            label: effectiveLbl,
+            aggregation: v.aggregation.toFitGrid(),
+            valueOf: (row) {
+              final raw = row[actualField];
+              if (raw is num) return raw;
+              if (raw == null) return null;
+              return num.tryParse(raw.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+            },
+            format: v.format,
+          );
+        }(),
+      ],
+    ];
+
+    // 4. Compute fitGridPivot
+    final pivotResult = fitGridPivot<Map<String, dynamic>>(
+      sourceRows,
+      rows: rowDimensions,
+      columns: colDimension,
+      values: valueDimensions,
+      columnTotals: config.showColumnTotals,
+    );
+
+    // 5. Convert pivotResult to Map<String, dynamic> rows
+    final pivotedRows = <Map<String, dynamic>>[];
+    for (final pr in pivotResult.rows) {
+      final rowMap = <String, dynamic>{};
+      for (var i = 0; i < rowDimensions.length; i++) {
+        rowMap[rowDimensions[i].id] = pr.keys[i]?.toString() ?? '(blank)';
+      }
+      for (final cell in pr.cells.entries) {
+        rowMap[cell.key] = cell.value;
+      }
+      pivotedRows.add(rowMap);
+    }
+
+    // 6. Build new AiGridColumns
+    final pivotedColumns = <AiGridColumn>[];
+
+    // Row dimension columns
+    for (var i = 0; i < rowDimensions.length; i++) {
+      pivotedColumns.add(
+        AiGridColumn(
+          field: rowDimensions[i].id,
+          title: rowDimensions[i].label,
+          width: 140,
+          type: AiGridColumnType.text,
+        ),
+      );
+    }
+
+    // Measure / value columns
+    for (final col in pivotResult.columns.skip(rowDimensions.length)) {
+      pivotedColumns.add(
+        AiGridColumn(
+          field: col.id,
+          title: col.label,
+          width: 130,
+          type: AiGridColumnType.number,
+          aggregateType: AiGridAggregateType.sum,
+        ),
+      );
+    }
+
+    // 7. Generate chart data
+    final categories = <String>[
+      for (final pr in pivotResult.rows)
+        pr.keys.map((k) => k?.toString() ?? '').join(' - '),
+    ];
+
+    final measureColumns = pivotResult.columns.skip(rowDimensions.length).toList();
+    final seriesNames = <String>[for (final c in measureColumns) c.label];
+    final matrix = <List<num>>[
+      for (final c in measureColumns)
+        <num>[
+          for (final pr in pivotResult.rows)
+            pr.cells[c.id] ?? 0,
+        ],
+    ];
+
+    _pivotChartData = PivotChartData(
+      categories: categories,
+      seriesNames: seriesNames,
+      values: matrix,
+    );
+
+    // 8. Apply to controller
+    _pivotConfig = config;
+    _columns = pivotedColumns;
+
+    if (_fitController != null) {
+      _fitController!.columns.columns =
+          pivotedColumns.map((c) => c.toFitGridColumn()).toList();
+      _fitController!.data.rows = pivotedRows;
+    }
+
+    notifyListeners();
+  }
+
+  /// Restores the grid to the original standard editable table.
+  void clearPivot() {
+    if (!isPivotActive) return;
+
+    final origRows = _prePivotRows;
+    final origCols = _prePivotColumns;
+
+    _pivotConfig = null;
+    _pivotChartData = null;
+    _prePivotRows = null;
+    _prePivotColumns = null;
+
+    if (origCols != null) {
+      _columns = origCols;
+    }
+
+    if (_fitController != null) {
+      if (origCols != null) {
+        _fitController!.columns.columns =
+            origCols.map((c) => c.toFitGridColumn()).toList();
+      }
+      if (origRows != null) {
+        _fitController!.data.rows = origRows;
+      }
+    }
+
+    notifyListeners();
+  }
+
+  /// Toggles visibility of the side-by-side pivot chart.
+  void togglePivotChart([bool? show]) {
+    if (_pivotConfig == null) return;
+    _pivotConfig = _pivotConfig!.copyWith(
+      showChart: show ?? !_pivotConfig!.showChart,
+    );
+    notifyListeners();
+  }
+
+  /// Updates the active pivot chart visualization type.
+  void setPivotChartType(AiGridPivotChartType type) {
+    if (_pivotConfig == null) return;
+    _pivotConfig = _pivotConfig!.copyWith(chartType: type);
+    notifyListeners();
   }
 
   /// Applies global text search across all columns.
