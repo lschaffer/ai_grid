@@ -11,6 +11,8 @@
 
 ![AI Grid Live Demo](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_grid_example1.gif)
 
+![AI Grid Pivot Grid & Side-by-Side Chart](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_grid_example_pivot.gif)
+
 * **Grid Engine**: Powered by **[fitgrid_table](https://pub.dev/packages/fitgrid_table)** — measuring your content instead of guessing widths, painting cells via direct canvas rendering (~3ms frame times on 1M rows), sticky hierarchical row grouping, isolate multi-sort, and summary footers.
 * **AI Agent & Tool Orchestration**: Powered by **[dart_mcp_core](https://pub.dev/packages/dart_mcp_core)** — exposing structured MCP local tools for real-time schema introspection, precise in-engine math calculations, multi-column filtering, and natural language table operations.
 
@@ -55,6 +57,8 @@
 ### 3. 📊 DevExtreme-Style Dynamic Pivot Grid & Side-by-Side Chart
 
 Convert any active table into an enterprise multi-dimensional Pivot Grid on the fly with real-time aggregated cross-tabulations and side-by-side synchronized charts.
+
+![DevExtreme-Style Pivot Grid with Field Chooser and Split Chart](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_grid_example_pivot.gif)
 
 * **Field Chooser Dialog (`AiGridPivotChooserDialog`)**:
   * Visual drop zones for **Row Fields** (vertical breakdown), **Column Fields** (horizontal cross-tabulation), and **Data / Measures** (metrics to aggregate).

@@ -35,6 +35,8 @@ An interactive showcase of **`ai_grid`** featuring the enterprise **Superstore S
 
 ## 📊 Example Prompts for Correct Pivot Grid Analysis
 
+![DevExtreme-Style Pivot Grid with Field Chooser and Split Chart](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_grid_example_pivot.gif)
+
 Pivot tables are designed to **aggregate higher-level business dimensions** against each other so that cross-tabulation cells are densely populated and actionable.
 
 ### ✅ Recommended Dense Aggregations
