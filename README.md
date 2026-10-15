@@ -15,6 +15,7 @@
 
 * **Grid Engine**: Powered by **[fitgrid_table](https://pub.dev/packages/fitgrid_table)** — measuring your content instead of guessing widths, painting cells via direct canvas rendering (~3ms frame times on 1M rows), sticky hierarchical row grouping, isolate multi-sort, and summary footers.
 * **AI Agent & Tool Orchestration**: Powered by **[dart_mcp_core](https://pub.dev/packages/dart_mcp_core)** — exposing structured MCP local tools for real-time schema introspection, precise in-engine math calculations, multi-column filtering, and natural language table operations.
+* **Coding Agent Ready**: Includes a standardized [`SKILL.md`](./SKILL.md) compatible with Claude Code, Antigravity, Cursor, Windsurf, Roo, and other autonomous coding agents for instant API discovery and integration.
 
 ---
 
