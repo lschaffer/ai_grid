@@ -907,12 +907,17 @@ class AiGridController extends ChangeNotifier {
   List<AiGridColumn>? _prePivotColumns;
   List<String>? _prePivotGrouping;
   PivotChartData? _pivotChartData;
+  List<FitGridColumnGroup> _pivotColumnGroups = const [];
 
   /// Whether the grid is currently displaying in aggregated Pivot Mode.
   bool get isPivotActive => _pivotConfig != null;
 
   /// Active pivot configuration, or null if in standard grid mode.
   AiGridPivotConfig? get pivotConfig => _pivotConfig;
+
+  /// Active banded column groups generated for pivot mode.
+  List<FitGridColumnGroup> get pivotColumnGroups =>
+      List.unmodifiable(_pivotColumnGroups);
 
   /// Computed chart series data derived from the active pivot.
   PivotChartData? get pivotChartData => _pivotChartData;
@@ -1027,10 +1032,52 @@ class AiGridController extends ChangeNotifier {
       pivotedRows.add(rowMap);
     }
 
-    // 6. Build new AiGridColumns
+    // 6. Build column groups (banded headers) & new AiGridColumns
+    final columnGroups = <FitGridColumnGroup>[];
+    final subTitleByColId = <String, String>{};
+
+    if (colDimension != null) {
+      final groupsMap = <String, List<String>>{};
+      for (final col in pivotResult.columns.skip(rowDimensions.length)) {
+        if (col.id.startsWith('total/')) {
+          final valId = col.id.substring('total/'.length);
+          final valDim = valueDimensions.where((v) => v.id == valId).firstOrNull;
+          final subTitle = valDim?.label ?? valId;
+          groupsMap.putIfAbsent('Grand Total', () => []).add(col.id);
+          subTitleByColId[col.id] = subTitle;
+        } else {
+          // Format from fitGridPivot: '${columns.id}=${columns.labelOf(heading)}/${value.id}'
+          final prefix = '${colDimension.id}=';
+          if (col.id.startsWith(prefix)) {
+            final rest = col.id.substring(prefix.length);
+            final slashIdx = rest.lastIndexOf('/');
+            if (slashIdx != -1) {
+              final headingLabel = rest.substring(0, slashIdx);
+              final valId = rest.substring(slashIdx + 1);
+              final valDim = valueDimensions.where((v) => v.id == valId).firstOrNull;
+              final subTitle = valDim?.label ?? valId;
+              groupsMap.putIfAbsent(headingLabel, () => []).add(col.id);
+              subTitleByColId[col.id] = subTitle;
+            }
+          }
+        }
+      }
+
+      for (final entry in groupsMap.entries) {
+        columnGroups.add(
+          FitGridColumnGroup(
+            id: entry.key,
+            label: entry.key,
+            columnIds: entry.value,
+          ),
+        );
+      }
+    }
+    _pivotColumnGroups = columnGroups;
+
     final pivotedColumns = <AiGridColumn>[];
 
-    // Row dimension columns
+    // Row dimension columns (ungrouped, span full double-height header)
     for (var i = 0; i < rowDimensions.length; i++) {
       pivotedColumns.add(
         AiGridColumn(
@@ -1042,12 +1089,13 @@ class AiGridController extends ChangeNotifier {
       );
     }
 
-    // Measure / value columns
+    // Measure / value columns (nested under their column group band)
     for (final col in pivotResult.columns.skip(rowDimensions.length)) {
+      final displayTitle = subTitleByColId[col.id] ?? col.label;
       pivotedColumns.add(
         AiGridColumn(
           field: col.id,
-          title: col.label,
+          title: displayTitle,
           width: 140,
           type: AiGridColumnType.number,
           aggregateType: AiGridAggregateType.sum,
@@ -1130,6 +1178,7 @@ class AiGridController extends ChangeNotifier {
     final origGrouping = _prePivotGrouping;
 
     _pivotConfig = null;
+    _pivotColumnGroups = const [];
     _pivotChartData = null;
     _prePivotRows = null;
     _prePivotColumns = null;

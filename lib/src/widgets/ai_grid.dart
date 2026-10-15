@@ -83,7 +83,11 @@ class AiGrid extends StatefulWidget {
     this.onSettingsChanged,
     this.editingOptions,
     this.onRowDoubleTap,
+    this.columnGroups,
   });
+
+  /// Optional column groups (banded headers) to display above column headers.
+  final List<FitGridColumnGroup>? columnGroups;
 
   @override
   State<AiGrid> createState() => _AiGridState();
@@ -158,6 +162,7 @@ class _AiGridState extends State<AiGrid> {
     _controller.addListener(_syncAiAssistantWindowState);
     _controller.addListener(_onControllerStateChangedForAutoSave);
     _controller.addListener(_onControllerChangedForEditing);
+    _controller.addListener(_onControllerChanged);
     if (_controller.showAiAssistant && widget.enableAiAssistant) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _draggableWindowController.show();
@@ -242,12 +247,17 @@ class _AiGridState extends State<AiGrid> {
     _controller.removeListener(_syncAiAssistantWindowState);
     _controller.removeListener(_onControllerStateChangedForAutoSave);
     _controller.removeListener(_onControllerChangedForEditing);
+    _controller.removeListener(_onControllerChanged);
     _draggableWindowController.dispose();
     _fitController.dispose();
     if (_internalController) {
       _controller.dispose();
     }
     super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onControllerChangedForEditing() {
@@ -271,6 +281,9 @@ class _AiGridState extends State<AiGrid> {
   }
 
   List<FitGridColumn<Map<String, dynamic>>> _buildFitColumns() {
+    if (_controller.isPivotActive) {
+      return _controller.columns.map((c) => c.toFitGridColumn()).toList();
+    }
     final opts = _controller.editingOptions;
     final isRowMode = opts.enabled && opts.mode == AiGridEditMode.row;
     final isFormMode = opts.enabled && opts.mode == AiGridEditMode.form;
@@ -1124,6 +1137,9 @@ class _AiGridState extends State<AiGrid> {
     final gridWidget = FitGrid<Map<String, dynamic>>(
       controller: _fitController,
       theme: gridTheme,
+      columnGroups: _controller.isPivotActive
+          ? _controller.pivotColumnGroups
+          : (widget.columnGroups ?? const <FitGridColumnGroup>[]),
       showFilterRow: !_controller.isPivotActive && _controller.showColumnFilterRow,
       showColumnMenu: true,
       columnMenuBuilder: (context, column, defaults) =>

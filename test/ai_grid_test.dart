@@ -1299,6 +1299,62 @@ void main() {
       expect(controller.isPivotActive, isFalse);
       expect(controller.activeGrouping, isEmpty);
     });
+
+    test('AiGridController generates DevExtreme-style banded column groups and clean sub-titles in pivot mode', () {
+      final controller = AiGridController();
+      final sample = [
+        {'category': 'Tech', 'segment': 'Consumer', 'region': 'Central', 'sales': 100.0, 'discount': 0.1},
+        {'category': 'Tech', 'segment': 'Consumer', 'region': 'Central', 'sales': 200.0, 'discount': 0.2},
+        {'category': 'Tech', 'segment': 'Corporate', 'region': 'East', 'sales': 300.0, 'discount': 0.05},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'category', title: 'Category'),
+        const AiGridColumn(field: 'segment', title: 'Segment'),
+        const AiGridColumn(field: 'region', title: 'Region'),
+        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+        const AiGridColumn(field: 'discount', title: 'Discount', type: AiGridColumnType.number),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final fitCtrl = FitGridController<Map<String, dynamic>>(
+        rows: sample,
+        columns: cols.map((c) => c.toFitGridColumn()).toList(),
+      );
+      controller.attach(columns: cols, dataSource: ds, fitController: fitCtrl);
+
+      controller.setPivot(const AiGridPivotConfig(
+        rowFieldIds: ['category'],
+        columnFieldIds: ['segment', 'region'],
+        values: [
+          AiGridPivotValueConfig(columnId: 'sales', aggregation: AiGridPivotAggregation.sum),
+          AiGridPivotValueConfig(columnId: 'discount', aggregation: AiGridPivotAggregation.average),
+        ],
+        showColumnTotals: true,
+      ));
+
+      expect(controller.isPivotActive, isTrue);
+      // Verify column groups: Should have 'Consumer / Central', 'Corporate / East', 'Grand Total'
+      expect(controller.pivotColumnGroups.isNotEmpty, isTrue);
+      final groupLabels = controller.pivotColumnGroups.map((g) => g.label).toList();
+      expect(groupLabels, contains('Consumer / Central'));
+      expect(groupLabels, contains('Corporate / East'));
+      expect(groupLabels, contains('Grand Total'));
+
+      // Verify that under 'Consumer / Central', there are 2 sub-columns for Sales and Discount
+      final consumerCentralGroup = controller.pivotColumnGroups.firstWhere((g) => g.label == 'Consumer / Central');
+      expect(consumerCentralGroup.columnIds.length, 2);
+
+      // Verify clean sub-titles on columns
+      final salesCol = controller.columns.firstWhere((c) => c.field == consumerCentralGroup.columnIds[0]);
+      expect(salesCol.title, 'Sales (Sum)');
+
+      final discountCol = controller.columns.firstWhere((c) => c.field == consumerCentralGroup.columnIds[1]);
+      expect(discountCol.title, 'Discount (Average)');
+
+      // Clearing pivot resets column groups
+      controller.clearPivot();
+      expect(controller.isPivotActive, isFalse);
+      expect(controller.pivotColumnGroups, isEmpty);
+    });
   });
 }
 
