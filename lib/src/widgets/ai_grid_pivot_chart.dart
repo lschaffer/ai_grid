@@ -56,10 +56,67 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
     Color(0xFF498205), // Olive
   ];
 
+  PivotChartData get _effectiveData {
+    final raw = widget.data;
+    if (raw.seriesNames.length <= 8 && raw.categories.length <= 15) {
+      return raw;
+    }
+
+    // Sort series by aggregate value sum across categories and take top 6
+    final seriesSums = <int, num>{};
+    for (var s = 0; s < raw.seriesNames.length; s++) {
+      num sum = 0;
+      if (s < raw.values.length) {
+        for (final v in raw.values[s]) {
+          sum += v;
+        }
+      }
+      seriesSums[s] = sum;
+    }
+
+    final sortedSeriesIndices = seriesSums.keys.toList()
+      ..sort((a, b) => seriesSums[b]!.compareTo(seriesSums[a]!));
+    final topSeriesIndices = sortedSeriesIndices.take(6).toList();
+
+    // Sort categories by sum across top series and take top 10
+    final catSums = <int, num>{};
+    for (var c = 0; c < raw.categories.length; c++) {
+      num sum = 0;
+      for (final s in topSeriesIndices) {
+        if (s < raw.values.length && c < raw.values[s].length) {
+          sum += raw.values[s][c];
+        }
+      }
+      catSums[c] = sum;
+    }
+
+    final sortedCatIndices = catSums.keys.toList()
+      ..sort((a, b) => catSums[b]!.compareTo(catSums[a]!));
+    final topCatIndices = sortedCatIndices.take(10).toList()..sort();
+
+    final newCategories = [for (final c in topCatIndices) raw.categories[c]];
+    final newSeriesNames = [for (final s in topSeriesIndices) raw.seriesNames[s]];
+    final newValues = <List<num>>[
+      for (final s in topSeriesIndices)
+        <num>[
+          for (final c in topCatIndices)
+            (s < raw.values.length && c < raw.values[s].length) ? raw.values[s][c] : 0,
+        ],
+    ];
+
+    return PivotChartData(
+      categories: newCategories,
+      seriesNames: newSeriesNames,
+      values: newValues,
+      valueFormatter: raw.valueFormatter,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final effective = _effectiveData;
 
     return Container(
       decoration: BoxDecoration(
@@ -100,6 +157,24 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                         fontSize: 13,
                       ),
                     ),
+                    if (widget.data.seriesNames.length > effective.seriesNames.length) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withAlpha(30),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'Top ${effective.seriesNames.length}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 Row(
@@ -192,44 +267,72 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
             ),
           ),
 
-          // Legend
-          if (widget.data.seriesNames.isNotEmpty)
+          // Legend (Constrained with SingleChildScrollView to never overflow)
+          if (effective.seriesNames.isNotEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 4,
-                children: [
-                  for (var i = 0; i < widget.data.seriesNames.length; i++)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 62),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
+                      for (var i = 0; i < effective.seriesNames.length; i++)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _palette[i % _palette.length],
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              effective.seriesNames[i],
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? Colors.grey[300] : Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      if (widget.data.seriesNames.length > effective.seriesNames.length)
                         Container(
-                          width: 10,
-                          height: 10,
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _palette[i % _palette.length],
-                            borderRadius: BorderRadius.circular(2),
+                            color: theme.colorScheme.primary.withAlpha(20),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '+${widget.data.seriesNames.length - effective.seriesNames.length} more in table',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.data.seriesNames[i],
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark ? Colors.grey[300] : Colors.grey[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
 
           // Chart Canvas
           Expanded(
-            child: widget.data.categories.isEmpty || widget.data.seriesNames.isEmpty
+            child: effective.categories.isEmpty || effective.seriesNames.isEmpty
                 ? Center(
                     child: Text(
                       'No data to visualize',
@@ -242,7 +345,7 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                     child: CustomPaint(
                       size: Size.infinite,
                       painter: _PivotChartPainter(
-                        data: widget.data,
+                        data: effective,
                         chartType: widget.chartType,
                         palette: _palette,
                         isDark: isDark,

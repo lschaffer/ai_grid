@@ -95,6 +95,7 @@ class _AiGridState extends State<AiGrid> {
   late final DraggableWindowController _draggableWindowController;
   bool _internalController = false;
   bool _isLoading = true;
+  double _pivotSplitRatio = 0.60;
 
   AiGridEditMode? _lastEditMode;
   int? _lastEditingRowIndex;
@@ -1151,16 +1152,62 @@ class _AiGridState extends State<AiGrid> {
       return LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 720;
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+
           if (isWide) {
+            final totalWidth = constraints.maxWidth;
+            const splitterWidth = 8.0;
+            final availableWidth = (totalWidth - splitterWidth).clamp(0.0, double.infinity);
+            final gridWidth = (availableWidth * _pivotSplitRatio).clamp(240.0, (availableWidth - 240.0).clamp(240.0, availableWidth));
+            final chartWidth = (availableWidth - gridWidth).clamp(0.0, availableWidth);
+
             return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  flex: 3,
+                SizedBox(
+                  width: gridWidth,
                   child: gridWidget,
                 ),
-                Expanded(
-                  flex: 2,
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeColumn,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragUpdate: (details) {
+                      setState(() {
+                        final newGridWidth = gridWidth + details.delta.dx;
+                        if (availableWidth > 0) {
+                          _pivotSplitRatio = (newGridWidth / availableWidth).clamp(0.20, 0.80);
+                        }
+                      });
+                    },
+                    child: Container(
+                      width: splitterWidth,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
+                        border: Border(
+                          left: BorderSide(
+                            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                          ),
+                          right: BorderSide(
+                            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 2,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: chartWidth,
                   child: AiGridPivotChart(
                     data: _controller.pivotChartData!,
                     chartType: _controller.pivotConfig!.chartType,
@@ -1172,15 +1219,59 @@ class _AiGridState extends State<AiGrid> {
               ],
             );
           } else {
+            final totalHeight = constraints.maxHeight;
+            const splitterHeight = 8.0;
+            final availableHeight = (totalHeight - splitterHeight).clamp(0.0, double.infinity);
+            final gridHeight = (availableHeight * _pivotSplitRatio).clamp(160.0, (availableHeight - 160.0).clamp(160.0, availableHeight));
+            final chartHeight = (availableHeight - gridHeight).clamp(0.0, availableHeight);
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  flex: 3,
+                SizedBox(
+                  height: gridHeight,
                   child: gridWidget,
                 ),
-                Expanded(
-                  flex: 2,
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeRow,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragUpdate: (details) {
+                      setState(() {
+                        final newGridHeight = gridHeight + details.delta.dy;
+                        if (availableHeight > 0) {
+                          _pivotSplitRatio = (newGridHeight / availableHeight).clamp(0.20, 0.80);
+                        }
+                      });
+                    },
+                    child: Container(
+                      height: splitterHeight,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
+                        border: Border(
+                          top: BorderSide(
+                            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                          ),
+                          bottom: BorderSide(
+                            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 36,
+                          height: 2,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.grey[600] : Colors.grey[400],
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: chartHeight,
                   child: AiGridPivotChart(
                     data: _controller.pivotChartData!,
                     chartType: _controller.pivotConfig!.chartType,

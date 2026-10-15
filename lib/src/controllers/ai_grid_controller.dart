@@ -3,7 +3,8 @@ import 'dart:math' as math;
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart';
+import 'package:intl/intl.dart';
+import 'package:material_ui/material_ui.dart';
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_data_source.dart';
@@ -904,6 +905,7 @@ class AiGridController extends ChangeNotifier {
   AiGridPivotConfig? _pivotConfig;
   List<Map<String, dynamic>>? _prePivotRows;
   List<AiGridColumn>? _prePivotColumns;
+  List<String>? _prePivotGrouping;
   PivotChartData? _pivotChartData;
 
   /// Whether the grid is currently displaying in aggregated Pivot Mode.
@@ -914,6 +916,9 @@ class AiGridController extends ChangeNotifier {
 
   /// Computed chart series data derived from the active pivot.
   PivotChartData? get pivotChartData => _pivotChartData;
+
+  /// The original column definitions before pivot mode was activated.
+  List<AiGridColumn> get originalColumns => _prePivotColumns ?? _columns;
 
   /// Transforms the grid on-the-fly into an aggregated Pivot Table.
   void setPivot(AiGridPivotConfig config) {
@@ -932,6 +937,7 @@ class AiGridController extends ChangeNotifier {
 
     _prePivotRows ??= sourceRows;
     _prePivotColumns ??= List<AiGridColumn>.from(_columns);
+    _prePivotGrouping ??= List<String>.from(_activeGrouping);
 
     // Resolve column fields
     final resolvedRowIds = config.rowFieldIds
@@ -1042,9 +1048,29 @@ class AiGridController extends ChangeNotifier {
         AiGridColumn(
           field: col.id,
           title: col.label,
-          width: 130,
+          width: 140,
           type: AiGridColumnType.number,
           aggregateType: AiGridAggregateType.sum,
+          cellBuilder: (context, row, rowIndex) {
+            final val = row[col.id];
+            final isEmpty = val == null || val.toString().isEmpty;
+            return Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                isEmpty
+                    ? '—'
+                    : (val is num
+                        ? NumberFormat('#,##0.##').format(val)
+                        : val.toString()),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isEmpty ? Colors.grey[400] : null,
+                  fontStyle: isEmpty ? FontStyle.italic : null,
+                ),
+              ),
+            );
+          },
         ),
       );
     }
@@ -1079,6 +1105,17 @@ class AiGridController extends ChangeNotifier {
       _fitController!.columns.columns =
           pivotedColumns.map((c) => c.toFitGridColumn()).toList();
       _fitController!.data.rows = pivotedRows;
+
+      // DevExtreme-style hierarchical grouping when multiple row fields exist
+      if (config.groupByRows && rowDimensions.length > 1) {
+        final groupFields = rowDimensions
+            .take(rowDimensions.length - 1)
+            .map((d) => d.id)
+            .toList();
+        setGrouping(groupFields);
+      } else {
+        setGrouping([]);
+      }
     }
 
     notifyListeners();
@@ -1090,11 +1127,13 @@ class AiGridController extends ChangeNotifier {
 
     final origRows = _prePivotRows;
     final origCols = _prePivotColumns;
+    final origGrouping = _prePivotGrouping;
 
     _pivotConfig = null;
     _pivotChartData = null;
     _prePivotRows = null;
     _prePivotColumns = null;
+    _prePivotGrouping = null;
 
     if (origCols != null) {
       _columns = origCols;
@@ -1107,6 +1146,11 @@ class AiGridController extends ChangeNotifier {
       }
       if (origRows != null) {
         _fitController!.data.rows = origRows;
+      }
+      if (origGrouping != null && origGrouping.isNotEmpty) {
+        setGrouping(origGrouping);
+      } else {
+        clearGrouping();
       }
     }
 

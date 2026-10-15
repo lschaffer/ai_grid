@@ -158,6 +158,7 @@ class AiGridPivotConfig {
     this.showRowTotals = true,
     this.showChart = false,
     this.chartType = AiGridPivotChartType.groupedBar,
+    this.groupByRows = true,
   });
 
   final List<String> rowFieldIds;
@@ -168,6 +169,9 @@ class AiGridPivotConfig {
   final bool showChart;
   final AiGridPivotChartType chartType;
 
+  /// Whether to hierarchically group rows in tree format when multiple row dimensions are selected.
+  final bool groupByRows;
+
   AiGridPivotConfig copyWith({
     List<String>? rowFieldIds,
     List<String>? columnFieldIds,
@@ -176,6 +180,7 @@ class AiGridPivotConfig {
     bool? showRowTotals,
     bool? showChart,
     AiGridPivotChartType? chartType,
+    bool? groupByRows,
   }) {
     return AiGridPivotConfig(
       rowFieldIds: rowFieldIds ?? this.rowFieldIds,
@@ -185,6 +190,7 @@ class AiGridPivotConfig {
       showRowTotals: showRowTotals ?? this.showRowTotals,
       showChart: showChart ?? this.showChart,
       chartType: chartType ?? this.chartType,
+      groupByRows: groupByRows ?? this.groupByRows,
     );
   }
 
@@ -196,6 +202,7 @@ class AiGridPivotConfig {
         'showRowTotals': showRowTotals,
         'showChart': showChart,
         'chartType': chartType.name,
+        'groupByRows': groupByRows,
       };
 
   factory AiGridPivotConfig.fromJson(Map<String, dynamic> json) {
@@ -223,6 +230,7 @@ class AiGridPivotConfig {
       showRowTotals: json['showRowTotals'] as bool? ?? true,
       showChart: json['showChart'] as bool? ?? false,
       chartType: AiGridPivotChartType.fromString(json['chartType'] as String?),
+      groupByRows: json['groupByRows'] as bool? ?? true,
     );
   }
 }

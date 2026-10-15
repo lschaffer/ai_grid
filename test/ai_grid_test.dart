@@ -1260,6 +1260,45 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AiGridPivotChooserDialog), findsNothing);
     });
+
+    test('AiGridController applies DevExtreme-style hierarchical grouping when groupByRows is enabled', () {
+      final controller = AiGridController();
+      final sample = [
+        {'category': 'Furniture', 'subCategory': 'Chairs', 'region': 'East', 'sales': 200.0},
+        {'category': 'Furniture', 'subCategory': 'Tables', 'region': 'East', 'sales': 300.0},
+        {'category': 'Technology', 'subCategory': 'Phones', 'region': 'West', 'sales': 500.0},
+      ];
+      final cols = [
+        const AiGridColumn(field: 'category', title: 'Category'),
+        const AiGridColumn(field: 'subCategory', title: 'SubCategory'),
+        const AiGridColumn(field: 'region', title: 'Region'),
+        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+      ];
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+      final fitCtrl = FitGridController<Map<String, dynamic>>(
+        rows: sample,
+        columns: cols.map((c) => c.toFitGridColumn()).toList(),
+      );
+      controller.attach(columns: cols, dataSource: ds, fitController: fitCtrl);
+
+      controller.setPivot(const AiGridPivotConfig(
+        rowFieldIds: ['category', 'subCategory'],
+        columnFieldIds: ['region'],
+        values: [
+          AiGridPivotValueConfig(columnId: 'sales', aggregation: AiGridPivotAggregation.sum),
+        ],
+        groupByRows: true,
+      ));
+
+      expect(controller.isPivotActive, isTrue);
+      // Grouping should be set on 'category' (all row dimensions except the last)
+      expect(controller.activeGrouping, contains('category'));
+
+      // Clearing pivot restores previous grouping
+      controller.clearPivot();
+      expect(controller.isPivotActive, isFalse);
+      expect(controller.activeGrouping, isEmpty);
+    });
   });
 }
 

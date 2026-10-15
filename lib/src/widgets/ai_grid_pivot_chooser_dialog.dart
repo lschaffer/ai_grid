@@ -72,7 +72,49 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
   late bool _showColumnTotals;
   late bool _showChart;
   late AiGridPivotChartType _chartType;
+  late bool _groupByRows;
   String _searchFilter = '';
+
+  static bool isCodeOrId(String field) {
+    final lower = field.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+    return lower.contains('id') ||
+        lower.contains('code') ||
+        lower.contains('zip') ||
+        lower.contains('postal') ||
+        lower.contains('key') ||
+        lower.contains('row') ||
+        lower == 'no';
+  }
+
+  static bool isPreferredMeasure(String field) {
+    final lower = field.toLowerCase();
+    return lower.contains('sale') ||
+        lower.contains('profit') ||
+        lower.contains('quant') ||
+        lower.contains('rev') ||
+        lower.contains('amount') ||
+        lower.contains('disc') ||
+        lower.contains('cost') ||
+        lower.contains('total') ||
+        lower.contains('price') ||
+        lower.contains('margin');
+  }
+
+  static bool isPreferredDimension(String field) {
+    final lower = field.toLowerCase();
+    return lower.contains('category') ||
+        lower.contains('sub') ||
+        lower.contains('region') ||
+        lower.contains('segment') ||
+        lower.contains('country') ||
+        lower.contains('city') ||
+        lower.contains('state') ||
+        lower.contains('dept') ||
+        lower.contains('department') ||
+        lower.contains('type') ||
+        lower.contains('status') ||
+        lower.contains('mode');
+  }
 
   @override
   void initState() {
@@ -85,28 +127,152 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
       _showColumnTotals = active.showColumnTotals;
       _showChart = active.showChart;
       _chartType = active.chartType;
+      _groupByRows = active.groupByRows;
     } else {
-      // Sensible defaults from available columns
-      final allCols = _availableColumns;
-      final textCols = allCols.where((c) => c.type == AiGridColumnType.text).toList();
-      final numCols = allCols.where((c) => c.type == AiGridColumnType.number || c.type == AiGridColumnType.currency).toList();
-
-      _rowFieldIds = textCols.isNotEmpty ? [textCols.first.field] : (allCols.isNotEmpty ? [allCols.first.field] : []);
-      _columnFieldIds = textCols.length > 1 ? [textCols[1].field] : [];
-      _values = numCols.isNotEmpty
-          ? [AiGridPivotValueConfig(columnId: numCols.first.field, aggregation: AiGridPivotAggregation.sum)]
-          : (allCols.isNotEmpty
-              ? [AiGridPivotValueConfig(columnId: allCols.last.field, aggregation: AiGridPivotAggregation.count)]
-              : []);
-      _showColumnTotals = true;
-      _showChart = true;
-      _chartType = AiGridPivotChartType.groupedBar;
+      _initSmartDefaults();
     }
   }
 
+  void _initSmartDefaults() {
+    final allCols = _availableColumns;
+
+    // 1. Genuine numeric measures (never postal code, IDs, or row numbers)
+    final candidateMeasures = allCols.where((c) {
+      if (isCodeOrId(c.field)) return false;
+      return c.type == AiGridColumnType.number ||
+          c.type == AiGridColumnType.currency ||
+          isPreferredMeasure(c.field);
+    }).toList();
+
+    candidateMeasures.sort((a, b) {
+      final aPref = isPreferredMeasure(a.field) ? 0 : 1;
+      final bPref = isPreferredMeasure(b.field) ? 0 : 1;
+      return aPref.compareTo(bPref);
+    });
+
+    // 2. Categorical dimensions (avoiding high-cardinality IDs)
+    final candidateDimensions = allCols.where((c) {
+      if (isCodeOrId(c.field)) return false;
+      return c.type == AiGridColumnType.text ||
+          c.type == AiGridColumnType.select ||
+          c.type == AiGridColumnType.date ||
+          isPreferredDimension(c.field);
+    }).toList();
+
+    candidateDimensions.sort((a, b) {
+      final aPref = isPreferredDimension(a.field) ? 0 : 1;
+      final bPref = isPreferredDimension(b.field) ? 0 : 1;
+      return aPref.compareTo(bPref);
+    });
+
+    // Default Rows: Category & SubCategory if present, else first 1-2 dimensions
+    final catCol = candidateDimensions
+        .where((c) => c.field.toLowerCase() == 'category')
+        .firstOrNull;
+    final subCatCol = candidateDimensions
+        .where((c) => c.field.toLowerCase().contains('sub'))
+        .firstOrNull;
+    if (catCol != null) {
+      _rowFieldIds = [catCol.field, if (subCatCol != null) subCatCol.field];
+    } else if (candidateDimensions.isNotEmpty) {
+      _rowFieldIds = [candidateDimensions.first.field];
+    } else {
+      _rowFieldIds = allCols.isNotEmpty ? [allCols.first.field] : [];
+    }
+
+    // Default Columns: Region or Segment if present, else next dimension
+    final regCol = candidateDimensions
+        .where((c) =>
+            c.field.toLowerCase() == 'region' &&
+            !_rowFieldIds.contains(c.field))
+        .firstOrNull;
+    final segCol = candidateDimensions
+        .where((c) =>
+            c.field.toLowerCase() == 'segment' &&
+            !_rowFieldIds.contains(c.field))
+        .firstOrNull;
+    if (regCol != null) {
+      _columnFieldIds = [regCol.field];
+    } else if (segCol != null) {
+      _columnFieldIds = [segCol.field];
+    } else {
+      final nextDim = candidateDimensions
+          .where((c) => !_rowFieldIds.contains(c.field))
+          .firstOrNull;
+      _columnFieldIds = nextDim != null ? [nextDim.field] : [];
+    }
+
+    // Default Values: Sales (sum) and Profit (sum) or Quantity (sum)
+    final salesCol = candidateMeasures
+        .where((c) => c.field.toLowerCase() == 'sales')
+        .firstOrNull;
+    final profitCol = candidateMeasures
+        .where((c) => c.field.toLowerCase() == 'profit')
+        .firstOrNull;
+    final quantCol = candidateMeasures
+        .where((c) => c.field.toLowerCase().contains('quant'))
+        .firstOrNull;
+
+    if (salesCol != null) {
+      _values = [
+        AiGridPivotValueConfig(
+            columnId: salesCol.field,
+            aggregation: AiGridPivotAggregation.sum),
+        if (profitCol != null)
+          AiGridPivotValueConfig(
+              columnId: profitCol.field,
+              aggregation: AiGridPivotAggregation.sum)
+        else if (quantCol != null)
+          AiGridPivotValueConfig(
+              columnId: quantCol.field,
+              aggregation: AiGridPivotAggregation.sum),
+      ];
+    } else if (candidateMeasures.isNotEmpty) {
+      _values = candidateMeasures
+          .take(2)
+          .map((c) => AiGridPivotValueConfig(
+              columnId: c.field, aggregation: AiGridPivotAggregation.sum))
+          .toList();
+    } else {
+      _values = allCols.isNotEmpty
+          ? [
+              AiGridPivotValueConfig(
+                  columnId: allCols.last.field,
+                  aggregation: AiGridPivotAggregation.count)
+            ]
+          : [];
+    }
+
+    _showColumnTotals = true;
+    _showChart = true;
+    _chartType = AiGridPivotChartType.column;
+    _groupByRows = true;
+  }
+
+  void _applyPreset({
+    required List<String> rows,
+    required List<String> columns,
+    required List<AiGridPivotValueConfig> values,
+    AiGridPivotChartType chartType = AiGridPivotChartType.column,
+  }) {
+    final available = _availableColumns.map((c) => c.field.toLowerCase()).toSet();
+    final validRows = rows.where((r) => available.contains(r.toLowerCase())).toList();
+    final validCols = columns.where((c) => available.contains(c.toLowerCase())).toList();
+    final validVals = values.where((v) => available.contains(v.columnId.toLowerCase())).toList();
+
+    setState(() {
+      if (validRows.isNotEmpty) _rowFieldIds = validRows;
+      _columnFieldIds = validCols;
+      if (validVals.isNotEmpty) _values = validVals;
+      _chartType = chartType;
+      _showChart = true;
+      _showColumnTotals = true;
+      _groupByRows = true;
+    });
+  }
+
   List<AiGridColumn> get _availableColumns {
-    // If pivot is active, use the original columns preserved by controller
-    return widget.controller.columns;
+    return widget.controller.originalColumns;
   }
 
   String _columnTitle(String field) {
@@ -137,6 +303,7 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
       showColumnTotals: _showColumnTotals,
       showChart: _showChart,
       chartType: _chartType,
+      groupByRows: _groupByRows,
     );
 
     widget.controller.setPivot(config);
@@ -162,7 +329,7 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 820, maxHeight: 680),
+        constraints: const BoxConstraints(maxWidth: 860, maxHeight: 700),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -196,9 +363,9 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Left: All Available Fields
+                  // Left: All Available Fields with Presets
                   Container(
-                    width: 280,
+                    width: 300,
                     decoration: BoxDecoration(
                       border: Border(
                         right: BorderSide(
@@ -211,14 +378,59 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Available Fields',
+                          'Quick Presets (DevExtreme Style)',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: isDark ? Colors.grey[400] : Colors.grey[700],
                           ),
                         ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            ActionChip(
+                              visualDensity: VisualDensity.compact,
+                              avatar: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF0078D4)),
+                              label: const Text('Category x Region', style: TextStyle(fontSize: 10)),
+                              onPressed: () => _applyPreset(
+                                rows: ['Category', 'SubCategory'],
+                                columns: ['Region'],
+                                values: const [
+                                  AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
+                                  AiGridPivotValueConfig(columnId: 'Profit', aggregation: AiGridPivotAggregation.sum),
+                                ],
+                              ),
+                            ),
+                            ActionChip(
+                              visualDensity: VisualDensity.compact,
+                              avatar: const Icon(Icons.pie_chart_outline, size: 14, color: Color(0xFF107C41)),
+                              label: const Text('Segment x Ship', style: TextStyle(fontSize: 10)),
+                              onPressed: () => _applyPreset(
+                                rows: ['Segment'],
+                                columns: ['ShipMode'],
+                                values: const [
+                                  AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
+                                  AiGridPivotValueConfig(columnId: 'Quantity', aggregation: AiGridPivotAggregation.sum),
+                                ],
+                                chartType: AiGridPivotChartType.groupedBar,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Divider(height: 1),
                         const SizedBox(height: 8),
+                        Text(
+                          'Available Fields',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.grey[400] : Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
                         TextField(
                           decoration: InputDecoration(
                             hintText: 'Search fields...',
@@ -237,24 +449,41 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
                               final col = filteredColumns[idx];
                               final isNumeric = col.type == AiGridColumnType.number ||
                                   col.type == AiGridColumnType.currency;
+                              final isMeasure = isNumeric && !isCodeOrId(col.field);
+
                               return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 3),
+                                margin: const EdgeInsets.symmetric(vertical: 2.5),
                                 elevation: 0.5,
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   child: Row(
                                     children: [
                                       Icon(
-                                        isNumeric ? Icons.numbers : Icons.text_fields,
-                                        size: 16,
-                                        color: isNumeric ? Colors.teal : Colors.blueGrey,
+                                        isMeasure
+                                            ? Icons.calculate
+                                            : (isCodeOrId(col.field) ? Icons.fingerprint : Icons.text_fields),
+                                        size: 15,
+                                        color: isMeasure ? Colors.teal : (isCodeOrId(col.field) ? Colors.orange : Colors.indigo),
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
-                                        child: Text(
-                                          col.title,
-                                          style: const TextStyle(fontSize: 12),
-                                          overflow: TextOverflow.ellipsis,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              col.title,
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            Text(
+                                              isMeasure ? 'Measure' : (isCodeOrId(col.field) ? 'Identifier' : 'Dimension'),
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                color: isMeasure ? Colors.teal : (isCodeOrId(col.field) ? Colors.orange : Colors.grey[600]),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                       PopupMenuButton<String>(
@@ -278,9 +507,36 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
                                           });
                                         },
                                         itemBuilder: (context) => [
-                                          const PopupMenuItem(value: 'row', child: Text('Add to Rows')),
-                                          const PopupMenuItem(value: 'col', child: Text('Add to Columns')),
-                                          const PopupMenuItem(value: 'data', child: Text('Add to Data (Measures)')),
+                                          const PopupMenuItem(
+                                            value: 'row',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.table_rows, size: 16, color: Colors.blue),
+                                                SizedBox(width: 8),
+                                                Text('Add to Row Fields'),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'col',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.view_column, size: 16, color: Colors.indigo),
+                                                SizedBox(width: 8),
+                                                Text('Add to Column Fields'),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'data',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.calculate, size: 16, color: Colors.teal),
+                                                SizedBox(width: 8),
+                                                Text('Add to Data / Measures'),
+                                              ],
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ],
@@ -378,6 +634,19 @@ class _AiGridPivotChooserDialogState extends State<AiGridPivotChooserDialog> {
                                   ),
                                   const SizedBox(width: 4),
                                   const Text('Grand Totals', style: TextStyle(fontSize: 12)),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value: _groupByRows,
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    onChanged: (v) => setState(() => _groupByRows = v ?? true),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text('Hierarchical Grouping', style: TextStyle(fontSize: 12)),
                                 ],
                               ),
                             ],
