@@ -1,6 +1,6 @@
 # AI Grid (`ai_grid`)
 
-[![pub version](https://img.shields.io/badge/pub-v0.2.0-blue.svg)](https://pub.dev/packages/ai_grid)
+[![pub version](https://img.shields.io/badge/pub-v0.3.0-blue.svg)](https://pub.dev/packages/ai_grid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.24.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![WASM Ready](https://img.shields.io/badge/WebAssembly-WASM%20Compatible-success.svg)](https://flutter.dev/to/wasm)
@@ -52,7 +52,29 @@
   * **Delete Confirmation Dialog**: Built-in confirmation before deleting rows (`beforeDelete`).
   * Persistence hooks via `commit`, `afterSave`, and `afterDelete`.
 
-### 3. 🧠 Native AI Assistant & Model Context Protocol (MCP)
+### 3. 📊 DevExtreme-Style Dynamic Pivot Grid & Side-by-Side Chart
+
+Convert any active table into an enterprise multi-dimensional Pivot Grid on the fly with real-time aggregated cross-tabulations and side-by-side synchronized charts.
+
+* **Field Chooser Dialog (`AiGridPivotChooserDialog`)**:
+  * Visual drop zones for **Row Fields** (vertical breakdown), **Column Fields** (horizontal cross-tabulation), and **Data / Measures** (metrics to aggregate).
+  * Smart column heuristic separating true metrics (`Sales`, `Quantity`, `Profit`) from dimensions (`Category`, `Region`) and primary keys (`OrderID`, `PostalCode`).
+  * Aggregation functions: `Sum`, `Average`, `Count`, `Min`, `Max`.
+  * One-click presets matching DevExtreme showcase designs (e.g. *Category &times; Region*, *Segment &times; Ship Mode*).
+* **DevExtreme-Style Banded Split Column Headers**:
+  * Automatically creates unified top-level header bands across multi-column breakdowns (e.g. `Consumer / Central` spanning over `Sales (Sum)` and `Discount (Average)`).
+  * Row dimension headers (`Order ID`, `Category`) cleanly span the full double-height header vertically.
+* **Hierarchical Row Tree Grouping**:
+  * Multiple row dimensions (e.g. `Category` &rarr; `SubCategory`) automatically generate collapsible tree-style grouping with group subtotals.
+* **Moveable Split-Panel Canvas Chart**:
+  * Side-by-side interactive chart (`AiGridPivotChart`) supporting `groupedBar`, `column`, `line`, and `pie` visualization.
+  * Interactive draggable divider with 1:1 absolute mouse tracking and theme-reactive highlight feedback.
+  * Smart Top-6 series and Top-10 categories data filtering to prevent legend overflow on large datasets.
+* **AI Assistant & Natural Language Control**:
+  * Run prompts like *"create pivot table, rows category and subcategory, columns segment, data fields sales (sum), profit (sum)"*.
+  * Deactivate or restore standard view anytime via toolbar button or *"reset pivot table"*.
+
+### 4. 🧠 Native AI Assistant & Model Context Protocol (MCP)
 * **Embedded AI Chat**: Conversational interface that understands your tabular schema, column types, and data distributions.
 * **Hallucination-Free Math Engine (`grid_calculate`)**: Calculations (sum, average, minimum, maximum, count, median) are executed strictly inside the Dart engine—ensuring 100% mathematical accuracy without LLM arithmetic errors.
 * **Multi-Column AND Filtering**: Seamlessly parses and applies complex queries across multiple columns simultaneously (e.g. *"filter region East and category Furniture"*).
@@ -60,7 +82,7 @@
 * **Context-Aware Suggestions**: Proactive quick-action chips generated dynamically based on active columns.
 * **LLM Provider Agnostic**: Connects seamlessly with Mistral, OpenAI, Anthropic Claude, Google Gemini, Ollama, custom OpenAI-compatible endpoints, or built-in local heuristics.
 
-### 3. 💾 Save & Restore Grid Settings (Auto-Save)
+### 5. 💾 Save & Restore Grid Settings (Auto-Save)
 * **Full State Persistence**: Export or restore grid configuration including:
   * `visibleColumns` & `hiddenColumns`
   * `groupColumns` (hierarchical row grouping)
@@ -71,11 +93,11 @@
 * **JSON Import/Export**: Export settings to JSON string or save to file via `controller.exportSettingsJson()` and restore via `controller.restoreSettingsJson(str)`.
 * **In-Memory Cache**: Built-in `AiGridSettingsStorage` handles session-level caching and retrieval.
 
-### 4. 📋 Copy-to-Clipboard in AI Assistant
+### 6. 📋 Copy-to-Clipboard in AI Assistant
 * **Prompt Bubbles**: 1-tap copy button on every user message bubble.
 * **AI Responses**: Copy button in the header of each assistant response card to copy the full AI response and execution summary directly to the system clipboard.
 
-### 5. 📱 Responsive Desktop & Mobile Layouts
+### 7. 📱 Responsive Desktop & Mobile Layouts
 * **Desktop Mode (≥ 620px)**:
   * Floatable, moveable, and resizable AI Assistant window powered by [`draggable_overlay_window`](https://pub.dev/packages/draggable_overlay_window).
   * 8-directional edge/corner resizing, drag-by-header, minimize, maximize, and smooth focus management.
@@ -84,7 +106,8 @@
   * Auto-flexing search bar that adapts to any screen width without pixel overflows.
   * Instant 1-tap Mode Switcher tab bar (`[ 📊 Data Grid ]` | `[ ✨ AI Assistant ]`).
   * Full-screen mobile assistant view with quick `[← Back to Data Grid]` navigation.
-### 6. ↔️ Interactive Column Resizing & Width Policies
+
+### 8. ↔️ Interactive Column Resizing & Width Policies
 * **Drag-to-Resize**: Hovering between column headers reveals draggable divider handles to interactively adjust column widths.
 * **Auto-Fit on Double-Click**: Double-clicking any column divider handle or choosing "Size to fit" in the column menu auto-fits the column to its actual cell content.
 * **Flexible Sizing Policies**: Configure `columnWidth` with any policy from [fitgrid_table](https://pub.dev/packages/fitgrid_table#column-widths):
@@ -94,31 +117,31 @@
   * `FitGridColumnWidth.fitHeader(min: 44)` — sized strictly to the header label.
 * **Layout Persistence**: Custom column widths automatically persist across app restarts when `autoSave: true` is enabled.
 
-### 7. 📤 Fast & Pure-Dart Excel (.xlsx) Export
+### 9. 📤 Fast & Pure-Dart Excel (.xlsx) Export
 * One-click **Export to Excel** directly accessible via the toolbar download button, mobile menu, or natural language AI command (`export`):
   * **Native Save As Dialog**: Opens the platform's native "Save As..." dialog (`FileSaver.instance.saveAs`) allowing the user to select the destination folder and filename across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
   * **Pure-Dart Excel Engine**: Generates `.xlsx` workbooks directly in Dart with zero C/C++ native dependencies or platform channels.
   * **Direct Programmatic API**: Trigger export programmatically anytime via `controller.export()`.
 
-### 8. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
+### 10. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
 * **Client-Side Pagination**: Simple opt-in via `enablePagination: true` and `pageSize: 25`, rendering an interactive page-navigation footer with total row counts and page controls.
 * **Server-Side Partial Data Load (`LazyAiGridDataSource`)**:
   * Only requests and loads the slice of records for the active page from your backend or REST/GraphQL API.
   * Dynamically passes current page, page size, active column sorting, and active filter criteria to your `fetch` callback.
 
-### 9. 🌐 WebAssembly (WASM) Compatible
+### 11. 🌐 WebAssembly (WASM) Compatible
 * Fully verified with Flutter WebAssembly (`dart2wasm`).
 * Zero direct dependencies on legacy `dart:html`.
 * Native filesystem operations are cleanly isolated behind conditional imports, ensuring zero runtime or compile-time breakages in browser WASM environments.
 
-### 10. 🎨 Modern Adaptive Theming
+### 12. 🎨 Modern Adaptive Theming
 * Harmonious styling that automatically reflects the parent application's Material 3 `ThemeData` across Light and Dark modes.
 
 ---
 
 ## 🛠️ MCP Tool Reference
 
-`ai_grid` exposes 16 specialized MCP tools through `AiGridSkill`:
+`ai_grid` exposes 18 specialized MCP tools through `AiGridSkill`:
 
 | Tool Name | Description |
 | :--- | :--- |
@@ -138,6 +161,8 @@
 | `grid_get_pagination_status` | Returns active pagination status (current page, total pages, page size, isPaginated). |
 | `grid_export_settings` | Exports current grid settings (visible columns, grouping, sorts, filters) as a JSON string. |
 | `grid_restore_settings` | Restores grid settings from a JSON string or settings object. |
+| `grid_create_pivot_table` | Transforms the table into an aggregated Pivot Table on the fly with optional side-by-side Chart. |
+| `grid_reset_pivot_table` | Deactivates pivot mode and restores the standard grid view, columns, and groupings. |
 | `grid_reset` | Resets grouping, filters, sorting, search, and restores all column visibility. |
 
 ---
@@ -150,7 +175,7 @@ Add `ai_grid` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ai_grid: ^0.0.3
+  ai_grid: ^0.3.0
   material_ui: ^1.4.0
 ```
 

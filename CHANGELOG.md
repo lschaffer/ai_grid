@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.0
+
+On-the-fly DevExtreme-Style Pivot Grid with interactive Field Chooser, banded split column headers, hierarchical row grouping, moveable split-panel canvas chart, and natural language AI Assistant tools.
+
+### DevExtreme-Style Dynamic Pivot Grid & Side-by-Side Chart
+* **Pivot Table Field Chooser Dialog (`AiGridPivotChooserDialog`)**:
+  * DevExtreme-inspired modal dialog featuring available fields list and drag/add drop zones for **Row Fields**, **Column Fields**, and **Data (Measures)**.
+  * Smart column classification heuristic distinguishing authentic measures (`Sales`, `Quantity`, `Profit`), dimensions (`Category`, `Region`), and identifiers (`OrderID`, `PostalCode`).
+  * Per-measure aggregation selection: `sum`, `average`, `count`, `min`, and `max`.
+  * Quick DevExtreme presets for instant cross-tabulations (e.g. *Category &times; Region*, *Segment &times; Ship Mode*).
+* **DevExtreme-Style Banded Split Column Headers (`FitGridColumnGroup`)**:
+  * Native integration with FitGrid's column groups: parent column dimensions (e.g. `Consumer / Central` or `Grand Total`) span horizontally across their nested child measures (`Sales (Sum)`, `Discount (Average)`).
+  * Ungrouped row dimension columns (`Order ID`, `Category`) automatically span the full double-height header vertically.
+* **Hierarchical Tree Row Grouping (`groupByRows`)**:
+  * Automatically sets tree-style multi-level row grouping across preceding row dimensions, enabling in-place collapsible drill-downs.
+* **Interactive Side-by-Side Canvas Pivot Chart (`AiGridPivotChart`)**:
+  * Real-time canvas visualization supporting `groupedBar`, `column`, `line`, and `pie` chart modes.
+  * Smart Top-6 series and Top-10 categories data filtering to keep charts crisp, readable, and responsive on high-cardinality cross-tabulations.
+  * Constrained, scrollable legend with `+N more in table` indicators to prevent flex overflows.
+* **Moveable Split Panel Divider**:
+  * Interactive draggable splitter divider between the grid and chart with 1:1 absolute mouse tracking and theme-highlighted hover/drag visual feedback.
+  * Responsive split: horizontal side-by-side on desktop (`>= 720px`) and vertical stacked on smaller viewports.
+* **Clean Empty Cell Formatting**:
+  * Muted em-dash (`—`) for empty matrix cross-tabulation intersections with `#,#00.##` numeric formatting.
+* **AI Assistant & MCP Pivot Tools**:
+  * `grid_create_pivot_table`: Transforms the table into an aggregated Pivot Table on the fly from natural language prompts.
+  * `grid_reset_pivot_table`: Instantly deactivates pivot mode and restores the original table, columns, and groupings.
+
 ## 0.2.0
 
 Comprehensive DevExtreme-style DataGrid Editing support across cell, row, and modal form modes with full CRUD lifecycle validation and action column orchestration.
