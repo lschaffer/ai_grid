@@ -106,15 +106,29 @@ class _AiGridDatasourceManagerDialogState
     if (yamlString != null && mounted) {
       try {
         final bytes = utf8.encode(yamlString);
-        await FileSaver.instance.saveFile(
-          name: '${desc.name}.agrid',
-          fileExtension: 'yaml',
-          bytes: Uint8List.fromList(bytes),
-          mimeType: MimeType.other,
-        );
+        String? savedPath;
+        try {
+          savedPath = await FileSaver.instance.saveAs(
+            name: '${desc.name}.agrid',
+            bytes: Uint8List.fromList(bytes),
+            fileExtension: 'yaml',
+            mimeType: MimeType.other,
+            dialogTitle: 'Save Dynamic Grid YAML Bundle',
+          );
+        } catch (_) {
+          savedPath = await FileSaver.instance.saveFile(
+            name: '${desc.name}.agrid',
+            fileExtension: 'yaml',
+            bytes: Uint8List.fromList(bytes),
+            mimeType: MimeType.other,
+          );
+        }
         if (mounted) {
+          final msg = (savedPath != null && savedPath.isNotEmpty)
+              ? 'Saved to: $savedPath'
+              : 'Exported "${desc.name}" bundle as YAML.';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Exported "${desc.name}" bundle as YAML.')),
+            SnackBar(content: Text(msg)),
           );
         }
       } catch (_) {
