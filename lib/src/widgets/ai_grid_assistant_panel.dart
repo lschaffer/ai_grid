@@ -1,9 +1,15 @@
+import 'dart:convert';
+import 'dart:io' as io;
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../config/ai_grid_config.dart';
 import '../controllers/ai_grid_controller.dart';
+import '../data/clipboard_content_service.dart';
+import '../data/pdf_table_extractor.dart';
 import '../mcp/ai_grid_tools.dart';
 import '../models/ai_grid_column.dart';
 import '../theme/ai_grid_theme.dart';
@@ -34,6 +40,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<_AssistantMessage> _messages = [];
+  final List<MessageAttachment> _attachments = [];
   bool _isLoading = false;
 
   void _copyToClipboard(BuildContext context, String text) {
@@ -111,28 +118,133 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     _scrollToBottom();
   }
 
+  Future<void> _pickAttachments() async {
+    try {
+      final files = await FilePicker.pickFiles();
+      if (files.isNotEmpty) {
+        for (final f in files) {
+          Uint8List? bytes;
+          try {
+            bytes = await f.readAsBytes();
+          } catch (_) {
+            if (f.path != null && !kIsWeb) {
+              final file = io.File(f.path!);
+              if (await file.exists()) {
+                bytes = await file.readAsBytes();
+              }
+            }
+          }
+          final name = f.name;
+          final mime = _mimeFromExtension(name);
+          _attachments.add(
+            MessageAttachment(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              name: name,
+              path: f.path ?? '',
+              bytes: bytes,
+              mimeType: mime,
+              size: bytes?.length,
+            ),
+          );
+        }
+        if (mounted) setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Failed to pick files: $e');
+    }
+  }
+
+  Future<void> _handleClipboardPaste([dynamic directPayloads]) async {
+    try {
+      List<ClipboardPayload> payloads;
+      if (directPayloads is List<ClipboardPayload>) {
+        payloads = directPayloads;
+      } else {
+        payloads = await ClipboardContentService.readClipboard();
+      }
+      if (payloads.isEmpty) return;
+
+      int addedCount = 0;
+      for (final p in payloads) {
+        if (p.isMedia && p.bytes != null) {
+          _attachments.add(
+            MessageAttachment(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              name: p.name,
+              path: p.filePath ?? '',
+              bytes: p.bytes,
+              mimeType: p.mimeType,
+              size: p.bytes?.length,
+            ),
+          );
+          addedCount++;
+        } else if (p.type == ClipboardContentType.text && p.text != null) {
+          final cur = _textCtrl.text;
+          _textCtrl.text = cur.isEmpty ? p.text! : '$cur\n${p.text}';
+        }
+      }
+
+      if (mounted && addedCount > 0) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Attached $addedCount item(s) from clipboard'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  static String _mimeFromExtension(String name) {
+    final ext = name.split('.').last.toLowerCase();
+    const map = <String, String>{
+      'txt': 'text/plain',
+      'md': 'text/markdown',
+      'csv': 'text/csv',
+      'tsv': 'text/tab-separated-values',
+      'json': 'application/json',
+      'yaml': 'text/yaml',
+      'yml': 'text/yaml',
+      'html': 'text/html',
+      'pdf': 'application/pdf',
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+    };
+    return map[ext] ?? 'application/octet-stream';
+  }
+
   Future<void> _handleSend() async {
     final text = _textCtrl.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _attachments.isEmpty) return;
+
+    final attachmentsToSend = List<MessageAttachment>.from(_attachments);
+    final displayText = text.isNotEmpty
+        ? text
+        : 'Attached: ${attachmentsToSend.map((a) => a.name).join(", ")}';
 
     setState(() {
-      _messages.add(_AssistantMessage(text: text, isUser: true));
+      _messages.add(_AssistantMessage(text: displayText, isUser: true));
       _isLoading = true;
+      _attachments.clear();
     });
     _textCtrl.clear();
     _scrollToBottom();
 
     try {
       if (widget.onSendPrompt != null) {
-        await widget.onSendPrompt!(text);
+        await widget.onSendPrompt!(displayText);
       } else {
         final llm = widget.aiConfig?.llmConfig ??
             AiGridEnvLoader.createLlmConfigFromEnv();
 
         if (llm != null && llm.isConfigured) {
-          await _executeWithAgentsEngine(text, llm);
+          await _executeWithAgentsEngine(displayText, attachmentsToSend, llm);
         } else {
-          _executeLocalHeuristic(text);
+          _executeLocalHeuristic(displayText);
         }
       }
     } catch (e) {
@@ -156,7 +268,56 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     }
   }
 
-  Future<void> _executeWithAgentsEngine(String prompt, LlmConfig config) async {
+  Future<void> _executeWithAgentsEngine(
+    String prompt,
+    List<MessageAttachment> attachments,
+    LlmConfig config,
+  ) async {
+    final parts = <ChatContentPart>[
+      TextPart(prompt),
+    ];
+
+    final promptBuilder = StringBuffer(prompt);
+
+    for (final att in attachments) {
+      if (att.bytes != null && att.bytes!.isNotEmpty) {
+        if (att.mimeType.toLowerCase().startsWith('image/')) {
+          parts.add(ImagePart.fromBytes(att.bytes!, mimeType: att.mimeType));
+        } else {
+          String? text;
+          try {
+            if (att.name.toLowerCase().endsWith('.pdf') ||
+                att.mimeType == 'application/pdf') {
+              text = PdfTableExtractor.extractText(att.bytes!);
+            } else {
+              text = utf8.decode(att.bytes!);
+            }
+          } catch (_) {}
+
+          if (text != null && text.isNotEmpty) {
+            promptBuilder.writeln(
+              '\n\n--- [Attached Document: ${att.name}] ---\n$text',
+            );
+          }
+
+          parts.add(DocumentPart(
+            bytes: att.bytes,
+            fileName: att.name,
+            mimeType: att.mimeType,
+            textContent: text,
+          ));
+        }
+      }
+    }
+
+    final effectivePrompt = promptBuilder.toString();
+
+    final userMsg = ChatMessage.user(
+      effectivePrompt,
+      parts: parts,
+      attachments: attachments,
+    );
+
     final tools = AiGridSkill.createTools(widget.controller);
     final agent = Agent(
       key: 'ai_grid_agent',
@@ -164,9 +325,10 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       llmConfig: config,
       systemPrompt: widget.aiConfig?.systemPrompt ??
           AiGridSkill.defaultSystemPrompt,
+      initialMessages: [userMsg],
       prompts: [
         SubPromptStep(
-          text: prompt,
+          text: effectivePrompt,
           stopAfterToolCall: false,
         ),
       ],
@@ -740,72 +902,250 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     );
   }
 
+  Widget _buildAttachmentPreviews(ThemeData theme) {
+    if (_attachments.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        border: Border(
+          bottom: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.attach_file, size: 12, color: theme.colorScheme.primary),
+              const SizedBox(width: 4),
+              Text(
+                'Attachments (${_attachments.length})',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () => setState(() => _attachments.clear()),
+                child: Text(
+                  'Clear all',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 60,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _attachments.length,
+              separatorBuilder: (ctx, i) => const SizedBox(width: 6),
+              itemBuilder: (context, idx) {
+                final att = _attachments[idx];
+                final isImage = att.mimeType.toLowerCase().startsWith('image/');
+
+                return Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    color: theme.colorScheme.surface,
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: isImage && att.bytes != null
+                            ? Image.memory(
+                                att.bytes!,
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                                errorBuilder: (ctx, err, stack) => _buildDocIcon(att, theme),
+                              )
+                            : _buildDocIcon(att, theme),
+                      ),
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _attachments.removeAt(idx)),
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: const BoxDecoration(
+                              color: Colors.black87,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, color: Colors.white, size: 10),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocIcon(MessageAttachment att, ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.insert_drive_file_outlined, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(height: 2),
+            Text(
+              att.name,
+              style: const TextStyle(fontSize: 8),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInputBox(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: isDark
-            ? colorScheme.surfaceContainerHighest
-            : const Color(0xFFF8FAFC),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.circular(12),
-        ),
-        border: Border(
-          top: BorderSide(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildAttachmentPreviews(theme),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
             color: isDark
-                ? colorScheme.outlineVariant.withAlpha(60)
-                : AiGridTheme.borderColor,
-            width: 1,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _textCtrl,
-              onSubmitted: (_) => _handleSend(),
-              style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
-              decoration: InputDecoration(
-                hintText: 'Type a message...',
-                hintStyle: TextStyle(
-                  fontSize: 13,
-                  color: colorScheme.onSurfaceVariant.withAlpha(160),
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                ? colorScheme.surfaceContainerHighest
+                : const Color(0xFFF8FAFC),
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? colorScheme.outlineVariant.withAlpha(60)
+                    : AiGridTheme.borderColor,
+                width: 1,
               ),
             ),
           ),
-          // Microphone icon omitted until speech-to-text is implemented.
-          IconButton(
-            icon: _isLoading
-                ? SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: colorScheme.primary,
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.attach_file_outlined, size: 18),
+                tooltip: 'Attach Files or Images',
+                onPressed: _isLoading ? null : _pickAttachments,
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(4),
+              ),
+              IconButton(
+                icon: const Icon(Icons.content_paste_go_outlined, size: 18),
+                tooltip: 'Paste from Clipboard (Ctrl+V)',
+                onPressed: _isLoading ? null : () => _handleClipboardPaste(),
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(4),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Actions(
+                  actions: <Type, Action<Intent>>{
+                    PasteTextIntent: CallbackAction<PasteTextIntent>(
+                      onInvoke: (intent) async {
+                        final payloads = await ClipboardContentService.readClipboard();
+                        final media = payloads.where((p) => p.isMedia).toList();
+                        if (media.isNotEmpty) {
+                          _handleClipboardPaste(media);
+                          return null;
+                        }
+                        final data = await Clipboard.getData(Clipboard.kTextPlain);
+                        if (data?.text != null) {
+                          final cur = _textCtrl.text;
+                          final sel = _textCtrl.selection;
+                          if (sel.isValid) {
+                            final newText = cur.replaceRange(sel.start, sel.end, data!.text!);
+                            _textCtrl.value = TextEditingValue(
+                              text: newText,
+                              selection: TextSelection.collapsed(offset: sel.start + data.text!.length),
+                            );
+                          } else {
+                            _textCtrl.text = '$cur${data!.text}';
+                          }
+                        }
+                        return null;
+                      },
                     ),
-                  )
-                : Icon(
-                    Icons.arrow_forward,
-                    size: 18,
-                    color: colorScheme.primary,
+                  },
+                  child: TextField(
+                    controller: _textCtrl,
+                    onSubmitted: (_) => _handleSend(),
+                    style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      hintText: _isLoading
+                          ? 'Assistant is working...'
+                          : 'Type a message, paste image/doc (Ctrl+V)...',
+                      hintStyle: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant.withAlpha(160),
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    ),
                   ),
-            onPressed: _isLoading ? null : _handleSend,
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.all(6),
+                ),
+              ),
+              IconButton(
+                icon: _isLoading
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.primary,
+                        ),
+                      )
+                    : Icon(
+                        Icons.arrow_forward,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
+                onPressed: _isLoading ? null : _handleSend,
+                constraints: const BoxConstraints(),
+                padding: const EdgeInsets.all(6),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

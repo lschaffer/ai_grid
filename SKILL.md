@@ -1,7 +1,7 @@
 ---
 name: ai-grid
 description: Comprehensive developer and coding agent guide for the ai_grid Flutter DataGrid package. Use when integrating, configuring, or extending high-performance canvas tables with DevExtreme-style editing (cell, row, modal form), dynamic Pivot Grids with banded split headers, hierarchical tree grouping, moveable split-panel charts, Excel export, and native Model Context Protocol (MCP) AI tools.
-version: 0.3.0
+version: 0.4.0
 author: lschaffer
 tags:
   - flutter
@@ -26,7 +26,7 @@ This skill provides an authoritative, complete guide for coding agents (Claude C
 1. **Ultra-High Performance Canvas Virtualization**: Powered by `fitgrid_table` — paints cells directly to the Flutter canvas with ~3ms frame times across up to 1,000,000 rows.
 2. **DevExtreme-Style Editing**: In-place cell editing, inline row editing with draft states and pinned action buttons, and modal popup form dialogs (`AiGridFormDialog`) with 4 configurable layouts.
 3. **DevExtreme-Style On-The-Fly Pivot Grid**: Transform any active table into an aggregated multi-dimensional pivot grid with banded split headers (`FitGridColumnGroup`), hierarchical tree row grouping, and moveable split-panel canvas charts.
-4. **Native AI Assistant & Model Context Protocol (MCP)**: 18 built-in tools (`dart_mcp_core`) enabling LLMs to introspect schema, run exact-math calculations in Dart (zero hallucination), filter, sort, group, pivot, and export via natural language.
+4. **Native AI Assistant & Model Context Protocol (MCP)**: 25 built-in tools (`dart_mcp_core`) enabling LLMs to introspect schema, run exact-math calculations in Dart (zero hallucination), filter, sort, group, pivot, and export via natural language.
 5. **Pure-Dart Excel (.xlsx) Export**: Zero native C/C++ dependencies; opens platform-native "Save As..." dialog across Desktop, Web, and Mobile.
 6. **Ecosystem Standard**: Fully compatible with `package:material_ui` and Flutter 3.24+ WebAssembly (`dart2wasm`).
 
@@ -39,7 +39,7 @@ In `pubspec.yaml`:
 dependencies:
   flutter:
     sdk: flutter
-  ai_grid: ^0.3.0
+  ai_grid: ^0.4.0
   material_ui: ^1.4.0
 ```
 
@@ -349,9 +349,46 @@ final dataSource = LazyAiGridDataSource(
 
 ---
 
-## 11. Coding Guidelines for AI Agents
+## 11. Dynamic DataGrid from Files, Web GET & Clipboard
+
+Enable multi-source tabular ingestion without hardcoded schemas:
+```dart
+AiGrid(
+  dataSource: _dataSource,
+  controller: _controller,
+  dynamicGrid: true, // Enables dynamic datasource toolbar buttons and ingestion
+  enableAiAssistant: true,
+  // Option C: Use lean built-in assistant or supply custom builder:
+  // assistantBuilder: (context, controller) => MyCustomMcpAssistant(controller: controller),
+)
+```
+
+### Ingestion Sources & Automatic Detection
+- **Files**: Pick `.csv`, `.tsv`, `.json`, `.md` (Markdown pipe tables), `.txt`, `.pdf`, `.docx` via native picker.
+- **Web (GET)**: Ingest public JSON array endpoints or HTML tables. Web sources are automatically marked `isReadonly: true`.
+- **System Clipboard**: Paste tables via `Ctrl+V` or clipboard button. Multimodal base64 image inspection extracts screenshot tables.
+
+### Storage & Serialization Schema
+- **Model Name**: `$name_mdl.yaml` (column descriptors, field types, validation rules).
+- **Data File**: `$name.json` (raw tabular rows).
+- **Persistence**: Saved in `SharedPreferences` via `AiGridDynamicStorage`.
+- **Bundle Portability**: Export/import portable bundles (`.agrid.yaml`) containing both the model YAML and data JSON.
+- **DevExtreme Write-Back**: Editing rows or cells automatically commits updates back to `AiGridDynamicStorage.updateDataRows`.
+
+### Dynamic MCP Tools
+- `grid_create_dynamic_datasource`: Creates, validates, and activates a dynamic dataset from structured rows or inferred columns.
+- `grid_list_datasources`: Lists all saved dynamic datasets, row counts, origins, and active status.
+- `grid_load_datasource`: Switches the active DataGrid view to any stored dataset.
+- `grid_delete_datasource`: Deletes a saved dynamic dataset and its associated YAML model.
+- `grid_fetch_web_data`: Fetches, inspects, and previews tabular data from a public HTTP GET URL.
+- `grid_export_datasource_yaml`: Exports the active or specified dataset as a portable YAML bundle string.
+
+---
+
+## 12. Coding Guidelines for AI Agents
 
 1. **Package Imports**: Always import `package:material_ui/material_ui.dart` instead of `flutter/material.dart`.
 2. **Never Call `setState` in Builds**: Always schedule state updates after frames or attach listeners inside `initState`/`dispose`.
 3. **Empty Pivot Intersections**: Null values in pivot cells are intentional representations of sparse intersections; format with `'—'` in muted gray rather than empty strings.
 4. **Synchronize Changes to Forked Repos**: If modifying files inside `lib/src/fitgrid/`, ensure identical parity with `c:\projects\ls\fitgrid`.
+5. **Option C Hybrid Architecture**: Keep `ai_grid` core zero-bloat and `dart2wasm` safe; use `assistantBuilder` for users plugging in full `flutter_ui_mcp`.

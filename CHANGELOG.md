@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.4.0
+
+Dynamic AI DataGrid with multi-source tabular ingestion (files, public HTTP GET APIs, and system clipboard), persistent YAML/JSON data models, portable bundle export/import, DevExtreme editing write-back, Option C Hybrid Composable Architecture, and 6 new Model Context Protocol (MCP) tools.
+
+### 🌐 Dynamic AI DataGrid from Files, Web GET & System Clipboard
+* **Multi-Source File Ingestion**:
+  * Native file picker integration supporting `.csv`, `.tsv`, `.json`, `.md` (Markdown pipe tables), `.txt`, `.pdf`, and `.docx`.
+  * Pure-Dart delimited parser (`DelimitedTableParser`) with automatic delimiter detection (comma, tab, semicolon) and heuristic data type inference (`number`, `currency`, `boolean`, `date`, `text`).
+  * Pure-Dart markdown pipe table extractor (`MarkdownTableExtractor`) extracting tables, headers, and cell values.
+* **Public Web APIs (HTTP GET)**:
+  * Ingest public JSON array endpoints or HTML table tags directly via `AiGridWebDataSourceDialog` and `WebTableFetcher`.
+  * Public web endpoints are automatically designated `isReadonly: true` for safe, read-only inspection.
+* **System Clipboard Ingestion & Multimodal Support**:
+  * `ClipboardContentService` with desktop PowerShell bitmap inspection, file drop detection, and pure-Dart text parsing fallback.
+  * Ingest tabular markdown, CSV, or JSON directly from the clipboard via keyboard shortcut (`Ctrl+V`) or toolbar action.
+* **Data Model & Persistence Architecture**:
+  * Model schema definition: `$name_mdl.yaml` (`AiGridDynamicModel`).
+  * Data rows: `$name.json`.
+  * `AiGridDynamicStorage`: Complete persistence manager leveraging `SharedPreferences` with in-memory caching and active datasource registry tracking.
+  * **Portable Bundles (`.agrid.yaml`)**: Export and import complete bundles combining model schemas and dataset rows across desktop, web, and mobile.
+* **DevExtreme Editing Write-Back**:
+  * In-place cell, row, and modal form edits automatically write back and persist directly to `SharedPreferences` for non-readonly datasources.
+* **Option C: Hybrid Composable Architecture**:
+  * Zero-bloat core with lean embedded assistant panel and zero native FFI dependencies for full Flutter WebAssembly (`dart2wasm`) safety.
+  * Pluggable `assistantBuilder` parameter on `AiGrid` allowing developers to drop in external AI chat interfaces such as `FlutterUiMcp` or `McpPlayground`.
+* **6 New Dynamic MCP Tools (`AiGridSkill`)**:
+  * `grid_create_dynamic_datasource`: Creates, validates, persists, and activates a dynamic dataset.
+  * `grid_list_datasources`: Lists all saved dynamic datasets, their row counts, origins, and active status.
+  * `grid_load_datasource`: Loads a stored dynamic DataGrid dataset by name into the interactive grid.
+  * `grid_delete_datasource`: Deletes a saved dynamic dataset and its associated YAML model.
+  * `grid_fetch_web_data`: Fetches, inspects, and previews tabular data from a public HTTP GET URL.
+  * `grid_export_datasource_yaml`: Exports a dynamic dataset package (model and data rows) as a YAML formatted string.
+* **Columns Editor Dialogs (`AiGridColumnEditorDialog` & `AiGridColumnsEditorDialog`)**:
+  * **Generic Full-Table Columns Editor (`AiGridColumnsEditorDialog`)**: Self-hosting nested `AiGrid` modal table for managing all column schemas: edit caption, data type (`number`, `text`, `date`, `datetime`), editable flag, required validation, default width, max width, editor type, and column reordering / deletion.
+  * **Single Column Editor (`AiGridColumnEditorDialog`)**: Quick per-column editor dialog accessible from column header context menus.
+  * Synchronized persistence: updates column definitions in the controller, reconfigures active FitGrid columns, and writes back schema modifications to the YAML model in `SharedPreferences`.
+* **Read-Only Mode & Complete Editor Control Suppression**:
+  * Datasets marked `isReadonly: true` (including all web endpoints fetched via HTTP GET) completely suppress editing capabilities.
+  * **Actions Column Hidden**: The pinned `__actions__` column (edit pencil, delete trash, check/cross save buttons) is completely removed from the table.
+  * **Toolbar Controls Suppressed**: The `+` (Add Record) and Columns Editor buttons are hidden from the toolbar.
+  * **Double-Click & In-Cell Editing Blocked**: Row double-tap triggers and cell editing triggers are locked to programmatic-only, preventing edit modes from engaging.
+  * **Controller Guards**: Programmatic edit and delete calls (`startEdit`, `startAdd`, `showEditDialog`, `saveEdit`, `deleteRow`) are safely rejected with early exits.
+* **FitGrid Double-Click Row Edit Stabilization**:
+  * Synced latest upstream FitGrid engine fixes to eliminate row collapse and erroneous edit state transitions when double-clicking table rows.
+* **Adaptive Toolbar & Viewport Resilience**:
+  * Replaced fixed search box widths with flexible `Expanded` + `ConstrainedBox(maxWidth: 220)` alignment to prevent horizontal `RenderFlex` overflows on compact viewports.
+  * Truncated datasource titles in the toolbar button to cleanly accommodate long web URLs.
+* **Datasource UI Dialogs & Toolbars**:
+  * `AiGridDatasourceManagerDialog`: Visual manager modal with search, active datasource badge, YAML export/import, delete with confirmation, and one-click loading.
+  * `AiGridWebDataSourceDialog`: Inspect and load public web endpoints.
+  * Dynamic toolbar buttons: "Datasources" manager button, "+ New Datasource" popup menu, and "Columns Editor" button.
+* **Runnable Example**:
+  * Added `example/lib/dynamic_ai_grid_example.dart` demonstrating pre-seeded tech companies dataset, switching datasources, and DevExtreme editing write-back.
+
 ## 0.3.0
 
 On-the-fly DevExtreme-Style Pivot Grid with interactive Field Chooser, banded split column headers, hierarchical row grouping, moveable split-panel canvas chart, and natural language AI Assistant tools.

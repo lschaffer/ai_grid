@@ -1,8 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
+
+import '../config/ai_grid_dynamic_storage.dart';
 import '../controllers/ai_grid_controller.dart';
+import '../data/clipboard_content_service.dart';
+import '../data/delimited_table_parser.dart';
+import '../data/markdown_table_extractor.dart';
+import '../models/ai_grid_dynamic_datasource.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../theme/ai_grid_theme.dart';
+import 'ai_grid_datasource_dialogs.dart';
 import 'ai_grid_pivot_chooser_dialog.dart';
 
 /// Top Toolbar for [AiGrid], providing search, filter toggle, group toggle,
@@ -13,6 +23,7 @@ class AiGridToolbar extends StatefulWidget {
   final bool isLlmConfigured;
   final bool hideIfNoLlm;
   final VoidCallback? onRefresh;
+  final bool dynamicGrid;
 
   const AiGridToolbar({
     super.key,
@@ -21,6 +32,7 @@ class AiGridToolbar extends StatefulWidget {
     this.isLlmConfigured = true,
     this.hideIfNoLlm = false,
     this.onRefresh,
+    this.dynamicGrid = false,
   });
 
   @override
@@ -59,7 +71,11 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                const Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text('Table exported successfully to $savedPath'),
@@ -91,13 +107,225 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
     }
   }
 
+  Future<void> _handleNewFromFile(BuildContext context) async {
+    try {
+      final file = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['csv', 'tsv', 'json', 'md', 'txt'],
+      );
+      if (file != null) {
+        final content = await file.xFile.readAsString();
+
+        final ext = file.extension?.toLowerCase() ?? '';
+        List<AiGridDynamicColumnModel> columns = [];
+        List<Map<String, dynamic>> rows = [];
+
+        if (ext == 'json') {
+          final decoded = jsonDecode(content);
+          if (decoded is List) {
+            for (final item in decoded) {
+              if (item is Map) rows.add(Map<String, dynamic>.from(item));
+            }
+            if (rows.isNotEmpty) {
+              for (final key in rows.first.keys) {
+                columns.add(AiGridDynamicColumnModel(field: key, title: key));
+              }
+            }
+          }
+        } else if (ext == 'md') {
+          final res = MarkdownTableExtractor.extractFirst(content);
+          if (res != null) {
+            columns = res.columns;
+            rows = res.rows;
+          }
+        } else {
+          final res = DelimitedTableParser.parse(content);
+          columns = res.columns;
+          rows = res.rows;
+        }
+
+        if (rows.isNotEmpty && context.mounted) {
+          final rawName = file.name
+              .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
+              .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+              .toLowerCase();
+          final name = rawName.isEmpty ? 'dataset' : rawName;
+          final modelName = '${name}_mdl.yaml';
+          final datasourceName = '$name.json';
+          final now = DateTime.now();
+
+          final dynamicModel = AiGridDynamicModel(
+            modelName: modelName,
+            datasourceName: datasourceName,
+            title: file.name,
+            sourceType: 'file',
+            sourceOrigin: file.name,
+            createdAt: now,
+            columns: columns,
+          );
+
+          final descriptor = AiGridDynamicDescriptor(
+            name: name,
+            modelName: modelName,
+            datasourceName: datasourceName,
+            title: file.name,
+            sourceType: 'file',
+            sourceOrigin: file.name,
+            createdAt: now,
+            updatedAt: now,
+            rowCount: rows.length,
+          );
+
+          await AiGridDynamicStorage.saveDatasource(
+            descriptor: descriptor,
+            model: dynamicModel,
+            rows: rows,
+          );
+
+          widget.controller.loadDynamicDatasource(
+            descriptor,
+            dynamicModel.toColumns(),
+            rows,
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Created dynamic grid from "${file.name}" (${rows.length} rows)!',
+              ),
+            ),
+          );
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Could not extract tabular data from selected file.',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to load file: $e')));
+      }
+    }
+  }
+
+  Future<void> _handleNewFromClipboard(BuildContext context) async {
+    try {
+      final payloads = await ClipboardContentService.readClipboard();
+      if (payloads.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Clipboard is empty or contains no supported tabular data.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final textPayload = payloads
+          .where((p) => p.type == ClipboardContentType.text)
+          .firstOrNull;
+      if (textPayload != null &&
+          textPayload.text != null &&
+          textPayload.text!.isNotEmpty) {
+        final text = textPayload.text!;
+        List<AiGridDynamicColumnModel> columns = [];
+        List<Map<String, dynamic>> rows = [];
+
+        final mdRes = MarkdownTableExtractor.extractFirst(text);
+        if (mdRes != null) {
+          columns = mdRes.columns;
+          rows = mdRes.rows;
+        } else {
+          final delRes = DelimitedTableParser.parse(text);
+          if (delRes.rows.isNotEmpty) {
+            columns = delRes.columns;
+            rows = delRes.rows;
+          }
+        }
+
+        if (rows.isNotEmpty && context.mounted) {
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final name = 'clipboard_$timestamp';
+          final model = AiGridDynamicModel(
+            modelName: '${name}_mdl.yaml',
+            datasourceName: '$name.json',
+            title: 'Clipboard Table',
+            sourceType: 'clipboard',
+            sourceOrigin: 'clipboard',
+            createdAt: DateTime.now(),
+            columns: columns,
+          );
+          final desc = AiGridDynamicDescriptor(
+            name: name,
+            modelName: '${name}_mdl.yaml',
+            datasourceName: '$name.json',
+            title: 'Clipboard Table',
+            sourceType: 'clipboard',
+            sourceOrigin: 'clipboard',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            rowCount: rows.length,
+          );
+
+          await AiGridDynamicStorage.saveDatasource(
+            descriptor: desc,
+            model: model,
+            rows: rows,
+          );
+          widget.controller.loadDynamicDatasource(
+            desc,
+            model.toColumns(),
+            rows,
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Created dynamic grid from clipboard (${rows.length} rows)!',
+              ),
+            ),
+          );
+          return;
+        }
+      }
+
+      // If media payload (image/doc), open AI Assistant
+      if (context.mounted) {
+        widget.controller.setAiAssistantVisible(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Clipboard contains image/document. Use the AI Assistant to extract tabular data.',
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to read clipboard: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
 
-    final toolbarBg = isDark ? colorScheme.surface : AiGridTheme.backgroundLight;
+    final toolbarBg = isDark
+        ? colorScheme.surface
+        : AiGridTheme.backgroundLight;
     final borderCol = isDark
         ? colorScheme.outlineVariant.withAlpha(80)
         : AiGridTheme.borderColor;
@@ -114,13 +342,16 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
                 color: toolbarBg,
-                border: Border(
-                  bottom: BorderSide(color: borderCol, width: 1),
-                ),
+                border: Border(bottom: BorderSide(color: borderCol, width: 1)),
               ),
               child: isMobile
                   ? _buildMobileToolbar(context, isDark, colorScheme, borderCol)
-                  : _buildDesktopToolbar(context, isDark, colorScheme, borderCol),
+                  : _buildDesktopToolbar(
+                      context,
+                      isDark,
+                      colorScheme,
+                      borderCol,
+                    ),
             );
           },
         );
@@ -138,7 +369,11 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
       children: [
         // Dropdown menu for mobile actions
         PopupMenuButton<String>(
-          icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
+          icon: Icon(
+            Icons.more_vert,
+            size: 20,
+            color: colorScheme.onSurfaceVariant,
+          ),
           tooltip: 'Grid Actions',
           onSelected: (value) {
             switch (value) {
@@ -160,7 +395,8 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
                 AiGridPivotChooserDialog.show(context, widget.controller);
                 break;
               case 'add':
-                if (widget.controller.editingOptions.mode == AiGridEditMode.form) {
+                if (widget.controller.editingOptions.mode ==
+                    AiGridEditMode.form) {
                   widget.controller.showEditDialog(context);
                 } else {
                   widget.controller.startAdd();
@@ -171,7 +407,8 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
           itemBuilder: (context) => [
             if (widget.controller.editingOptions.enabled &&
                 widget.controller.editingOptions.allowAdding &&
-                widget.controller.editingOptions.mode != AiGridEditMode.cell) ...[
+                widget.controller.editingOptions.mode !=
+                    AiGridEditMode.cell) ...[
               const PopupMenuItem(
                 value: 'add',
                 child: Row(
@@ -293,20 +530,20 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
                 size: 18,
                 color: widget.isLlmConfigured
                     ? (widget.controller.showAiAssistant
-                        ? Colors.white
-                        : colorScheme.primary)
+                          ? Colors.white
+                          : colorScheme.primary)
                     : colorScheme.onSurface.withAlpha(90),
               ),
               style: IconButton.styleFrom(
                 backgroundColor: !widget.isLlmConfigured
                     ? (isDark
-                        ? colorScheme.surfaceContainerHighest.withAlpha(80)
-                        : Colors.grey.shade200)
+                          ? colorScheme.surfaceContainerHighest.withAlpha(80)
+                          : Colors.grey.shade200)
                     : (widget.controller.showAiAssistant
-                        ? colorScheme.primary
-                        : (isDark
-                            ? colorScheme.surfaceContainerHighest
-                            : const Color(0xFFEFF6FF))),
+                          ? colorScheme.primary
+                          : (isDark
+                                ? colorScheme.surfaceContainerHighest
+                                : const Color(0xFFEFF6FF))),
                 padding: const EdgeInsets.all(8),
               ),
             ),
@@ -322,9 +559,13 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
     ColorScheme colorScheme,
     Color borderCol,
   ) {
+    final isReadonly =
+        widget.controller.activeDynamicDatasource?.isReadonly ?? false;
+
     return Row(
       children: [
-        if (widget.controller.editingOptions.enabled &&
+        if (!isReadonly &&
+            widget.controller.editingOptions.enabled &&
             widget.controller.editingOptions.allowAdding &&
             widget.controller.editingOptions.mode != AiGridEditMode.cell) ...[
           IconButton(
@@ -335,7 +576,8 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
             ),
             tooltip: 'Add Record',
             onPressed: () {
-              if (widget.controller.editingOptions.mode == AiGridEditMode.form) {
+              if (widget.controller.editingOptions.mode ==
+                  AiGridEditMode.form) {
                 widget.controller.showEditDialog(context);
               } else {
                 widget.controller.startAdd();
@@ -400,7 +642,8 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
           tooltip: widget.controller.isPivotActive
               ? 'Configure Pivot Table'
               : 'Pivot Table (Field Chooser)...',
-          onPressed: () => AiGridPivotChooserDialog.show(context, widget.controller),
+          onPressed: () =>
+              AiGridPivotChooserDialog.show(context, widget.controller),
         ),
         if (widget.controller.isPivotActive) ...[
           IconButton(
@@ -422,11 +665,32 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
             onPressed: widget.controller.clearPivot,
           ),
         ],
-        const Spacer(),
+        if (widget.dynamicGrid) ...[
+          const SizedBox(width: 4),
+          _buildDatasourcesButton(context, colorScheme),
+          _buildNewDatasourceButton(context, colorScheme),
+          if (!isReadonly)
+            IconButton(
+              icon: Icon(
+                Icons.view_column_outlined,
+                size: 20,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              tooltip: 'Columns Editor (Manage All Columns)',
+              onPressed: () =>
+                  widget.controller.showColumnsEditorDialog(context),
+            ),
+        ],
+        const SizedBox(width: 8),
         // Global Search Box
-        SizedBox(
-          width: 220,
-          child: _buildSearchBox(context, isDark, colorScheme, borderCol),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 220),
+              child: _buildSearchBox(context, isDark, colorScheme, borderCol),
+            ),
+          ),
         ),
         if (widget.enableAiAssistant &&
             (!widget.hideIfNoLlm || widget.isLlmConfigured)) ...[
@@ -444,8 +708,8 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
                 size: 16,
                 color: widget.isLlmConfigured
                     ? (widget.controller.showAiAssistant
-                        ? Colors.white
-                        : colorScheme.primary)
+                          ? Colors.white
+                          : colorScheme.primary)
                     : colorScheme.onSurface.withAlpha(90),
               ),
               label: Text(
@@ -455,30 +719,30 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
                   fontWeight: FontWeight.w600,
                   color: widget.isLlmConfigured
                       ? (widget.controller.showAiAssistant
-                          ? Colors.white
-                          : colorScheme.primary)
+                            ? Colors.white
+                            : colorScheme.primary)
                       : colorScheme.onSurface.withAlpha(90),
                 ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: !widget.isLlmConfigured
                     ? (isDark
-                        ? colorScheme.surfaceContainerHighest.withAlpha(80)
-                        : Colors.grey.shade200)
+                          ? colorScheme.surfaceContainerHighest.withAlpha(80)
+                          : Colors.grey.shade200)
                     : (widget.controller.showAiAssistant
-                        ? colorScheme.primary
-                        : (isDark
-                            ? colorScheme.surfaceContainerHighest
-                            : const Color(0xFFEFF6FF))),
+                          ? colorScheme.primary
+                          : (isDark
+                                ? colorScheme.surfaceContainerHighest
+                                : const Color(0xFFEFF6FF))),
                 elevation: 0,
                 side: BorderSide(
                   color: !widget.isLlmConfigured
                       ? Colors.transparent
                       : (widget.controller.showAiAssistant
-                          ? colorScheme.primary
-                          : (isDark
-                              ? colorScheme.outlineVariant.withAlpha(100)
-                              : const Color(0xFFBFDBFE))),
+                            ? colorScheme.primary
+                            : (isDark
+                                  ? colorScheme.outlineVariant.withAlpha(100)
+                                  : const Color(0xFFBFDBFE))),
                   width: 1,
                 ),
                 shape: RoundedRectangleBorder(
@@ -539,27 +803,133 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
               : const Color(0xFFF8FAFC),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide(
-              color: borderCol,
-              width: 1,
-            ),
+            borderSide: BorderSide(color: borderCol, width: 1),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide(
-              color: borderCol,
-              width: 1,
-            ),
+            borderSide: BorderSide(color: borderCol, width: 1),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(4),
-            borderSide: BorderSide(
-              color: colorScheme.primary,
-              width: 1.5,
-            ),
+            borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDatasourcesButton(
+    BuildContext context,
+    ColorScheme colorScheme,
+  ) {
+    final active = widget.controller.activeDynamicDatasource;
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        side: BorderSide(
+          color: active != null
+              ? colorScheme.primary
+              : colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      icon: Icon(
+        Icons.table_view_outlined,
+        size: 16,
+        color: active != null
+            ? colorScheme.primary
+            : colorScheme.onSurfaceVariant,
+      ),
+      label: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 160),
+        child: Text(
+          active != null ? active.title : 'Datasources',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: active != null ? FontWeight.bold : FontWeight.normal,
+            color: active != null
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+      onPressed: () =>
+          AiGridDatasourceManagerDialog.show(context, widget.controller),
+    );
+  }
+
+  Widget _buildNewDatasourceButton(
+    BuildContext context,
+    ColorScheme colorScheme,
+  ) {
+    return PopupMenuButton<String>(
+      icon: Icon(
+        Icons.add_circle_outline,
+        size: 20,
+        color: colorScheme.primary,
+      ),
+      tooltip: 'New Datasource...',
+      onSelected: (val) {
+        if (val == 'file') {
+          _handleNewFromFile(context);
+        } else if (val == 'web') {
+          AiGridWebDataSourceDialog.show(context, widget.controller);
+        } else if (val == 'clipboard') {
+          _handleNewFromClipboard(context);
+        } else if (val == 'clear') {
+          widget.controller.clearDynamicDatasource();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Cleared grid to an empty table.')),
+            );
+          }
+        }
+      },
+      itemBuilder: (ctx) => const [
+        PopupMenuItem(
+          value: 'file',
+          child: Row(
+            children: [
+              Icon(Icons.upload_file_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('From File (CSV, TSV, JSON, MD)...'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'web',
+          child: Row(
+            children: [
+              Icon(Icons.cloud_download_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('From Web URL (GET)...'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'clipboard',
+          child: Row(
+            children: [
+              Icon(Icons.content_paste_go_outlined, size: 18),
+              SizedBox(width: 8),
+              Text('From Clipboard...'),
+            ],
+          ),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'clear',
+          child: Row(
+            children: [
+              Icon(Icons.clear_all, size: 18),
+              SizedBox(width: 8),
+              Text('Clear to Empty Table'),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

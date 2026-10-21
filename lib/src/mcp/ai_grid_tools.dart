@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
+import '../config/ai_grid_dynamic_storage.dart';
 import '../controllers/ai_grid_controller.dart';
+import '../data/web_table_fetcher.dart';
+import '../models/ai_grid_column.dart';
+import '../models/ai_grid_dynamic_datasource.dart';
 import '../models/ai_grid_pivot.dart';
 
 /// Exposes all local tools and skill manifest for [AiGrid] control via MCP.
@@ -9,9 +13,9 @@ class AiGridSkill {
 
   static const String skillName = 'ai_grid_control';
   static const String skillDescription =
-      'Controls an interactive AI DataGrid: inspect schema, filter (supports multi-column AND), calculate exact metrics without hallucinations, sort, group, search, show/hide columns, and reset tabular data.';
+      'Controls an interactive AI DataGrid: inspect schema, filter (supports multi-column AND), calculate exact metrics without hallucinations, sort, group, search, show/hide columns, create dynamic grids from files or web GET, and reset tabular data.';
 
-  /// Creates all 11 MCP tools bound to the provided [controller].
+  /// Creates all MCP tools bound to the provided [controller].
   static List<McpLocalTool> createTools(AiGridController controller) {
     return [
       GridGetSchemaTool(controller),
@@ -33,6 +37,12 @@ class AiGridSkill {
       GridRestoreSettingsTool(controller),
       GridCreatePivotTableTool(controller),
       GridResetPivotTableTool(controller),
+      GridCreateDynamicDatasourceTool(controller),
+      GridListDatasourcesTool(controller),
+      GridLoadDatasourceTool(controller),
+      GridDeleteDatasourceTool(controller),
+      GridFetchWebDataTool(controller),
+      GridExportDatasourceYamlTool(controller),
     ];
   }
 
@@ -73,6 +83,20 @@ IMPORTANT RULES FOR PIVOT TABLES:
   - Map numeric metrics to `data: [{"column": "sales", "aggregation": "sum"}, {"column": "discount", "aggregation": "average"}]`
   - Set `showChart: true` to auto-create a chart beside the table.
 • When the user asks to exit, close, or switch back from pivot mode to the normal table (e.g. "switch back to normal table mode", "exit pivot"), use `grid_reset_pivot_table`.
+
+IMPORTANT RULES FOR DYNAMIC DATAGRIDS & ATTACHMENTS:
+• When the user attaches a file, document, PDF, or image/screenshot and asks to create a grid/table from it (e.g. "create datagrid from attached file", "extract table from picture/pdf and create editable grid, name is monthly sales"):
+  1. Inspect the attached document or image to find tabular data.
+  2. Determine column names and detect appropriate types ('text', 'number', 'currency', 'date', 'boolean').
+  3. Formulate the model columns and row data array.
+  4. Invoke `grid_create_dynamic_datasource` with:
+     - `name`: sanitised datasource name (e.g. "monthly_sales")
+     - `model`: the column list (with fields, titles, types, editable: true)
+     - `data`: the extracted rows array
+     - `source_type`: 'file' or 'clipboard'
+• When the user asks to fetch data from a web URL (e.g. "fetch webpage from https://... and extract data into grid"):
+  Use `grid_fetch_web_data` with the url. If table data is extracted, it will automatically register it as a read-only dynamic DataGrid.
+• To list or switch between saved dynamic datasets, use `grid_list_datasources` and `grid_load_datasource`.
 
 Confirm the actions and calculations clearly and concisely to the user. Do not append extra explanatory notes like "(active filters joined by AND)" or "(joined by AND)".
 ''';
@@ -1283,3 +1307,445 @@ class GridResetPivotTableTool extends McpLocalTool {
     );
   }
 }
+
+class GridCreateDynamicDatasourceTool extends McpLocalTool {
+  final AiGridController controller;
+  GridCreateDynamicDatasourceTool(this.controller);
+
+  @override
+  String get name => 'grid_create_dynamic_datasource';
+
+  @override
+  String get description =>
+      'Creates, persists, and activates a dynamic DataGrid dataset from structured rows and a column model definition.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'name': {
+            'type': 'string',
+            'description': 'Unique identifier for the datasource (e.g. monthly_sales, product_inventory).',
+          },
+          'title': {
+            'type': 'string',
+            'description': 'Display title for the datasource.',
+          },
+          'model': {
+            'description': 'Column definitions as a list of objects or a YAML/JSON string. Each column has field, title, type (text, number, currency, date, boolean), and optional editable (bool).',
+          },
+          'data': {
+            'type': 'array',
+            'description': 'Array of JSON row maps matching the column fields.',
+            'items': {'type': 'object'},
+          },
+          'source_type': {
+            'type': 'string',
+            'description': 'Source of data: file, web, or clipboard.',
+          },
+          'source_origin': {
+            'type': 'string',
+            'description': 'Original filename or URL.',
+          },
+          'is_readonly': {
+            'type': 'boolean',
+            'description': 'Whether the dataset is read-only. Defaults to false.',
+          },
+        },
+        'required': ['name', 'model', 'data'],
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final rawName = arguments['name']?.toString().trim() ?? '';
+    if (rawName.isEmpty) {
+      return MCPToolResult.error('Parameter "name" is required.');
+    }
+    final name = rawName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '_');
+    final title = arguments['title']?.toString() ?? name;
+    final isReadonly = arguments['is_readonly'] as bool? ?? false;
+    final sourceType = arguments['source_type']?.toString() ?? 'file';
+    final sourceOrigin = arguments['source_origin']?.toString();
+
+    // 1. Parse model columns
+    List<AiGridDynamicColumnModel> columns = [];
+    final rawModel = arguments['model'];
+    if (rawModel is List) {
+      columns = rawModel
+          .map((c) => AiGridDynamicColumnModel.fromJson(Map<String, dynamic>.from(c as Map)))
+          .toList();
+    } else if (rawModel is Map) {
+      final cols = rawModel['columns'] as List? ?? [];
+      columns = cols
+          .map((c) => AiGridDynamicColumnModel.fromJson(Map<String, dynamic>.from(c as Map)))
+          .toList();
+    } else if (rawModel is String) {
+      try {
+        final parsed = rawModel.trim().startsWith('{')
+            ? jsonDecode(rawModel)
+            : AiGridDynamicModel.fromYamlString(rawModel);
+        if (parsed is AiGridDynamicModel) {
+          columns = parsed.columns;
+        } else if (parsed is Map) {
+          final cols = parsed['columns'] as List? ?? [];
+          columns = cols
+              .map((c) => AiGridDynamicColumnModel.fromJson(Map<String, dynamic>.from(c as Map)))
+              .toList();
+        }
+      } catch (e) {
+        return MCPToolResult.error('Failed to parse column model: $e');
+      }
+    }
+
+    // 2. Parse data rows
+    final rawData = arguments['data'];
+    if (rawData is! List) {
+      return MCPToolResult.error('Parameter "data" must be an array of row objects.');
+    }
+    final rows = rawData
+        .map((r) => Map<String, dynamic>.from(r as Map))
+        .toList();
+
+    // If no columns provided, infer from first row
+    if (columns.isEmpty && rows.isNotEmpty) {
+      for (final key in rows.first.keys) {
+        columns.add(
+          AiGridDynamicColumnModel(
+            field: key,
+            title: key,
+            type: AiGridColumnType.text,
+            editable: !isReadonly,
+          ),
+        );
+      }
+    }
+
+    final modelName = '${name}_mdl.yaml';
+    final datasourceName = '$name.json';
+    final now = DateTime.now();
+
+    final dynamicModel = AiGridDynamicModel(
+      modelName: modelName,
+      datasourceName: datasourceName,
+      title: title,
+      isReadonly: isReadonly,
+      sourceType: sourceType,
+      sourceOrigin: sourceOrigin,
+      createdAt: now,
+      columns: columns,
+    );
+
+    final descriptor = AiGridDynamicDescriptor(
+      name: name,
+      modelName: modelName,
+      datasourceName: datasourceName,
+      title: title,
+      sourceType: sourceType,
+      sourceOrigin: sourceOrigin,
+      isReadonly: isReadonly,
+      createdAt: now,
+      updatedAt: now,
+      rowCount: rows.length,
+    );
+
+    // Save to persistence
+    await AiGridDynamicStorage.saveDatasource(
+      descriptor: descriptor,
+      model: dynamicModel,
+      rows: rows,
+    );
+
+    // Load into interactive controller
+    controller.loadDynamicDatasource(
+      descriptor,
+      dynamicModel.toColumns(),
+      rows,
+    );
+
+    return MCPToolResult.text(
+      'Successfully created dynamic datasource "$name" ($title) with ${rows.length} rows and ${columns.length} columns. '
+      'Model saved as "$modelName" and data as "$datasourceName". Grid is now displaying this dataset.',
+    );
+  }
+}
+
+class GridListDatasourcesTool extends McpLocalTool {
+  final AiGridController controller;
+  GridListDatasourcesTool(this.controller);
+
+  @override
+  String get name => 'grid_list_datasources';
+
+  @override
+  String get description =>
+      'Lists all saved dynamic DataGrid datasources, their row counts, origins, and active status.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final list = await AiGridDynamicStorage.listDatasources();
+    final activeName = controller.activeDynamicDatasource?.name;
+
+    if (list.isEmpty) {
+      return MCPToolResult.text('No dynamic datasources currently saved in storage.');
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('Saved Dynamic Datasources (${list.length}):');
+    for (final d in list) {
+      final isActive = d.name == activeName ? ' [ACTIVE]' : '';
+      final ro = d.isReadonly ? ' (Read-only)' : '';
+      buffer.writeln(
+        '• "${d.name}" ($isActive$ro): ${d.rowCount} rows, source: ${d.sourceType} (${d.sourceOrigin ?? 'unspecified'}), created: ${d.createdAt.toIso8601String().substring(0, 10)}',
+      );
+    }
+    return MCPToolResult.text(buffer.toString().trim());
+  }
+}
+
+class GridLoadDatasourceTool extends McpLocalTool {
+  final AiGridController controller;
+  GridLoadDatasourceTool(this.controller);
+
+  @override
+  String get name => 'grid_load_datasource';
+
+  @override
+  String get description =>
+      'Loads a saved dynamic DataGrid datasource by name into the interactive grid.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'name': {
+            'type': 'string',
+            'description': 'Name of the datasource to load.',
+          },
+        },
+        'required': ['name'],
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final name = arguments['name']?.toString().trim() ?? '';
+    if (name.isEmpty) return MCPToolResult.error('Parameter "name" is required.');
+
+    final desc = await AiGridDynamicStorage.getDescriptor(name);
+    final model = await AiGridDynamicStorage.getModel(name);
+    final rows = await AiGridDynamicStorage.getDataRows(name);
+
+    if (desc == null || model == null || rows == null) {
+      return MCPToolResult.error('Datasource "$name" not found in local storage.');
+    }
+
+    controller.loadDynamicDatasource(
+      desc,
+      model.toColumns(),
+      rows,
+    );
+
+    return MCPToolResult.text(
+      'Loaded dynamic datasource "${desc.name}" (${desc.title}) with ${rows.length} rows and ${model.columns.length} columns into the DataGrid.',
+    );
+  }
+}
+
+class GridDeleteDatasourceTool extends McpLocalTool {
+  final AiGridController controller;
+  GridDeleteDatasourceTool(this.controller);
+
+  @override
+  String get name => 'grid_delete_datasource';
+
+  @override
+  String get description => 'Deletes a dynamic datasource from storage by name.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'name': {
+            'type': 'string',
+            'description': 'Name of the datasource to delete.',
+          },
+        },
+        'required': ['name'],
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final name = arguments['name']?.toString().trim() ?? '';
+    if (name.isEmpty) return MCPToolResult.error('Parameter "name" is required.');
+
+    final success = await AiGridDynamicStorage.deleteDatasource(name);
+    if (!success) {
+      return MCPToolResult.error('Failed to delete datasource "$name".');
+    }
+    return MCPToolResult.text('Successfully deleted dynamic datasource "$name".');
+  }
+}
+
+class GridFetchWebDataTool extends McpLocalTool {
+  final AiGridController controller;
+  GridFetchWebDataTool(this.controller);
+
+  @override
+  String get name => 'grid_fetch_web_data';
+
+  @override
+  String get description =>
+      'Fetches tabular data from a public HTTP GET endpoint (JSON API or HTML table) and optionally registers it as a read-only dynamic DataGrid.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'url': {
+            'type': 'string',
+            'description': 'HTTP or HTTPS URL to fetch data from.',
+          },
+          'name': {
+            'type': 'string',
+            'description': 'Optional name for the datasource. If omitted, inferred from URL.',
+          },
+          'create_datasource': {
+            'type': 'boolean',
+            'description': 'Whether to immediately register and display as dynamic DataGrid. Defaults to true.',
+          },
+        },
+        'required': ['url'],
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final url = arguments['url']?.toString().trim() ?? '';
+    if (url.isEmpty) return MCPToolResult.error('Parameter "url" is required.');
+
+    final createDs = arguments['create_datasource'] as bool? ?? true;
+    final customName = arguments['name']?.toString().trim();
+
+    try {
+      final result = await WebTableFetcher.fetch(url);
+
+      if (!result.hasTableData) {
+        final snippet = result.rawContent != null && result.rawContent!.length > 1000
+            ? '${result.rawContent!.substring(0, 1000)}...'
+            : result.rawContent ?? 'No tabular content found.';
+        return MCPToolResult.text(
+          'HTTP GET succeeded but could not automatically parse tabular structure. Raw content:\n\n$snippet\n\n'
+          'Use grid_create_dynamic_datasource to construct the table after parsing.',
+        );
+      }
+
+      if (createDs) {
+        final uri = Uri.parse(url);
+        final baseName = customName ??
+            (uri.pathSegments.isNotEmpty ? uri.pathSegments.last : uri.host)
+                .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
+                .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+        final name = (baseName.isEmpty ? 'web_data' : baseName).toLowerCase();
+        final modelName = '${name}_mdl.yaml';
+        final datasourceName = '$name.json';
+        final now = DateTime.now();
+
+        final dynamicModel = AiGridDynamicModel(
+          modelName: modelName,
+          datasourceName: datasourceName,
+          title: 'Web: $url',
+          isReadonly: true,
+          sourceType: 'web',
+          sourceOrigin: url,
+          createdAt: now,
+          columns: result.columns,
+        );
+
+        final descriptor = AiGridDynamicDescriptor(
+          name: name,
+          modelName: modelName,
+          datasourceName: datasourceName,
+          title: 'Web: $url',
+          sourceType: 'web',
+          sourceOrigin: url,
+          isReadonly: true,
+          createdAt: now,
+          updatedAt: now,
+          rowCount: result.rows.length,
+        );
+
+        await AiGridDynamicStorage.saveDatasource(
+          descriptor: descriptor,
+          model: dynamicModel,
+          rows: result.rows,
+        );
+
+        controller.loadDynamicDatasource(
+          descriptor,
+          dynamicModel.toColumns(),
+          result.rows,
+        );
+
+        return MCPToolResult.text(
+          'Successfully fetched $url and created read-only dynamic DataGrid "$name" with '
+          '${result.rows.length} rows and ${result.columns.length} columns. Grid is now active.',
+        );
+      } else {
+        return MCPToolResult.text(
+          'Fetched $url: found ${result.rows.length} rows and ${result.columns.length} columns:\n'
+          'Columns: ${result.columns.map((c) => "${c.field} (${c.type.name})").join(", ")}',
+        );
+      }
+    } catch (e) {
+      return MCPToolResult.error('Failed to fetch from web: $e');
+    }
+  }
+}
+
+class GridExportDatasourceYamlTool extends McpLocalTool {
+  final AiGridController controller;
+  GridExportDatasourceYamlTool(this.controller);
+
+  @override
+  String get name => 'grid_export_datasource_yaml';
+
+  @override
+  String get description =>
+      'Exports a dynamic datasource package (model and data rows) as a YAML formatted string.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'name': {
+            'type': 'string',
+            'description': 'Name of the datasource to export. Defaults to the active dynamic datasource.',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final name = arguments['name']?.toString().trim() ??
+        controller.activeDynamicDatasource?.name ??
+        '';
+
+    if (name.isEmpty) {
+      return MCPToolResult.error(
+        'No active dynamic datasource found. Specify the "name" parameter.',
+      );
+    }
+
+    final yamlString = await AiGridDynamicStorage.exportBundleYaml(name);
+    if (yamlString == null) {
+      return MCPToolResult.error('Datasource "$name" not found in local storage.');
+    }
+
+    return MCPToolResult.text(yamlString);
+  }
+}
+

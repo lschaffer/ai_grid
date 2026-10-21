@@ -26,3 +26,4 @@ tool/
 .env.*
 *.env
 !.env.example
+.tobeplanned

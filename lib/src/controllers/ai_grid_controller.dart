@@ -10,6 +10,10 @@ import '../models/ai_grid_column.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../models/ai_grid_pivot.dart';
+import '../config/ai_grid_dynamic_storage.dart';
+import '../models/ai_grid_dynamic_datasource.dart';
+import '../widgets/ai_grid_column_editor_dialog.dart';
+import '../widgets/ai_grid_columns_editor_dialog.dart';
 import '../widgets/ai_grid_form_dialog.dart';
 import '../widgets/ai_grid_pivot_chart.dart';
 
@@ -19,6 +23,10 @@ class AiGridController extends ChangeNotifier {
   FitGridController<Map<String, dynamic>>? _fitController;
   AiGridDataSource? _dataSource;
   List<AiGridColumn> _columns = [];
+  AiGridDynamicDescriptor? _activeDynamicDatasource;
+
+  /// Active dynamic datasource descriptor if currently bound to a dynamic dataset.
+  AiGridDynamicDescriptor? get activeDynamicDatasource => _activeDynamicDatasource;
 
   List<String> _activeGrouping = [];
   final Map<String, Map<String, dynamic>> _activeFilters = {};
@@ -110,6 +118,7 @@ class AiGridController extends ChangeNotifier {
 
   /// Starts adding a new row, initializing draft values with column defaults or [initialValues].
   void startAdd([Map<String, dynamic>? initialValues]) {
+    if (_activeDynamicDatasource?.isReadonly == true) return;
     _discardPendingRow();
     _editingRowIndex = null;
     _isAddingRow = true;
@@ -148,6 +157,7 @@ class AiGridController extends ChangeNotifier {
 
   /// Starts editing an existing row at [rowIndex] in row or form mode.
   void startEdit(int rowIndex) {
+    if (_activeDynamicDatasource?.isReadonly == true) return;
     if (_fitController == null) return;
     final removedAt = _discardPendingRow();
     if (removedAt >= 0 && removedAt < rowIndex) rowIndex--;
@@ -176,6 +186,9 @@ class AiGridController extends ChangeNotifier {
     Map<String, dynamic>? initialValues,
     String? title,
   }) {
+    if (_activeDynamicDatasource?.isReadonly == true) {
+      return Future.value(false);
+    }
     if (rowIndex != null) {
       startEdit(rowIndex);
     } else {
@@ -232,6 +245,7 @@ class AiGridController extends ChangeNotifier {
   /// Validates and saves the active edit or added row.
   /// Returns null on success, or an error message on validation failure.
   Future<String?> saveEdit() async {
+    if (_activeDynamicDatasource?.isReadonly == true) return 'Table is read-only';
     if (_draftRow == null || _fitController == null) return null;
 
     // 1. Column-level validation
@@ -311,6 +325,9 @@ class AiGridController extends ChangeNotifier {
     if (_dataSource is LocalAiGridDataSource) {
       (_dataSource as LocalAiGridDataSource).setData(allRows);
     }
+    if (_activeDynamicDatasource != null && !_activeDynamicDatasource!.isReadonly) {
+      AiGridDynamicStorage.updateDataRows(_activeDynamicDatasource!.name, allRows);
+    }
 
     final savedRow = Map<String, dynamic>.from(_draftRow!);
 
@@ -338,6 +355,7 @@ class AiGridController extends ChangeNotifier {
 
   /// Deletes a row at [rowIndex] after running beforeDelete guard.
   Future<bool> deleteRow(int rowIndex) async {
+    if (_activeDynamicDatasource?.isReadonly == true) return false;
     if (_fitController == null) return false;
     final viewRows = _fitController!.data.view;
     if (rowIndex < 0 || rowIndex >= viewRows.length) return false;
@@ -356,6 +374,9 @@ class AiGridController extends ChangeNotifier {
     _fitController!.data.rows = allRows;
     if (_dataSource is LocalAiGridDataSource) {
       (_dataSource as LocalAiGridDataSource).setData(allRows);
+    }
+    if (_activeDynamicDatasource != null && !_activeDynamicDatasource!.isReadonly) {
+      AiGridDynamicStorage.updateDataRows(_activeDynamicDatasource!.name, allRows);
     }
 
     final idVal = targetRow['OrderID'] ?? targetRow['id'] ?? targetRow['ID'] ?? '#$rowIndex';
@@ -381,6 +402,9 @@ class AiGridController extends ChangeNotifier {
 
   /// Grid columns defined for this DataGrid.
   List<AiGridColumn> get columns => _columns;
+
+  /// Active data source if attached.
+  AiGridDataSource? get dataSource => _dataSource;
 
   /// Currently active grouping fields (hierarchical).
   List<String> get activeGrouping => List.unmodifiable(_activeGrouping);
@@ -508,6 +532,231 @@ class AiGridController extends ChangeNotifier {
     if (notify) {
       notifyListeners();
     }
+  }
+
+  /// Loads a dynamic datasource into the grid, reconfiguring columns and rows.
+  void loadDynamicDatasource(
+    AiGridDynamicDescriptor descriptor,
+    List<AiGridColumn> columns,
+    List<Map<String, dynamic>> rows,
+  ) {
+    _activeDynamicDatasource = descriptor;
+    final effectiveColumns = descriptor.isReadonly
+        ? columns
+            .map((c) => c.copyWith(editable: false, enableEditingMode: false))
+            .toList()
+        : columns;
+    _columns = effectiveColumns;
+    _dataSource = LocalAiGridDataSource(
+      columns: effectiveColumns,
+      initialData: rows,
+    );
+
+    if (_fitController != null) {
+      _fitController!.columns.columns =
+          effectiveColumns.map((c) => c.toFitGridColumn()).toList();
+      _fitController!.data.rows = rows;
+    } else {
+      _fitController = FitGridController<Map<String, dynamic>>(
+        columns: effectiveColumns.map((c) => c.toFitGridColumn()).toList(),
+        rows: rows,
+      );
+    }
+
+    // Seed initial column width overrides if declared
+    for (final col in _columns) {
+      if (col.width != null && col.width! > 0) {
+        _fitController!.columns.setWidth(col.field, col.width!);
+      }
+    }
+
+    _discardPendingRow();
+    _editingRowIndex = null;
+    _isAddingRow = false;
+    _draftRow = null;
+    _validationErrors.clear();
+
+    _activeGrouping.clear();
+    _activeFilters.clear();
+    _activeSortColumn = null;
+    _searchQuery = '';
+    _hiddenFields.clear();
+
+    AiGridDynamicStorage.setActiveDatasourceName(descriptor.name);
+    notifyListeners();
+  }
+
+  /// Clears the active dynamic datasource and resets the grid to an empty table (no columns, no rows).
+  void clearDynamicDatasource() {
+    _discardPendingRow();
+    _editingRowIndex = null;
+    _isAddingRow = false;
+    _draftRow = null;
+    _validationErrors.clear();
+
+    _activeDynamicDatasource = null;
+    _columns = [];
+    _dataSource = LocalAiGridDataSource(
+      columns: const [],
+      initialData: const [],
+    );
+
+    if (_fitController != null) {
+      _fitController!.columns.columns = [];
+      _fitController!.data.rows = [];
+    }
+
+    _activeGrouping.clear();
+    _activeFilters.clear();
+    _activeSortColumn = null;
+    _searchQuery = '';
+    _hiddenFields.clear();
+
+    AiGridDynamicStorage.setActiveDatasourceName(null);
+    notifyListeners();
+  }
+
+  /// Opens the modal popup [AiGridColumnEditorDialog] to edit a column's schema definition.
+  /// Only available when the dynamic grid is not read-only.
+  Future<bool?> showColumnEditorDialog(
+    BuildContext context, {
+    required String field,
+  }) {
+    return AiGridColumnEditorDialog.show(context, controller: this, field: field);
+  }
+
+  /// Opens the modal popup [AiGridColumnsEditorDialog] to edit and reorder all grid columns
+  /// in an interactive, nested [AiGrid] table.
+  /// Only available when the dynamic grid is not read-only.
+  Future<bool?> showColumnsEditorDialog(BuildContext context) {
+    return AiGridColumnsEditorDialog.show(context, controller: this);
+  }
+
+  /// Updates all column definitions for this grid, syncing with the underlying engine,
+  /// data source, and persisting updates to [AiGridDynamicStorage] if dynamic and writable.
+  Future<bool> updateAllColumns(List<AiGridColumn> newColumns) async {
+    _columns = List<AiGridColumn>.from(newColumns);
+    if (_prePivotColumns != null) {
+      _prePivotColumns = List<AiGridColumn>.from(_columns);
+    }
+
+    if (_dataSource is LocalAiGridDataSource) {
+      _dataSource = LocalAiGridDataSource(
+        columns: _columns,
+        initialData: (_dataSource as LocalAiGridDataSource).data,
+      );
+    }
+
+    if (_fitController != null) {
+      _fitController!.columns.columns =
+          _columns.map((c) => c.toFitGridColumn()).toList();
+      for (final col in _columns) {
+        if (col.width != null && col.width! > 0) {
+          _fitController!.columns.setWidth(col.field, col.width!);
+        }
+      }
+    }
+
+    if (_activeDynamicDatasource != null &&
+        !_activeDynamicDatasource!.isReadonly) {
+      final existingModel =
+          await AiGridDynamicStorage.getModel(_activeDynamicDatasource!.name);
+      if (existingModel != null) {
+        final updatedDynamicCols = _columns
+            .map((c) => AiGridDynamicColumnModel.fromAiGridColumn(c))
+            .toList();
+        final updatedModel =
+            existingModel.copyWith(columns: updatedDynamicCols);
+        await AiGridDynamicStorage.updateModel(
+            _activeDynamicDatasource!.name, updatedModel);
+      }
+    }
+
+    notifyListeners();
+    return true;
+  }
+
+  /// Updates the schema definition of column [field] (title/caption, data type,
+  /// editability, editor type, required validation rule, and width / maxWidth constraints).
+  ///
+  /// Reconfigures columns in the active grid controller, data source, and persists
+  /// updates to [AiGridDynamicStorage] if bound to an active, writable dynamic datasource.
+  Future<bool> updateColumnDefinition({
+    required String field,
+    required String title,
+    required AiGridColumnType type,
+    required bool editable,
+    required bool required,
+    double? width,
+    double? maxWidth,
+    AiGridEditorType? editorType,
+  }) async {
+    final colIndex = _columns.indexWhere((c) => c.field == field);
+    if (colIndex == -1) return false;
+    final oldCol = _columns[colIndex];
+
+    final updatedCol = AiGridColumn(
+      field: oldCol.field,
+      title: title,
+      type: type,
+      width: width,
+      minWidth: oldCol.minWidth,
+      maxWidth: maxWidth,
+      resizable: oldCol.resizable,
+      isGroupable: oldCol.isGroupable,
+      isSortable: oldCol.isSortable,
+      isFilterable: oldCol.isFilterable,
+      editable: editable,
+      enableEditingMode: editable,
+      editorIndex: oldCol.editorIndex,
+      editorType: editorType,
+      editorOptions: oldCol.editorOptions,
+      validator: oldCol.validator,
+      required: required,
+      onChanged: oldCol.onChanged,
+      editorBuilder: oldCol.editorBuilder,
+      aggregateType: oldCol.aggregateType,
+      numberFormat: oldCol.numberFormat,
+      selectOptions: oldCol.selectOptions,
+      cellBuilder: oldCol.cellBuilder,
+    );
+
+    final updatedColumns = List<AiGridColumn>.from(_columns);
+    updatedColumns[colIndex] = updatedCol;
+    _columns = updatedColumns;
+
+    if (_dataSource is LocalAiGridDataSource) {
+      _dataSource = LocalAiGridDataSource(
+        columns: updatedColumns,
+        initialData: (_dataSource as LocalAiGridDataSource).data,
+      );
+    }
+
+    if (_fitController != null) {
+      _fitController!.columns.columns =
+          updatedColumns.map((c) => c.toFitGridColumn()).toList();
+      if (width != null && width > 0) {
+        _fitController!.columns.setWidth(field, width);
+      }
+    }
+
+    if (_activeDynamicDatasource != null &&
+        !_activeDynamicDatasource!.isReadonly) {
+      final existingModel =
+          await AiGridDynamicStorage.getModel(_activeDynamicDatasource!.name);
+      if (existingModel != null) {
+        final updatedDynamicCols = updatedColumns
+            .map((c) => AiGridDynamicColumnModel.fromAiGridColumn(c))
+            .toList();
+        final updatedModel =
+            existingModel.copyWith(columns: updatedDynamicCols);
+        await AiGridDynamicStorage.updateModel(
+            _activeDynamicDatasource!.name, updatedModel);
+      }
+    }
+
+    notifyListeners();
+    return true;
   }
 
   bool _disposed = false;

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:ai_grid/ai_grid.dart';
+import 'dynamic_ai_grid_example.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -748,6 +749,27 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: FilledButton.tonalIcon(
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.auto_awesome, size: 16),
+              label: const Text('Dynamic AI Grid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DynamicGridHomePage(
+                      isDarkMode: widget.isDarkMode,
+                      onToggleTheme: widget.onToggleTheme,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
           // Top bar switch among editing modes (Row, Cell, Form)
           Container(
             height: 36,

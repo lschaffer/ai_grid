@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:draggable_overlay_window/draggable_overlay_window.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
+
 import '../config/ai_grid_config.dart';
+import '../mcp/ai_grid_tools.dart';
 import '../config/ai_grid_settings_storage.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../fitgrid/fitgrid_table.dart';
@@ -84,7 +88,20 @@ class AiGrid extends StatefulWidget {
     this.editingOptions,
     this.onRowDoubleTap,
     this.columnGroups,
+    this.dynamicGrid = false,
+    this.assistantBuilder,
   });
+
+  /// Whether to enable dynamic DataGrid datasource management.
+  final bool dynamicGrid;
+
+  /// Optional custom assistant widget builder (e.g. for plugging in FlutterUiMcp).
+  final Widget Function(
+    BuildContext context,
+    AiGridController controller,
+    List<McpLocalTool> tools,
+  )?
+  assistantBuilder;
 
   /// Optional column groups (banded headers) to display above column headers.
   final List<FitGridColumnGroup>? columnGroups;
@@ -109,6 +126,18 @@ class _AiGridState extends State<AiGrid> {
   AiGridActionColumnPosition? _lastActionPos;
   bool? _lastAllowUpdating;
   bool? _lastAllowDeleting;
+  List<AiGridColumn>? _lastColumns;
+
+  List<AiGridColumn> get _effectiveColumns {
+    if (_controller.columns.isNotEmpty) {
+      return _controller.columns;
+    }
+    if (_controller.dataSource != null &&
+        _controller.dataSource!.columns.isNotEmpty) {
+      return _controller.dataSource!.columns;
+    }
+    return widget.dataSource.columns;
+  }
 
   @override
   void initState() {
@@ -130,13 +159,14 @@ class _AiGridState extends State<AiGrid> {
     _lastAllowDeleting = _controller.editingOptions.allowDeleting;
 
     final fitColumns = _buildFitColumns();
+    _lastColumns = List.of(_effectiveColumns);
     _fitController = FitGridController<Map<String, dynamic>>(
       columns: fitColumns,
       rows: const [],
       selectionMode: FitGridSelectionMode.multiple,
     );
 
-    for (final col in widget.dataSource.columns) {
+    for (final col in _effectiveColumns) {
       if (col.width != null && col.width! > 0) {
         _fitController.columns.setWidth(col.field, col.width!);
       }
@@ -185,7 +215,7 @@ class _AiGridState extends State<AiGrid> {
         } else if (widget.autoSave) {
           final saved =
               await AiGridSettingsStorage.loadAsync(widget.persistenceKey) ??
-                  AiGridSettingsStorage.load(widget.persistenceKey);
+              AiGridSettingsStorage.load(widget.persistenceKey);
           if (saved != null && mounted) {
             _controller.restoreSettings(saved);
           }
@@ -208,7 +238,8 @@ class _AiGridState extends State<AiGrid> {
   void _syncAiAssistantWindowState() {
     if (_controller.showAiAssistant && !_draggableWindowController.isVisible) {
       _draggableWindowController.show();
-    } else if (!_controller.showAiAssistant && _draggableWindowController.isVisible) {
+    } else if (!_controller.showAiAssistant &&
+        _draggableWindowController.isVisible) {
       _draggableWindowController.hide();
     }
   }
@@ -222,16 +253,18 @@ class _AiGridState extends State<AiGrid> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _fitController.columns.columns = _buildFitColumns();
+        _lastColumns = List.of(_effectiveColumns);
         _controller.attach(
           fitController: _fitController,
-          columns: widget.dataSource.columns,
+          columns: _effectiveColumns,
           dataSource: widget.dataSource,
           notify: false,
         );
         _loadData();
       });
     }
-    if (widget.editingOptions != oldWidget.editingOptions && widget.editingOptions != null) {
+    if (widget.editingOptions != oldWidget.editingOptions &&
+        widget.editingOptions != null) {
       _controller.setEditingOptions(widget.editingOptions!, notify: false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -262,16 +295,24 @@ class _AiGridState extends State<AiGrid> {
 
   void _onControllerChangedForEditing() {
     final opts = _controller.editingOptions;
+    final currentCols = _effectiveColumns;
+    final columnsChanged =
+        _lastColumns == null ||
+        _lastColumns!.length != currentCols.length ||
+        !listEquals(_lastColumns, currentCols);
+
     if (_lastEditMode != opts.mode ||
         _lastEditingRowIndex != _controller.editingRowIndex ||
         _lastActionPos != opts.actionColumnPosition ||
         _lastAllowUpdating != opts.allowUpdating ||
-        _lastAllowDeleting != opts.allowDeleting) {
+        _lastAllowDeleting != opts.allowDeleting ||
+        columnsChanged) {
       _lastEditMode = opts.mode;
       _lastEditingRowIndex = _controller.editingRowIndex;
       _lastActionPos = opts.actionColumnPosition;
       _lastAllowUpdating = opts.allowUpdating;
       _lastAllowDeleting = opts.allowDeleting;
+      _lastColumns = List.of(currentCols);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _fitController.columns.columns = _buildFitColumns();
@@ -284,18 +325,21 @@ class _AiGridState extends State<AiGrid> {
     if (_controller.isPivotActive) {
       return _controller.columns.map((c) => c.toFitGridColumn()).toList();
     }
+    final isReadonly = _controller.activeDynamicDatasource?.isReadonly ?? false;
     final opts = _controller.editingOptions;
-    final isRowMode = opts.enabled && opts.mode == AiGridEditMode.row;
-    final isFormMode = opts.enabled && opts.mode == AiGridEditMode.form;
+    final isEditingEffective = opts.enabled && !isReadonly;
+    final isRowMode = isEditingEffective && opts.mode == AiGridEditMode.row;
+    final isFormMode = isEditingEffective && opts.mode == AiGridEditMode.form;
 
-    final columns = widget.dataSource.columns.map((c) {
-      if (isRowMode && c.isEditable) {
+    final columns = _effectiveColumns.map((c) {
+      if (isRowMode && c.isEditable && !isReadonly) {
         return _buildRowEditableColumn(c);
       }
       return c.toFitGridColumn();
     }).toList();
 
-    if ((isRowMode || isFormMode) &&
+    if (isEditingEffective &&
+        (isRowMode || isFormMode) &&
         (opts.allowUpdating || opts.allowDeleting)) {
       final actionCol = _buildActionColumn();
       if (opts.actionColumnPosition == AiGridActionColumnPosition.left) {
@@ -309,7 +353,8 @@ class _AiGridState extends State<AiGrid> {
   }
 
   FitGridColumn<Map<String, dynamic>> _buildActionColumn() {
-    final isLeft = _controller.editingOptions.actionColumnPosition ==
+    final isLeft =
+        _controller.editingOptions.actionColumnPosition ==
         AiGridActionColumnPosition.left;
 
     return FitGridColumn<Map<String, dynamic>>(
@@ -405,8 +450,11 @@ class _AiGridState extends State<AiGrid> {
                   },
                   child: const Padding(
                     padding: EdgeInsets.all(4),
-                    child: Icon(Icons.delete_outline,
-                        size: 18, color: Colors.redAccent),
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: Colors.redAccent,
+                    ),
                   ),
                 ),
               ),
@@ -416,7 +464,9 @@ class _AiGridState extends State<AiGrid> {
     );
   }
 
-  FitGridColumn<Map<String, dynamic>> _buildRowEditableColumn(AiGridColumn col) {
+  FitGridColumn<Map<String, dynamic>> _buildRowEditableColumn(
+    AiGridColumn col,
+  ) {
     final base = col.toFitGridColumn();
     return base.copyWith(
       cellBuilder: (context, row, rowIndex) {
@@ -441,7 +491,8 @@ class _AiGridState extends State<AiGrid> {
       listenable: _controller,
       builder: (context, _) {
         final val = _controller.draftRow?[col.field];
-        final error = _controller.validationErrors[col.field] ?? col.validate(val);
+        final error =
+            _controller.validationErrors[col.field] ?? col.validate(val);
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;
 
@@ -487,14 +538,16 @@ class _AiGridState extends State<AiGrid> {
                 color: isDark ? Colors.white : Colors.black87,
               ),
               items: options
-                  .map((opt) => DropdownMenuItem(
-                        value: opt,
-                        child: Text(
-                          opt,
-                          style: const TextStyle(fontSize: 13),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ))
+                  .map(
+                    (opt) => DropdownMenuItem(
+                      value: opt,
+                      child: Text(
+                        opt,
+                        style: const TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
                   .toList(),
               onChanged: (v) => _controller.updateDraftValue(col.field, v),
             ),
@@ -576,7 +629,8 @@ class _AiGridState extends State<AiGrid> {
           );
         } else {
           // Text / Number / Currency
-          final isNum = col.editorType == AiGridEditorType.number ||
+          final isNum =
+              col.editorType == AiGridEditorType.number ||
               col.type == AiGridColumnType.number ||
               col.editorType == AiGridEditorType.currency ||
               col.type == AiGridColumnType.currency;
@@ -586,9 +640,10 @@ class _AiGridState extends State<AiGrid> {
           editor = TextFormField(
             key: ValueKey('inline_${col.field}_${_controller.editingRowIndex}'),
             initialValue: initial,
-            autofocus: _controller.editingRowIndex != null &&
-                widget.dataSource.columns.indexWhere((c) => c.isEditable) ==
-                    widget.dataSource.columns.indexOf(col),
+            autofocus:
+                _controller.editingRowIndex != null &&
+                _effectiveColumns.indexWhere((c) => c.isEditable) ==
+                    _effectiveColumns.indexOf(col),
             showCursor: true,
             cursorColor: theme.colorScheme.primary,
             cursorWidth: 1.5,
@@ -598,7 +653,10 @@ class _AiGridState extends State<AiGrid> {
               color: isDark ? Colors.white : Colors.black87,
             ),
             keyboardType: isNum
-                ? const TextInputType.numberWithOptions(decimal: true, signed: true)
+                ? const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  )
                 : TextInputType.text,
             decoration: const InputDecoration(
               isDense: true,
@@ -611,10 +669,18 @@ class _AiGridState extends State<AiGrid> {
             ),
             onChanged: (newText) {
               if (isNum) {
-                final parsed = num.tryParse(newText.replaceAll(RegExp(r'[^0-9.-]'), ''));
-                _controller.updateDraftValue(col.field, parsed ?? (newText.isEmpty ? null : newText));
+                final parsed = num.tryParse(
+                  newText.replaceAll(RegExp(r'[^0-9.-]'), ''),
+                );
+                _controller.updateDraftValue(
+                  col.field,
+                  parsed ?? (newText.isEmpty ? null : newText),
+                );
               } else {
-                _controller.updateDraftValue(col.field, newText.isEmpty ? null : newText);
+                _controller.updateDraftValue(
+                  col.field,
+                  newText.isEmpty ? null : newText,
+                );
               }
             },
           );
@@ -623,8 +689,10 @@ class _AiGridState extends State<AiGrid> {
         final cellBackground = error != null
             ? Colors.red.withValues(alpha: isDark ? 0.2 : 0.08)
             : (isDark
-                ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6)
-                : const Color(0xFFFBFDFF));
+                  ? theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.6,
+                    )
+                  : const Color(0xFFFBFDFF));
 
         Widget styledCell = Focus(
           child: Builder(
@@ -633,8 +701,8 @@ class _AiGridState extends State<AiGrid> {
               final borderSideColor = error != null
                   ? Colors.redAccent
                   : isFocused
-                      ? theme.colorScheme.primary
-                      : (isDark ? Colors.white24 : Colors.grey.shade300);
+                  ? theme.colorScheme.primary
+                  : (isDark ? Colors.white24 : Colors.grey.shade300);
 
               return Container(
                 width: double.infinity,
@@ -680,7 +748,9 @@ class _AiGridState extends State<AiGrid> {
 
   FitGridEditTrigger get _editTrigger {
     final opts = _controller.editingOptions;
-    return opts.enabled && opts.allowUpdating && opts.mode == AiGridEditMode.cell
+    return opts.enabled &&
+            opts.allowUpdating &&
+            opts.mode == AiGridEditMode.cell
         ? FitGridEditTrigger.singleTap
         : FitGridEditTrigger.programmatic;
   }
@@ -701,7 +771,11 @@ class _AiGridState extends State<AiGrid> {
         actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         title: Row(
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 22),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.redAccent,
+              size: 22,
+            ),
             const SizedBox(width: 10),
             Text(
               'Validation Errors (${errors.length})',
@@ -731,13 +805,17 @@ class _AiGridState extends State<AiGrid> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: errors.entries.map((entry) {
-                      final col = widget.dataSource.columns.firstWhere(
+                      final col = _effectiveColumns.firstWhere(
                         (c) => c.field == entry.key,
-                        orElse: () => AiGridColumn(field: entry.key, title: entry.key),
+                        orElse: () =>
+                            AiGridColumn(field: entry.key, title: entry.key),
                       );
                       return Container(
                         margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: isDark
                               ? Colors.red.withValues(alpha: 0.15)
@@ -754,8 +832,11 @@ class _AiGridState extends State<AiGrid> {
                           children: [
                             const Padding(
                               padding: EdgeInsets.only(top: 2),
-                              child: Icon(Icons.close_rounded,
-                                  size: 14, color: Colors.redAccent),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 14,
+                                color: Colors.redAccent,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -763,12 +844,16 @@ class _AiGridState extends State<AiGrid> {
                                 text: TextSpan(
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: isDark ? Colors.white : Colors.black87,
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
                                   ),
                                   children: [
                                     TextSpan(
                                       text: '${col.title}: ',
-                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                     TextSpan(
                                       text: entry.value,
@@ -796,7 +881,9 @@ class _AiGridState extends State<AiGrid> {
           FilledButton(
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('OK'),
@@ -850,12 +937,11 @@ class _AiGridState extends State<AiGrid> {
     final colorScheme = theme.colorScheme;
 
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
-    final effectiveTheme = widget.theme ??
+    final effectiveTheme =
+        widget.theme ??
         (widget.configuration is FitGridThemeData
             ? widget.configuration as FitGridThemeData
             : AiGridTheme.createThemeFromContext(context));
@@ -875,12 +961,15 @@ class _AiGridState extends State<AiGrid> {
               type: MaterialType.transparency,
               child: Container(
                 decoration: BoxDecoration(
-                  color: isDark ? colorScheme.surface : AiGridTheme.backgroundLight,
+                  color: isDark
+                      ? colorScheme.surface
+                      : AiGridTheme.backgroundLight,
                   border: Border.all(color: borderColor),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: () {
-                  final isLlmConfigured = widget.aiConfig?.isLlmConfigured ??
+                  final isLlmConfigured =
+                      widget.aiConfig?.isLlmConfigured ??
                       (AiGridEnvLoader.createLlmConfigFromEnv()?.isConfigured ??
                           false);
                   return isMobile
@@ -925,6 +1014,7 @@ class _AiGridState extends State<AiGrid> {
             isLlmConfigured: isLlmConfigured,
             hideIfNoLlm: widget.aiConfig?.hideAiAssistantIfNoLlm ?? false,
             onRefresh: _loadData,
+            dynamicGrid: widget.dynamicGrid,
           ),
         if (widget.enableAiAssistant && isLlmConfigured) ...[
           Container(
@@ -933,9 +1023,7 @@ class _AiGridState extends State<AiGrid> {
               color: isDark
                   ? colorScheme.surfaceContainerHighest
                   : const Color(0xFFF1F5F9),
-              border: Border(
-                bottom: BorderSide(color: borderColor, width: 1),
-              ),
+              border: Border(bottom: BorderSide(color: borderColor, width: 1)),
             ),
             child: Row(
               children: [
@@ -1036,19 +1124,23 @@ class _AiGridState extends State<AiGrid> {
         ],
         if (_controller.showAiAssistant && widget.enableAiAssistant)
           Expanded(
-            child: AiGridAssistantPanel(
-              controller: _controller,
-              aiConfig: widget.aiConfig,
-              onSendPrompt: widget.onAiPrompt,
-              isFullScreen: true,
-              embeddedInWindow: false,
-            ),
+            child: widget.assistantBuilder != null
+                ? widget.assistantBuilder!(
+                    context,
+                    _controller,
+                    AiGridSkill.createTools(_controller),
+                  )
+                : AiGridAssistantPanel(
+                    controller: _controller,
+                    aiConfig: widget.aiConfig,
+                    onSendPrompt: widget.onAiPrompt,
+                    isFullScreen: true,
+                    embeddedInWindow: false,
+                  ),
           )
         else ...[
           AiGridGroupPanel(controller: _controller),
-          Expanded(
-            child: _buildGrid(context, gridTheme),
-          ),
+          Expanded(child: _buildGrid(context, gridTheme)),
         ],
       ],
     );
@@ -1102,12 +1194,18 @@ class _AiGridState extends State<AiGrid> {
               enableScrolling: false,
               contentPadding: EdgeInsets.zero,
             ),
-            content: AiGridAssistantPanel(
-              controller: _controller,
-              aiConfig: widget.aiConfig,
-              onSendPrompt: widget.onAiPrompt,
-              embeddedInWindow: true,
-            ),
+            content: widget.assistantBuilder != null
+                ? widget.assistantBuilder!(
+                    context,
+                    _controller,
+                    AiGridSkill.createTools(_controller),
+                  )
+                : AiGridAssistantPanel(
+                    controller: _controller,
+                    aiConfig: widget.aiConfig,
+                    onSendPrompt: widget.onAiPrompt,
+                    embeddedInWindow: true,
+                  ),
           ),
       ],
       child: Column(
@@ -1119,18 +1217,51 @@ class _AiGridState extends State<AiGrid> {
               isLlmConfigured: isLlmConfigured,
               hideIfNoLlm: widget.aiConfig?.hideAiAssistantIfNoLlm ?? false,
               onRefresh: _loadData,
+              dynamicGrid: widget.dynamicGrid,
             ),
           AiGridGroupPanel(controller: _controller),
-          Expanded(
-            child: _buildGrid(context, gridTheme),
-          ),
+          Expanded(child: _buildGrid(context, gridTheme)),
         ],
       ),
     );
   }
 
   Widget _buildGrid(BuildContext context, FitGridThemeData gridTheme) {
-    final effectiveEditTrigger = _controller.isPivotActive
+    if (widget.dynamicGrid && (_fitController.columns.columns.isEmpty)) {
+      final theme = Theme.of(context);
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.table_chart_outlined,
+              size: 52,
+              color: theme.colorScheme.outline.withValues(alpha: 0.7),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'No table loaded yet',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Attach a file in chat, paste tabular data (Ctrl+V), or click "+ New Datasource".',
+              style: TextStyle(fontSize: 13, color: theme.colorScheme.outline),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isReadonly =
+        _controller.activeDynamicDatasource?.isReadonly ?? false;
+    final effectiveEditTrigger = (_controller.isPivotActive ||
+            isReadonly ||
+            !_controller.editingOptions.enabled)
         ? FitGridEditTrigger.programmatic
         : _editTrigger;
 
@@ -1140,7 +1271,8 @@ class _AiGridState extends State<AiGrid> {
       columnGroups: _controller.isPivotActive
           ? _controller.pivotColumnGroups
           : (widget.columnGroups ?? const <FitGridColumnGroup>[]),
-      showFilterRow: !_controller.isPivotActive && _controller.showColumnFilterRow,
+      showFilterRow:
+          !_controller.isPivotActive && _controller.showColumnFilterRow,
       showColumnMenu: true,
       columnMenuBuilder: (context, column, defaults) =>
           _buildColumnMenu(context, column, defaults),
@@ -1151,7 +1283,7 @@ class _AiGridState extends State<AiGrid> {
       paginated: widget.enablePagination || widget.pageSize != null,
       pageSize: widget.pageSize ?? 40,
       onRowDoubleTap: (row, rowIndex) {
-        if (_controller.isPivotActive) return;
+        if (_controller.isPivotActive || isReadonly) return;
         if (widget.onRowDoubleTap != null) {
           widget.onRowDoubleTap!(row, rowIndex);
         } else if (_controller.editingOptions.enabled &&
@@ -1177,7 +1309,10 @@ class _AiGridState extends State<AiGrid> {
           if (isWide) {
             final totalWidth = constraints.maxWidth;
             const splitterWidth = 8.0;
-            final availableWidth = (totalWidth - splitterWidth).clamp(0.0, double.infinity);
+            final availableWidth = (totalWidth - splitterWidth).clamp(
+              0.0,
+              double.infinity,
+            );
             final minGridWidth = 200.0;
             final minChartWidth = 200.0;
             final minRatio = availableWidth > (minGridWidth + minChartWidth)
@@ -1189,15 +1324,15 @@ class _AiGridState extends State<AiGrid> {
 
             final effectiveRatio = _pivotSplitRatio.clamp(minRatio, maxRatio);
             final gridWidth = availableWidth * effectiveRatio;
-            final chartWidth = (availableWidth - gridWidth).clamp(0.0, availableWidth);
+            final chartWidth = (availableWidth - gridWidth).clamp(
+              0.0,
+              availableWidth,
+            );
 
             return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
-                  width: gridWidth,
-                  child: gridWidget,
-                ),
+                SizedBox(width: gridWidth, child: gridWidget),
                 MouseRegion(
                   cursor: SystemMouseCursors.resizeColumn,
                   child: GestureDetector(
@@ -1210,9 +1345,14 @@ class _AiGridState extends State<AiGrid> {
                       });
                     },
                     onHorizontalDragUpdate: (details) {
-                      if (_splitDragStartPos != null && _splitDragStartRatio != null && availableWidth > 0) {
-                        final dx = details.globalPosition.dx - _splitDragStartPos!;
-                        final newRatio = (_splitDragStartRatio! + (dx / availableWidth)).clamp(minRatio, maxRatio);
+                      if (_splitDragStartPos != null &&
+                          _splitDragStartRatio != null &&
+                          availableWidth > 0) {
+                        final dx =
+                            details.globalPosition.dx - _splitDragStartPos!;
+                        final newRatio =
+                            (_splitDragStartRatio! + (dx / availableWidth))
+                                .clamp(minRatio, maxRatio);
                         setState(() {
                           _pivotSplitRatio = newRatio;
                         });
@@ -1236,18 +1376,30 @@ class _AiGridState extends State<AiGrid> {
                       width: splitterWidth,
                       decoration: BoxDecoration(
                         color: _isDraggingSplitter
-                            ? (isDark ? const Color(0xFF37373D) : const Color(0xFFE2E8F0))
-                            : (isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9)),
+                            ? (isDark
+                                  ? const Color(0xFF37373D)
+                                  : const Color(0xFFE2E8F0))
+                            : (isDark
+                                  ? const Color(0xFF252526)
+                                  : const Color(0xFFF1F5F9)),
                         border: Border(
                           left: BorderSide(
                             color: _isDraggingSplitter
-                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                                : (isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
+                                ? theme.colorScheme.primary.withValues(
+                                    alpha: 0.5,
+                                  )
+                                : (isDark
+                                      ? const Color(0xFF333333)
+                                      : const Color(0xFFE2E8F0)),
                           ),
                           right: BorderSide(
                             color: _isDraggingSplitter
-                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                                : (isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
+                                ? theme.colorScheme.primary.withValues(
+                                    alpha: 0.5,
+                                  )
+                                : (isDark
+                                      ? const Color(0xFF333333)
+                                      : const Color(0xFFE2E8F0)),
                           ),
                         ),
                       ),
@@ -1258,7 +1410,9 @@ class _AiGridState extends State<AiGrid> {
                           decoration: BoxDecoration(
                             color: _isDraggingSplitter
                                 ? theme.colorScheme.primary
-                                : (isDark ? Colors.grey[600] : Colors.grey[400]),
+                                : (isDark
+                                      ? Colors.grey[600]
+                                      : Colors.grey[400]),
                             borderRadius: BorderRadius.circular(1),
                           ),
                         ),
@@ -1281,7 +1435,10 @@ class _AiGridState extends State<AiGrid> {
           } else {
             final totalHeight = constraints.maxHeight;
             const splitterHeight = 8.0;
-            final availableHeight = (totalHeight - splitterHeight).clamp(0.0, double.infinity);
+            final availableHeight = (totalHeight - splitterHeight).clamp(
+              0.0,
+              double.infinity,
+            );
             final minGridHeight = 140.0;
             final minChartHeight = 140.0;
             final minRatio = availableHeight > (minGridHeight + minChartHeight)
@@ -1293,15 +1450,15 @@ class _AiGridState extends State<AiGrid> {
 
             final effectiveRatio = _pivotSplitRatio.clamp(minRatio, maxRatio);
             final gridHeight = availableHeight * effectiveRatio;
-            final chartHeight = (availableHeight - gridHeight).clamp(0.0, availableHeight);
+            final chartHeight = (availableHeight - gridHeight).clamp(
+              0.0,
+              availableHeight,
+            );
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
-                  height: gridHeight,
-                  child: gridWidget,
-                ),
+                SizedBox(height: gridHeight, child: gridWidget),
                 MouseRegion(
                   cursor: SystemMouseCursors.resizeRow,
                   child: GestureDetector(
@@ -1314,9 +1471,14 @@ class _AiGridState extends State<AiGrid> {
                       });
                     },
                     onVerticalDragUpdate: (details) {
-                      if (_splitDragStartPos != null && _splitDragStartRatio != null && availableHeight > 0) {
-                        final dy = details.globalPosition.dy - _splitDragStartPos!;
-                        final newRatio = (_splitDragStartRatio! + (dy / availableHeight)).clamp(minRatio, maxRatio);
+                      if (_splitDragStartPos != null &&
+                          _splitDragStartRatio != null &&
+                          availableHeight > 0) {
+                        final dy =
+                            details.globalPosition.dy - _splitDragStartPos!;
+                        final newRatio =
+                            (_splitDragStartRatio! + (dy / availableHeight))
+                                .clamp(minRatio, maxRatio);
                         setState(() {
                           _pivotSplitRatio = newRatio;
                         });
@@ -1340,18 +1502,30 @@ class _AiGridState extends State<AiGrid> {
                       height: splitterHeight,
                       decoration: BoxDecoration(
                         color: _isDraggingSplitter
-                            ? (isDark ? const Color(0xFF37373D) : const Color(0xFFE2E8F0))
-                            : (isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9)),
+                            ? (isDark
+                                  ? const Color(0xFF37373D)
+                                  : const Color(0xFFE2E8F0))
+                            : (isDark
+                                  ? const Color(0xFF252526)
+                                  : const Color(0xFFF1F5F9)),
                         border: Border(
                           top: BorderSide(
                             color: _isDraggingSplitter
-                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                                : (isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
+                                ? theme.colorScheme.primary.withValues(
+                                    alpha: 0.5,
+                                  )
+                                : (isDark
+                                      ? const Color(0xFF333333)
+                                      : const Color(0xFFE2E8F0)),
                           ),
                           bottom: BorderSide(
                             color: _isDraggingSplitter
-                                ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                                : (isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0)),
+                                ? theme.colorScheme.primary.withValues(
+                                    alpha: 0.5,
+                                  )
+                                : (isDark
+                                      ? const Color(0xFF333333)
+                                      : const Color(0xFFE2E8F0)),
                           ),
                         ),
                       ),
@@ -1362,7 +1536,9 @@ class _AiGridState extends State<AiGrid> {
                           decoration: BoxDecoration(
                             color: _isDraggingSplitter
                                 ? theme.colorScheme.primary
-                                : (isDark ? Colors.grey[600] : Colors.grey[400]),
+                                : (isDark
+                                      ? Colors.grey[600]
+                                      : Colors.grey[400]),
                             borderRadius: BorderRadius.circular(1),
                           ),
                         ),
@@ -1396,27 +1572,39 @@ class _AiGridState extends State<AiGrid> {
     List<PopupMenuEntry<void>> defaults,
   ) {
     if (column.id == '__actions__') {
-      final isLeft = _controller.editingOptions.actionColumnPosition ==
+      final isLeft =
+          _controller.editingOptions.actionColumnPosition ==
           AiGridActionColumnPosition.left;
-      PopupMenuItem<void> pinItem(String label, IconData icon,
-              AiGridActionColumnPosition pos, bool enabled) =>
-          PopupMenuItem<void>(
-            enabled: enabled,
-            onTap: () => _controller.setEditingOptions(
-              _controller.editingOptions.copyWith(actionColumnPosition: pos),
-            ),
-            child: Row(
-              children: [
-                SizedBox(width: 28, child: Icon(icon, size: 18)),
-                Text(label),
-              ],
-            ),
-          );
+      PopupMenuItem<void> pinItem(
+        String label,
+        IconData icon,
+        AiGridActionColumnPosition pos,
+        bool enabled,
+      ) => PopupMenuItem<void>(
+        enabled: enabled,
+        onTap: () => _controller.setEditingOptions(
+          _controller.editingOptions.copyWith(actionColumnPosition: pos),
+        ),
+        child: Row(
+          children: [
+            SizedBox(width: 28, child: Icon(icon, size: 18)),
+            Text(label),
+          ],
+        ),
+      );
       return [
-        pinItem('Pin to start', Icons.keyboard_double_arrow_left,
-            AiGridActionColumnPosition.left, !isLeft),
-        pinItem('Pin to end', Icons.keyboard_double_arrow_right,
-            AiGridActionColumnPosition.right, isLeft),
+        pinItem(
+          'Pin to start',
+          Icons.keyboard_double_arrow_left,
+          AiGridActionColumnPosition.left,
+          !isLeft,
+        ),
+        pinItem(
+          'Pin to end',
+          Icons.keyboard_double_arrow_right,
+          AiGridActionColumnPosition.right,
+          isLeft,
+        ),
       ];
     }
     final isGrouped = _controller.activeGrouping.contains(column.id);
@@ -1439,17 +1627,67 @@ class _AiGridState extends State<AiGrid> {
           ),
           Flexible(
             child: Text(
-              isGrouped ? 'Ungroup by ${column.label}' : 'Group by ${column.label}',
+              isGrouped
+                  ? 'Ungroup by ${column.label}'
+                  : 'Group by ${column.label}',
             ),
           ),
         ],
       ),
     );
 
-    return [
-      groupItem,
-      const PopupMenuDivider(),
-      ...defaults,
-    ];
+    final entries = <PopupMenuEntry<void>>[groupItem];
+
+    // Column Editor dialog for dynamic grid (enabled only for not read-only grid)
+    final activeDynamic = _controller.activeDynamicDatasource;
+    final isDynamic = widget.dynamicGrid || activeDynamic != null;
+    final isNotReadonly = activeDynamic == null ? true : !activeDynamic.isReadonly;
+
+    if (isDynamic && isNotReadonly) {
+      entries.add(
+        PopupMenuItem<void>(
+          onTap: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _controller.showColumnEditorDialog(context, field: column.id);
+            });
+          },
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 28,
+                child: Icon(Icons.tune_rounded, size: 18),
+              ),
+              Flexible(
+                child: Text('Edit Column "${column.label}"'),
+              ),
+            ],
+          ),
+        ),
+      );
+      entries.add(
+        PopupMenuItem<void>(
+          onTap: () {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _controller.showColumnsEditorDialog(context);
+            });
+          },
+          child: const Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Icon(Icons.view_column_rounded, size: 18),
+              ),
+              Flexible(
+                child: Text('Edit All Columns...'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    entries.add(const PopupMenuDivider());
+    entries.addAll(defaults);
+    return entries;
   }
 }

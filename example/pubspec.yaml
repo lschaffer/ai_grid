@@ -24,4 +24,5 @@ flutter:
   assets:
     - assets/superstore_sales_1000.json
     - assets/sales_1000.json
+    - assets/monthly_sales_200.pdf
     - .env

@@ -1,6 +1,6 @@
 name: ai_grid
 description: "An intelligent DataGrid for Flutter with native AI assistant and MCP skill control."
-version: 0.3.0
+version: 0.4.0
 repository: https://github.com/lschaffer/ai_grid
 issue_tracker: https://github.com/lschaffer/ai_grid/issues
 topics:
@@ -19,10 +19,13 @@ dependencies:
     sdk: flutter
   material_ui: ^1.4.0
   intl: ^0.20.2
-  dart_mcp_core: ^1.1.4
+  dart_mcp_core: ^1.3.0
   draggable_overlay_window: ^1.1.1
   file_saver: ^0.7.0
   shared_preferences: ^2.5.6
+  file_picker: ^13.1.0
+  http: ^1.6.0
+  yaml: ^3.1.4
 
 dev_dependencies:
   flutter_test:

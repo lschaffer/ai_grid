@@ -152,6 +152,8 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
         return AiGridEditorType.currency;
       case AiGridColumnType.date:
         return AiGridEditorType.date;
+      case AiGridColumnType.datetime:
+        return AiGridEditorType.dateTime;
       case AiGridColumnType.boolean:
         return AiGridEditorType.boolean;
       case AiGridColumnType.select:

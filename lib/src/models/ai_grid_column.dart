@@ -10,6 +10,7 @@ enum AiGridColumnType {
   number,
   currency,
   date,
+  datetime,
   boolean,
   select,
 }
@@ -132,6 +133,7 @@ class AiGridColumn {
           filterSpec = FitGridFilterSpec.number((r) => _extractNum(r[field]));
           break;
         case AiGridColumnType.date:
+        case AiGridColumnType.datetime:
           filterSpec = FitGridFilterSpec.date((r) => _extractDate(r[field]));
           break;
         case AiGridColumnType.select:
@@ -420,6 +422,8 @@ class AiGridColumn {
       }
     } else if (type == AiGridColumnType.date && raw is DateTime) {
       return DateFormat('yyyy-MM-dd').format(raw);
+    } else if (type == AiGridColumnType.datetime && raw is DateTime) {
+      return DateFormat('yyyy-MM-dd HH:mm').format(raw);
     }
     return raw.toString();
   }
@@ -429,7 +433,7 @@ class AiGridColumn {
     if (type == AiGridColumnType.number || type == AiGridColumnType.currency) {
       return _extractNum(raw);
     }
-    if (type == AiGridColumnType.date) {
+    if (type == AiGridColumnType.date || type == AiGridColumnType.datetime) {
       return _extractDate(raw);
     }
     if (type == AiGridColumnType.boolean) {
@@ -451,6 +455,100 @@ class AiGridColumn {
     return DateTime.tryParse(raw.toString());
   }
 
+  AiGridColumn copyWith({
+    String? field,
+    String? title,
+    AiGridColumnType? type,
+    double? width,
+    double? minWidth,
+    double? maxWidth,
+    FitGridColumnWidth? columnWidth,
+    bool? resizable,
+    bool? isGroupable,
+    bool? isSortable,
+    bool? isFilterable,
+    bool? editable,
+    bool? enableEditingMode,
+    int? editorIndex,
+    AiGridEditorType? editorType,
+    Map<String, dynamic>? editorOptions,
+    String? Function(dynamic value)? validator,
+    bool? required,
+    void Function(dynamic value, Map<String, dynamic> draftRow)? onChanged,
+    Widget Function(
+      BuildContext context,
+      dynamic value,
+      ValueChanged<dynamic> onChanged,
+    )? editorBuilder,
+    AiGridAggregateType? aggregateType,
+    String? numberFormat,
+    List<String>? selectOptions,
+    FitGridCellBuilder<Map<String, dynamic>>? cellBuilder,
+  }) {
+    return AiGridColumn(
+      field: field ?? this.field,
+      title: title ?? this.title,
+      type: type ?? this.type,
+      width: width ?? this.width,
+      minWidth: minWidth ?? this.minWidth,
+      maxWidth: maxWidth ?? this.maxWidth,
+      columnWidth: columnWidth ?? this.columnWidth,
+      resizable: resizable ?? this.resizable,
+      isGroupable: isGroupable ?? this.isGroupable,
+      isSortable: isSortable ?? this.isSortable,
+      isFilterable: isFilterable ?? this.isFilterable,
+      editable: editable ?? this.editable,
+      enableEditingMode: enableEditingMode ?? this.enableEditingMode,
+      editorIndex: editorIndex ?? this.editorIndex,
+      editorType: editorType ?? this.editorType,
+      editorOptions: editorOptions ?? this.editorOptions,
+      validator: validator ?? this.validator,
+      required: required ?? this.required,
+      onChanged: onChanged ?? this.onChanged,
+      editorBuilder: editorBuilder ?? this.editorBuilder,
+      aggregateType: aggregateType ?? this.aggregateType,
+      numberFormat: numberFormat ?? this.numberFormat,
+      selectOptions: selectOptions ?? this.selectOptions,
+      cellBuilder: cellBuilder ?? this.cellBuilder,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiGridColumn &&
+          runtimeType == other.runtimeType &&
+          field == other.field &&
+          title == other.title &&
+          type == other.type &&
+          width == other.width &&
+          minWidth == other.minWidth &&
+          maxWidth == other.maxWidth &&
+          editable == other.editable &&
+          required == other.required &&
+          editorType == other.editorType &&
+          numberFormat == other.numberFormat &&
+          isSortable == other.isSortable &&
+          isGroupable == other.isGroupable &&
+          isFilterable == other.isFilterable;
+
+  @override
+  int get hashCode => Object.hash(
+        field,
+        title,
+        type,
+        width,
+        minWidth,
+        maxWidth,
+        editable,
+        required,
+        editorType,
+        numberFormat,
+        isSortable,
+        isGroupable,
+        isFilterable,
+      );
+
   Map<String, dynamic> toJson() => {
         'field': field,
         'title': title,
@@ -459,6 +557,8 @@ class AiGridColumn {
         'isSortable': isSortable,
         'isFilterable': isFilterable,
         'editable': isEditable,
+        'required': required,
+        if (maxWidth != null) 'max_width': maxWidth,
         'editorIndex': editorIndex,
         'aggregateType': aggregateType.name,
       };

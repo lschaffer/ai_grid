@@ -1,6 +1,6 @@
 # AI Grid (`ai_grid`)
 
-[![pub version](https://img.shields.io/badge/pub-v0.3.0-blue.svg)](https://pub.dev/packages/ai_grid)
+[![pub version](https://img.shields.io/badge/pub-v0.4.0-blue.svg)](https://pub.dev/packages/ai_grid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.24.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![WASM Ready](https://img.shields.io/badge/WebAssembly-WASM%20Compatible-success.svg)](https://flutter.dev/to/wasm)
@@ -59,8 +59,6 @@
 
 Convert any active table into an enterprise multi-dimensional Pivot Grid on the fly with real-time aggregated cross-tabulations and side-by-side synchronized charts.
 
-![DevExtreme-Style Pivot Grid with Field Chooser and Split Chart](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_grid_example_pivot.gif)
-
 * **Field Chooser Dialog (`AiGridPivotChooserDialog`)**:
   * Visual drop zones for **Row Fields** (vertical breakdown), **Column Fields** (horizontal cross-tabulation), and **Data / Measures** (metrics to aggregate).
   * Smart column heuristic separating true metrics (`Sales`, `Quantity`, `Profit`) from dimensions (`Category`, `Region`) and primary keys (`OrderID`, `PostalCode`).
@@ -97,12 +95,45 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
 * **Automatic Layout Restoration (`autoSave`)**: Pass `autoSave: true` and a `persistenceKey` to automatically persist all user layout changes and restore them on startup.
 * **JSON Import/Export**: Export settings to JSON string or save to file via `controller.exportSettingsJson()` and restore via `controller.restoreSettingsJson(str)`.
 * **In-Memory Cache**: Built-in `AiGridSettingsStorage` handles session-level caching and retrieval.
+### 6. 🌐 Dynamic AI DataGrid (Files, Web GET & Clipboard Ingestion)
 
-### 6. 📋 Copy-to-Clipboard in AI Assistant
+Instantly generate, inspect, and interact with dynamic DataGrids from external files, public web APIs, or clipboard content without hardcoding data models:
+
+* **Multi-Source Ingestion**:
+  * **Files**: Pick `.csv`, `.tsv`, `.json`, `.md` (Markdown pipe tables), `.txt`, `.pdf`, or `.docx` files. Tabular structures and field types (`number`, `text`, `boolean`, `date`, `currency`) are automatically detected and parsed.
+  * **Public Web APIs (GET)**: Ingest JSON endpoints or HTML tables directly from HTTP URLs. Data is fetched on demand and maintained in read-only mode for safety.
+  * **System Clipboard**: Paste tables directly with `Ctrl+V` or the clipboard button. Automatically extracts markdown tables, delimited text, or JSON structures. Multimodal support handles clipboard images and dropped files.
+* **Persistent Data Models & Bundles**:
+  * Schemas are modeled as YAML definitions (`$name_mdl.yaml`) and data rows are saved as JSON (`$name.json`) in `SharedPreferences`.
+  * **Export / Import Bundles**: Export complete dynamic dataset bundles (`.agrid.yaml`) containing both the column metadata model and dataset rows. Easily import bundles across devices.
+  * **In-Place DevExtreme Write-Back**: Edits made in cell, row, or modal form modes are automatically committed back to `SharedPreferences` storage.
+* **6 Built-in Dynamic MCP Tools**:
+  * `grid_create_dynamic_datasource`: Creates, validates, and activates a dynamic dataset from structured rows or inferred columns.
+  * `grid_list_datasources`: Lists all saved dynamic datasets, row counts, origins, and active status.
+  * `grid_load_datasource`: Switches the active DataGrid view to any stored dataset.
+  * `grid_delete_datasource`: Deletes a saved dynamic dataset and its associated YAML model.
+  * `grid_fetch_web_data`: Fetches, previews, and inspects web data before ingestion.
+  * `grid_export_datasource_yaml`: Exports the active or specified dataset as a portable YAML bundle string.
+* **Generic Columns Editor Dialogs**:
+  * **Full-Table Columns Editor (`AiGridColumnsEditorDialog`)**: Self-hosting, nested `AiGrid` dialog for modifying all columns in the active table. Modify column captions, data types (`number`, `text`, `date`, `datetime`), editable permissions, required validation flags, widths, max widths, editor types, and reorder or delete columns.
+  * **Single Column Editor (`AiGridColumnEditorDialog`)**: Quick per-column editor accessible via header context menus for fast schema adjustments.
+  * Changes immediately update the live grid and persist back to storage YAML models.
+* **Read-Only Datatable Protection & Editor Suppression**:
+  * Tables fetched from web endpoints or loaded with `isReadonly: true` strictly enforce read-only semantics.
+  * **Actions Column Suppressed**: The pinned `__actions__` column containing edit pencil, delete trash, and check/cancel buttons is hidden.
+  * **Toolbar Controls Suppressed**: The `+` (Add Record) and Columns Editor buttons are hidden from the toolbar.
+  * **Inline Edit Triggers Blocked**: In-cell and double-click row edit triggers are locked, preventing editing states from activating.
+  * **CRUD Operations Guarded**: Invocations to `startEdit`, `startAdd`, `showEditDialog`, `saveEdit`, and `deleteRow` safely early-exit.
+* **Option C: Hybrid Composable Architecture**:
+  * Keeps `ai_grid` core lightweight with zero native FFI dependencies for full `dart2wasm` safety.
+  * Provides a pluggable `assistantBuilder` slot on `AiGrid` for developers who want to drop in external AI chat interfaces such as `FlutterUiMcp` or `McpPlayground`.
+* **Runnable Example**: See [`example/lib/dynamic_ai_grid_example.dart`](./example/lib/dynamic_ai_grid_example.dart).
+
+### 7. 📋 Copy-to-Clipboard in AI Assistant
 * **Prompt Bubbles**: 1-tap copy button on every user message bubble.
 * **AI Responses**: Copy button in the header of each assistant response card to copy the full AI response and execution summary directly to the system clipboard.
 
-### 7. 📱 Responsive Desktop & Mobile Layouts
+### 8. 📱 Responsive Desktop & Mobile Layouts
 * **Desktop Mode (≥ 620px)**:
   * Floatable, moveable, and resizable AI Assistant window powered by [`draggable_overlay_window`](https://pub.dev/packages/draggable_overlay_window).
   * 8-directional edge/corner resizing, drag-by-header, minimize, maximize, and smooth focus management.
@@ -112,7 +143,7 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
   * Instant 1-tap Mode Switcher tab bar (`[ 📊 Data Grid ]` | `[ ✨ AI Assistant ]`).
   * Full-screen mobile assistant view with quick `[← Back to Data Grid]` navigation.
 
-### 8. ↔️ Interactive Column Resizing & Width Policies
+### 9. ↔️ Interactive Column Resizing & Width Policies
 * **Drag-to-Resize**: Hovering between column headers reveals draggable divider handles to interactively adjust column widths.
 * **Auto-Fit on Double-Click**: Double-clicking any column divider handle or choosing "Size to fit" in the column menu auto-fits the column to its actual cell content.
 * **Flexible Sizing Policies**: Configure `columnWidth` with any policy from [fitgrid_table](https://pub.dev/packages/fitgrid_table#column-widths):
@@ -122,31 +153,31 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
   * `FitGridColumnWidth.fitHeader(min: 44)` — sized strictly to the header label.
 * **Layout Persistence**: Custom column widths automatically persist across app restarts when `autoSave: true` is enabled.
 
-### 9. 📤 Fast & Pure-Dart Excel (.xlsx) Export
+### 10. 📤 Fast & Pure-Dart Excel (.xlsx) Export
 * One-click **Export to Excel** directly accessible via the toolbar download button, mobile menu, or natural language AI command (`export`):
   * **Native Save As Dialog**: Opens the platform's native "Save As..." dialog (`FileSaver.instance.saveAs`) allowing the user to select the destination folder and filename across Web, Desktop (Windows, macOS, Linux), and Mobile (Android, iOS).
   * **Pure-Dart Excel Engine**: Generates `.xlsx` workbooks directly in Dart with zero C/C++ native dependencies or platform channels.
   * **Direct Programmatic API**: Trigger export programmatically anytime via `controller.export()`.
 
-### 10. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
+### 11. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
 * **Client-Side Pagination**: Simple opt-in via `enablePagination: true` and `pageSize: 25`, rendering an interactive page-navigation footer with total row counts and page controls.
 * **Server-Side Partial Data Load (`LazyAiGridDataSource`)**:
   * Only requests and loads the slice of records for the active page from your backend or REST/GraphQL API.
   * Dynamically passes current page, page size, active column sorting, and active filter criteria to your `fetch` callback.
 
-### 11. 🌐 WebAssembly (WASM) Compatible
+### 12. 🌐 WebAssembly (WASM) Compatible
 * Fully verified with Flutter WebAssembly (`dart2wasm`).
 * Zero direct dependencies on legacy `dart:html`.
 * Native filesystem operations are cleanly isolated behind conditional imports, ensuring zero runtime or compile-time breakages in browser WASM environments.
 
-### 12. 🎨 Modern Adaptive Theming
+### 13. 🎨 Modern Adaptive Theming
 * Harmonious styling that automatically reflects the parent application's Material 3 `ThemeData` across Light and Dark modes.
 
 ---
 
 ## 🛠️ MCP Tool Reference
 
-`ai_grid` exposes 18 specialized MCP tools through `AiGridSkill`:
+`ai_grid` exposes 25 specialized MCP tools through `AiGridSkill`:
 
 | Tool Name | Description |
 | :--- | :--- |
@@ -168,6 +199,12 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
 | `grid_restore_settings` | Restores grid settings from a JSON string or settings object. |
 | `grid_create_pivot_table` | Transforms the table into an aggregated Pivot Table on the fly with optional side-by-side Chart. |
 | `grid_reset_pivot_table` | Deactivates pivot mode and restores the standard grid view, columns, and groupings. |
+| `grid_create_dynamic_datasource` | Creates, persists, and activates a dynamic DataGrid dataset from structured rows or inferred columns. |
+| `grid_list_datasources` | Lists all saved dynamic datasets, their row counts, origins, and active status. |
+| `grid_load_datasource` | Loads a saved dynamic DataGrid dataset by name into the interactive grid. |
+| `grid_delete_datasource` | Deletes a dynamic dataset and its associated YAML model from storage. |
+| `grid_fetch_web_data` | Fetches, inspects, and previews tabular data from a public HTTP GET URL. |
+| `grid_export_datasource_yaml` | Exports a dynamic dataset package (model and data rows) as a YAML formatted string. |
 | `grid_reset` | Resets grouping, filters, sorting, search, and restores all column visibility. |
 
 ---
@@ -180,7 +217,7 @@ Add `ai_grid` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ai_grid: ^0.3.0
+  ai_grid: ^0.4.0
   material_ui: ^1.4.0
 ```
 
