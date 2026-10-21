@@ -99,6 +99,10 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
 
 Instantly generate, inspect, and interact with dynamic DataGrids from external files, public web APIs, or clipboard content without hardcoding data models:
 
+| Dynamic Grid from Clipboard | Create Table from PDF Attachment |
+| :---: | :---: |
+| ![Dynamic Grid from Clipboard](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_dynamic_grid_from_clipboard.gif) | ![Dynamic Grid from PDF](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_dynamic_grid_from_pdf.gif) |
+
 * **Multi-Source Ingestion**:
   * **Files**: Pick `.csv`, `.tsv`, `.json`, `.md` (Markdown pipe tables), `.txt`, `.pdf`, or `.docx` files. Tabular structures and field types (`number`, `text`, `boolean`, `date`, `currency`) are automatically detected and parsed.
   * **Public Web APIs (GET)**: Ingest JSON endpoints or HTML tables directly from HTTP URLs. Data is fetched on demand and maintained in read-only mode for safety.

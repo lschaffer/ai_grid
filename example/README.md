@@ -30,6 +30,9 @@ An interactive showcase of **`ai_grid`** featuring the enterprise **Superstore S
 * **Layout Presets & Settings Storage**:
   * Pre-configured layout presets (Grouped, Financial Focus, High-Value Sales).
   * Export/Restore grid layout JSON and persistent auto-save (`autoSave: true`).
+* **Dynamic AI DataGrid & Multi-Source Ingestion (`dynamic_ai_grid_example.dart`)**:
+  * Ingest tables dynamically from files (CSV, TSV, JSON, MD, PDF, Word), system clipboard (`Ctrl+V`), or public web APIs (HTTP GET).
+  * Extract tabular structures from attachments using embedded multimodal AI Assistant.
 
 ---
 
