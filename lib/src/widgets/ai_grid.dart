@@ -1136,6 +1136,7 @@ class _AiGridState extends State<AiGrid> {
                     onSendPrompt: widget.onAiPrompt,
                     isFullScreen: true,
                     embeddedInWindow: false,
+                    dynamicGrid: widget.dynamicGrid,
                   ),
           )
         else ...[
@@ -1205,6 +1206,7 @@ class _AiGridState extends State<AiGrid> {
                     aiConfig: widget.aiConfig,
                     onSendPrompt: widget.onAiPrompt,
                     embeddedInWindow: true,
+                    dynamicGrid: widget.dynamicGrid,
                   ),
           ),
       ],

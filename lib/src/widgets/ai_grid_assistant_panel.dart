@@ -22,6 +22,7 @@ class AiGridAssistantPanel extends StatefulWidget {
   final Future<void> Function(String prompt)? onSendPrompt;
   final bool embeddedInWindow;
   final bool isFullScreen;
+  final bool dynamicGrid;
 
   const AiGridAssistantPanel({
     super.key,
@@ -30,6 +31,7 @@ class AiGridAssistantPanel extends StatefulWidget {
     this.onSendPrompt,
     this.embeddedInWindow = false,
     this.isFullScreen = false,
+    this.dynamicGrid = false,
   });
 
   @override
@@ -80,6 +82,10 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     _initDefaultSuggestions();
   }
 
+  bool get _isDynamicMode =>
+      widget.dynamicGrid ||
+      widget.controller.activeDynamicDatasource != null;
+
   void _initDefaultSuggestions() {
     final llm = widget.aiConfig?.llmConfig ??
         AiGridEnvLoader.createLlmConfigFromEnv();
@@ -87,11 +93,25 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         ? '${llm.provider.displayName} (${llm.model})'
         : 'Local Heuristic';
 
+    final isDynamic = _isDynamicMode;
+
+    final String welcomeDesc;
+    if (isDynamic) {
+      welcomeDesc =
+          'Connected to $modelName.\n\n'
+          'You can create and manage DataGrids dynamically:\n'
+          '• Attach a file (PDF, CSV, JSON, Markdown, TXT, Word) using 📎 or paste from clipboard (Ctrl+V or 📋) and ask to create a table\n'
+          '• Ingest public web APIs (HTTP GET)\n'
+          '• Ask me to calculate, filter, sort, group, pivot, or export to Excel.';
+    } else {
+      welcomeDesc =
+          'Connected to $modelName. Ask me to calculate, group, filter, sort, or summarize your data.';
+    }
+
     _messages.add(
       _AssistantMessage(
-        title: 'Assistant Ready',
-        description:
-            'Connected to $modelName. Ask me to calculate, group, filter, sort, or summarize your data.',
+        title: isDynamic ? 'Dynamic DataGrid Assistant' : 'Assistant Ready',
+        description: welcomeDesc,
         isSystem: true,
       ),
     );
@@ -793,6 +813,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       }
     }
 
+    final isDynamic = _isDynamicMode;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Wrap(
@@ -801,6 +822,11 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         children: [
           _buildChip(context, '💡 Help', () {
             final examples = <String>[];
+            if (isDynamic) {
+              examples.add('• "Create a table from the attached file"');
+              examples.add('• "Extract table from clipboard and name it sales"');
+              examples.add('• "Fetch data from https://..."');
+            }
             if (numCol != null) {
               examples.add('• "Calculate average ${numCol.title}"');
             }
@@ -813,7 +839,8 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             if (sortCol != null) {
               examples.add('• "Sort by ${sortCol.title}"');
             }
-            examples.add('• "Reset all filters"');
+            examples.add('• "Export to Excel"');
+            examples.add('• "Reset grid"');
 
             setState(() {
               _messages.add(
@@ -825,6 +852,10 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             });
             _scrollToBottom();
           }),
+          if (isDynamic) ...[
+            _buildChip(context, '📎 Attach File', _pickAttachments),
+            _buildChip(context, '📋 Paste Clipboard', _handleClipboardPaste),
+          ],
           if (numCol != null)
             _buildChip(context, '📊 Avg ${numCol.title}', () {
               final result = widget.controller.calculate(
