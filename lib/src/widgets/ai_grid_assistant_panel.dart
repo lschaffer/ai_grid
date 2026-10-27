@@ -419,6 +419,153 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       return;
     }
 
+    // Smart Column Heuristic Execution
+    if (lower.contains('smart column') ||
+        lower.contains('run smart') ||
+        lower.contains('synthesize') ||
+        lower.contains('evaluate column')) {
+      if (widget.controller.smartColumns.isNotEmpty) {
+        widget.controller.runSmartColumns(force: true);
+        _messages.add(
+          _AssistantMessage(
+            title: 'AI Smart Columns',
+            description:
+                'Triggered evaluation for ${widget.controller.smartColumns.length} AI smart columns across all rows.',
+            isUser: false,
+          ),
+        );
+        _scrollToBottom();
+        return;
+      }
+    }
+
+    // Cell selection heuristic
+    if (lower.startsWith('select') ||
+        lower.contains('select ') ||
+        lower.contains('selection')) {
+      AiGridColumn? targetCol;
+      for (final col in widget.controller.columns) {
+        if (lower.contains(col.field.toLowerCase()) ||
+            lower.contains(col.title.toLowerCase())) {
+          targetCol = col;
+          break;
+        }
+      }
+
+      final bool isLow = lower.contains('low') ||
+          lower.contains('min') ||
+          lower.contains('bottom') ||
+          lower.contains('worst');
+      final bool isHigh = lower.contains('high') ||
+          lower.contains('max') ||
+          lower.contains('top') ||
+          lower.contains('best');
+
+      if (targetCol != null && (isLow || isHigh)) {
+        widget.controller.setSorting(targetCol.field, descending: isHigh);
+        const int selectCount = 3;
+        final maxRows = widget.controller.rows.length;
+        final extent = (selectCount < maxRows ? selectCount : maxRows) - 1;
+        if (extent >= 0) {
+          widget.controller.selectCellRange(
+            anchorRow: 0,
+            anchorColumn: targetCol.field,
+            extentRow: extent,
+            extentColumn: targetCol.field,
+          );
+          final summary = widget.controller.calculateSelectedRangeSummary();
+          _messages.add(
+            _AssistantMessage(
+              title: 'Cell Range Selection',
+              description:
+                  'Selected ${isLow ? "lowest" : "highest"} ${extent + 1} cells in "${targetCol.title}".'
+                  '\nSum: ${summary?.sum?.toStringAsFixed(2) ?? "0"} | Avg: ${summary?.average?.toStringAsFixed(2) ?? "0"} | Min: ${summary?.min} | Max: ${summary?.max}',
+              isUser: false,
+            ),
+          );
+          _scrollToBottom();
+          return;
+        }
+      }
+
+      // Categorical / keyword matching in column (e.g. "Critical", "P1", "Positive", "Negative")
+      String? matchedCategory;
+      if (targetCol != null) {
+        for (final row in widget.controller.rows) {
+          final cellStr = row[targetCol.field]?.toString().toLowerCase() ?? '';
+          for (final word in lower.split(RegExp(r'\s+'))) {
+            final w = word.replaceAll(RegExp(r'[^a-z0-9]'), '');
+            if (w.length >= 3 &&
+                cellStr.contains(w) &&
+                !['select', 'all', 'tickets', 'rows', 'cells', 'the', 'and', 'for', targetCol.field.toLowerCase()].contains(w)) {
+              matchedCategory = w;
+              break;
+            }
+          }
+          if (matchedCategory != null) break;
+        }
+      }
+
+      if (targetCol != null && matchedCategory != null) {
+        final categoryLower = matchedCategory;
+        int matching = 0;
+        for (final row in widget.controller.rows) {
+          final val = row[targetCol.field]?.toString().toLowerCase() ?? '';
+          if (val.contains(categoryLower)) matching++;
+        }
+
+        widget.controller.setSorting(targetCol.field, descending: false);
+        final selectCount = matching > 0 ? matching : 1;
+        final maxRows = widget.controller.rows.length;
+        final extent = (selectCount < maxRows ? selectCount : maxRows) - 1;
+        if (extent >= 0) {
+          final isTicketsOrRows = lower.contains('ticket') || lower.contains('row');
+          final cols = widget.controller.columns;
+          final startCol = isTicketsOrRows ? cols.first.field : targetCol.field;
+          final endCol = isTicketsOrRows ? cols.last.field : targetCol.field;
+
+          widget.controller.selectCellRange(
+            anchorRow: 0,
+            anchorColumn: startCol,
+            extentRow: extent,
+            extentColumn: endCol,
+          );
+          final summary = widget.controller.calculateSelectedRangeSummary();
+          _messages.add(
+            _AssistantMessage(
+              title: 'Cell Range Selection',
+              description:
+                  'Selected $selectCount ${isTicketsOrRows ? "tickets" : "cells"} matching "$categoryLower" in "${targetCol.title}".'
+                  '\nActive selection count: ${summary?.cellCount ?? selectCount}.',
+              isUser: false,
+            ),
+          );
+          _scrollToBottom();
+          return;
+        }
+      } else if (lower.contains('all')) {
+        final cols = widget.controller.columns;
+        final rowCount = widget.controller.rows.length;
+        if (cols.isNotEmpty && rowCount > 0) {
+          widget.controller.selectCellRange(
+            anchorRow: 0,
+            anchorColumn: cols.first.field,
+            extentRow: rowCount - 1,
+            extentColumn: cols.last.field,
+          );
+          _messages.add(
+            _AssistantMessage(
+              title: 'Cell Range Selection',
+              description: 'Selected all cells across the grid ($rowCount rows).',
+              isUser: false,
+            ),
+          );
+          _scrollToBottom();
+          return;
+        }
+      }
+    }
+
     if (lower.contains('calc') ||
         lower.contains('avg') ||
         lower.contains('average') ||
@@ -785,7 +932,57 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     );
   }
 
+  void _sendPresetPrompt(String prompt) {
+    _textCtrl.text = prompt;
+    _handleSend();
+  }
+
   Widget _buildSuggestionChips(BuildContext context) {
+    final suggested = widget.aiConfig?.suggestedPrompts;
+    final isDynamic = _isDynamicMode;
+
+    if (suggested != null && suggested.isNotEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            _buildChip(context, '💡 Help', () {
+              final examples = <String>[];
+              examples.add('Contextual Suggestions:');
+              for (final p in suggested) {
+                examples.add('• "$p"');
+              }
+              examples.add('\nStandard Actions:');
+              examples.add('• "Export to Excel"');
+              examples.add('• "Reset grid"');
+
+              setState(() {
+                _messages.add(
+                  _AssistantMessage(
+                    title: 'Available Capabilities',
+                    description: examples.join('\n'),
+                  ),
+                );
+              });
+              _scrollToBottom();
+            }),
+            if (isDynamic) ...[
+              _buildChip(context, '📎 Attach File', _pickAttachments),
+              _buildChip(context, '📋 Paste Clipboard', _handleClipboardPaste),
+            ],
+            for (final prompt in suggested)
+              _buildChip(
+                context,
+                '✨ $prompt',
+                () => _sendPresetPrompt(prompt),
+              ),
+          ],
+        ),
+      );
+    }
+
     final cols = widget.controller.columns;
     AiGridColumn? numCol;
     AiGridColumn? groupCol;
@@ -813,7 +1010,6 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       }
     }
 
-    final isDynamic = _isDynamicMode;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Wrap(

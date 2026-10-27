@@ -1,7 +1,7 @@
 ---
 name: ai-grid
 description: Comprehensive developer and coding agent guide for the ai_grid Flutter DataGrid package. Use when integrating, configuring, or extending high-performance canvas tables with DevExtreme-style editing (cell, row, modal form), dynamic Pivot Grids with banded split headers, hierarchical tree grouping, moveable split-panel charts, Excel export, and native Model Context Protocol (MCP) AI tools.
-version: 0.4.0
+version: 0.8.0
 author: lschaffer
 tags:
   - flutter
@@ -276,10 +276,63 @@ controller.clearPivot();
 | `grid_restore_settings` | `settings` | Restores layout settings from JSON string or map. |
 | `grid_create_pivot_table` | `rows`, `columns`, `data` (`column`, `aggregation`), `showChart`, `chartType` | Transforms grid into an aggregated Pivot Table on the fly. |
 | `grid_reset_pivot_table` | *(none)* | Deactivates pivot mode and restores original table. |
+| `grid_create_dynamic_datasource` | `name`, `model`, `data`, `source_type` | Ingests and registers a dynamic dataset from files or clipboard. |
+| `grid_list_datasources` | *(none)* | Lists all stored dynamic datasets and active status. |
+| `grid_load_datasource` | `name` | Switches the grid view to a saved dynamic dataset. |
+| `grid_delete_datasource` | `name` | Deletes a stored dynamic dataset. |
+| `grid_fetch_web_data` | `url` | Fetches JSON or HTML tables from web endpoints. |
+| `grid_export_datasource_yaml` | `name` | Exports dataset as portable YAML model/data bundle. |
+| `grid_set_conditional_format` | `field`, `type` (`dataBar`, `highlight`, `colorScale`), `operator`, `targetValue`, `backgroundColor`, `textColor` | Applies in-cell visual analytics or row alerts. |
+| `grid_clear_conditional_formats` | `field` (optional) | Clears active conditional formats. |
+| `grid_get_selected_range` | *(none)* | Returns rectangular range coordinates, dimensions, and computed stats (count, sum, avg, min, max). |
+| `grid_select_range` | `startRow`, `startColumn`, `endRow`, `endColumn` | Programmatically selects a rectangular cell range. |
+| `grid_add_smart_column` | `field`, `title`, `promptTemplate`, `options`, `autoRun` | Adds an AI prompt-synthesized column to the grid. |
+| `grid_run_smart_columns` | `field` (optional), `force` (bool) | Triggers LLM batch synthesis for smart columns. |
 
 ---
 
-## 8. Best Practices for AI Agents Writing Pivot Prompts
+## 8. AI Smart / Prompt Columns
+
+`ai_grid` allows developers and AI agents to define dynamic columns synthesized on-demand per row:
+* **Prompt Interpolation**: Prompt templates interpolate row values using `{fieldName}` placeholders (e.g. `"Classify sentiment of '{notes}'"`).
+* **Batch LLM Engine**: Evaluates rows in chunks via `McpAgentEngine` with built-in heuristic fallbacks for offline execution.
+* **Inline Sparkle Cell State**:
+  - `generating`: animated spinner with shimmering `"Synthesizing..."` text.
+  - `generated`: purple sparkle icon `✨` (`Icons.auto_awesome`) with prompt tooltip.
+  - `idle`: clickable `✨ Generate` button for on-demand single-cell execution.
+* **Controller APIs**:
+  ```dart
+  controller.addSmartColumn(AiGridSmartColumn(
+    field: 'sentiment',
+    title: 'AI Sentiment',
+    promptTemplate: "Classify sentiment of '{issue}'",
+    options: ['Positive', 'Neutral', 'Negative'],
+  ));
+  await controller.runSmartColumns(force: true);
+  ```
+
+---
+
+## 9. Cell Range Selection & Bidirectional Spreadsheet Copy/Paste
+
+`ai_grid` provides full desktop spreadsheet range selection and Excel clipboard integration:
+* **Mouse Drag**: Click and drag across cells to form a blue highlighted selection box.
+* **Keyboard Navigation**: Arrow keys move focus; `Shift + Arrow` expands or contracts the selected range.
+* **Clipboard Interoperability**:
+  - `Ctrl+C` (Cmd+C) serializes the selected rectangular matrix to Tab-Separated Values (TSV). Pastes natively into Microsoft Excel, Google Sheets, or LibreOffice.
+  - `Ctrl+V` (Cmd+V) parses TSV clipboard tables and batch-writes values into editable columns starting at the anchor cell.
+* **Excel-Style Status Bar**: Displays real-time metrics (`Count`, `Sum`, `Average`, `Min`, `Max`) and a quick-copy button at the bottom of the grid.
+* **Programmatic Controller API**:
+  ```dart
+  controller.selectCellRange(anchorRow: 0, anchorColumn: 'q1', extentRow: 3, extentColumn: 'q4');
+  final summary = controller.calculateSelectedRangeSummary();
+  await controller.copySelectedRangeToClipboard(includeHeaders: true);
+  controller.clearCellRangeSelection();
+  ```
+
+---
+
+## 10. Best Practices for AI Agents Writing Pivot Prompts
 
 ### ✅ Dense, Informative Aggregations
 Pivot tables are designed to **aggregate higher-level categorical dimensions**:
@@ -298,7 +351,7 @@ Pivot tables are designed to **aggregate higher-level categorical dimensions**:
 
 ---
 
-## 9. Layout Persistence & Settings Storage
+## 11. Layout Persistence & Settings Storage
 
 Enable automatic persistence across app restarts:
 ```dart
@@ -326,7 +379,7 @@ Persists:
 
 ---
 
-## 10. Server-Side Data Loading (`LazyAiGridDataSource`)
+## 12. Server-Side Data Loading (`LazyAiGridDataSource`)
 
 For datasets with millions of rows loaded on-demand from a remote API:
 
@@ -349,7 +402,7 @@ final dataSource = LazyAiGridDataSource(
 
 ---
 
-## 11. Dynamic DataGrid from Files, Web GET & Clipboard
+## 13. Dynamic DataGrid from Files, Web GET & Clipboard
 
 Enable multi-source tabular ingestion without hardcoded schemas:
 ```dart
@@ -385,7 +438,7 @@ AiGrid(
 
 ---
 
-## 12. Coding Guidelines for AI Agents
+## 14. Coding Guidelines for AI Agents
 
 1. **Package Imports**: Always import `package:material_ui/material_ui.dart` instead of `flutter/material.dart`.
 2. **Never Call `setState` in Builds**: Always schedule state updates after frames or attach listeners inside `initState`/`dispose`.

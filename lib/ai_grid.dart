@@ -1,5 +1,9 @@
 export 'src/fitgrid/fitgrid_table.dart';
 export 'src/models/ai_grid_column.dart';
+export 'src/models/ai_grid_smart_column.dart';
+export 'src/models/ai_grid_smart_column_runner.dart';
+export 'src/models/ai_grid_conditional_format.dart';
+export 'src/models/ai_grid_range_summary.dart';
 export 'src/models/ai_grid_editing_options.dart';
 export 'src/models/ai_grid_pivot.dart';
 export 'src/models/ai_grid_data_source.dart';

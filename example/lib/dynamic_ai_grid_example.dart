@@ -272,11 +272,6 @@ class _DynamicGridHomePageState extends State<DynamicGridHomePage> {
             icon: const Icon(Icons.language_outlined),
             onPressed: () => AiGridWebDataSourceDialog.show(context, _controller),
           ),
-          IconButton(
-            tooltip: widget.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: widget.onToggleTheme,
-          ),
           const SizedBox(width: 8),
         ],
       ),

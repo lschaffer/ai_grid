@@ -1,7 +1,7 @@
 ---
 name: ai-grid
 description: Comprehensive developer and coding agent guide for the ai_grid Flutter DataGrid package. Use when integrating, configuring, or extending high-performance canvas tables with DevExtreme-style editing (cell, row, modal form), dynamic Pivot Grids with banded split headers, hierarchical tree grouping, moveable split-panel charts, Excel export, and native Model Context Protocol (MCP) AI tools.
-version: 0.4.0
+version: 0.8.0
 author: lschaffer
 tags:
   - flutter

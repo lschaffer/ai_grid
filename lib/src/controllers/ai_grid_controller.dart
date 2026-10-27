@@ -4,9 +4,12 @@ import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
+import '../models/ai_grid_conditional_format.dart';
+import '../models/ai_grid_range_summary.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../models/ai_grid_pivot.dart';
@@ -16,6 +19,9 @@ import '../widgets/ai_grid_column_editor_dialog.dart';
 import '../widgets/ai_grid_columns_editor_dialog.dart';
 import '../widgets/ai_grid_form_dialog.dart';
 import '../widgets/ai_grid_pivot_chart.dart';
+import '../config/ai_grid_config.dart';
+import '../models/ai_grid_smart_column.dart';
+import '../models/ai_grid_smart_column_runner.dart';
 
 /// Controller coordinating grid state, grouping, filtering, sorting,
 /// column visibility, and introspection for AI Assistant tools.
@@ -44,6 +50,24 @@ class AiGridController extends ChangeNotifier {
   Map<String, dynamic>? _draftRow;
   bool _isAddingRow = false;
   final Map<String, String> _validationErrors = {};
+  final Map<String, Map<int, AiGridSmartCellStatus>> _smartCellStatus = {};
+  bool _isGeneratingSmartColumns = false;
+
+  /// Whether an AI smart column evaluation batch is currently in progress.
+  bool get isGeneratingSmartColumns => _isGeneratingSmartColumns;
+
+  /// All smart columns currently defined in the grid.
+  List<AiGridSmartColumn> get smartColumns =>
+      _columns.whereType<AiGridSmartColumn>().toList();
+
+  /// Whether the specified [field] is an [AiGridSmartColumn].
+  bool isSmartColumn(String field) =>
+      _columns.any((c) => c.field == field && c is AiGridSmartColumn);
+
+  /// Gets the current generation status of a smart column cell.
+  AiGridSmartCellStatus getSmartCellStatus(String field, int rowIndex) {
+    return _smartCellStatus[field]?[rowIndex] ?? AiGridSmartCellStatus.idle;
+  }
 
   /// Empty placeholder row shown in the grid while adding in row mode.
   Map<String, dynamic>? _pendingNewRow;
@@ -114,6 +138,383 @@ class AiGridController extends ChangeNotifier {
   void clearEditEvents() {
     _editEvents.clear();
     notifyListeners();
+  }
+
+  final List<AiGridConditionalFormat> _conditionalFormats = [];
+
+  /// Active conditional formatting rules.
+  List<AiGridConditionalFormat> get conditionalFormats =>
+      List.unmodifiable(_conditionalFormats);
+
+  /// Adds or updates a conditional formatting rule and updates the grid.
+  void addConditionalFormat(AiGridConditionalFormat format) {
+    _conditionalFormats.removeWhere((f) => f.id == format.id);
+    _conditionalFormats.add(format);
+    _syncEffectiveColumns();
+    notifyListeners();
+  }
+
+  /// Removes a conditional formatting rule by [id].
+  void removeConditionalFormat(String id) {
+    _conditionalFormats.removeWhere((f) => f.id == id);
+    _syncEffectiveColumns();
+    notifyListeners();
+  }
+
+  /// Clears all conditional formatting rules or rules matching [field].
+  void clearConditionalFormats([String? field]) {
+    if (field != null) {
+      _conditionalFormats.removeWhere((f) => f.field == field);
+    } else {
+      _conditionalFormats.clear();
+    }
+    _syncEffectiveColumns();
+    notifyListeners();
+  }
+
+  /// Resolves row background color for conditional formatting.
+  Color? resolveRowColor(Map<String, dynamic> row, int rowIndex) {
+    for (final fmt in _conditionalFormats) {
+      if (fmt.type == AiGridFormatType.highlight &&
+          fmt.applyToRow &&
+          fmt.backgroundColor != null) {
+        final val = fmt.field == '*' ? row : row[fmt.field];
+        if (fmt.matches(val, row)) {
+          return fmt.backgroundColor;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Builds a [FitGridColumn] from an [AiGridColumn], applying any active dynamic conditional formats.
+  FitGridColumn<Map<String, dynamic>> buildFitGridColumn(AiGridColumn col) {
+    var effectiveCol = col;
+    final fieldFormats =
+        _conditionalFormats.where((f) => f.field == col.field).toList();
+    if (fieldFormats.isNotEmpty) {
+      final barFormat = fieldFormats
+          .where((f) => f.type == AiGridFormatType.dataBar)
+          .firstOrNull;
+      final highlightFormats = fieldFormats
+          .where((f) => f.type == AiGridFormatType.highlight)
+          .toList();
+      final colorScaleFormat = fieldFormats
+          .where((f) => f.type == AiGridFormatType.colorScale)
+          .firstOrNull;
+
+      FitGridCellVisual<Map<String, dynamic>>? visual = col.visual;
+      if (visual == null && barFormat != null) {
+        visual = FitGridCellVisual.bar(
+          (row) {
+            final v = row[col.field];
+            if (v is num) return v;
+            if (v != null) return num.tryParse(v.toString());
+            return null;
+          },
+          min: barFormat.min,
+          max: barFormat.max,
+          color: barFormat.positiveColor,
+          negativeColor: barFormat.negativeColor,
+          showText: barFormat.showText,
+        );
+      }
+
+      TextStyle? Function(dynamic value, Map<String, dynamic> row)? cellStyle =
+          col.cellStyle;
+      if (highlightFormats.isNotEmpty || colorScaleFormat != null) {
+        final existingStyle = cellStyle;
+        cellStyle = (val, row) {
+          TextStyle? base = existingStyle?.call(val, row);
+          for (final h in highlightFormats) {
+            if (h.matches(val, row)) {
+              base = (base ?? const TextStyle()).copyWith(
+                color: h.textColor,
+                fontWeight: h.fontWeight,
+                backgroundColor: h.applyToRow ? null : h.backgroundColor,
+              );
+            }
+          }
+          if (colorScaleFormat != null && val is num) {
+            final min = colorScaleFormat.min ?? 0;
+            final max = colorScaleFormat.max ?? 100;
+            final interpolated =
+                colorScaleFormat.interpolateColor(val, min, max);
+            if (interpolated != null) {
+              base = (base ?? const TextStyle()).copyWith(color: interpolated);
+            }
+          }
+          return base;
+        };
+      }
+
+      effectiveCol = col.copyWith(
+        visual: visual,
+        cellStyle: cellStyle,
+      );
+    }
+
+    // Smart column visual styling & inline sparkle indicator
+    if (col is AiGridSmartColumn && effectiveCol.cellBuilder == null) {
+      final smartCol = col;
+      effectiveCol = effectiveCol.copyWith(
+        cellBuilder: (context, row, rowIndex) {
+          final status = getSmartCellStatus(smartCol.field, rowIndex);
+          final val = row[smartCol.field];
+          final valStr = val?.toString() ?? '';
+          final theme = Theme.of(context);
+          final sparkleColor = smartCol.sparkleColor ?? const Color(0xFF8B5CF6);
+
+          if (status == AiGridSmartCellStatus.generating) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: sparkleColor,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'Synthesizing...',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontStyle: FontStyle.italic,
+                      color: theme.hintColor,
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            );
+          }
+
+          if (valStr.isEmpty) {
+            return InkWell(
+              onTap: () => runSmartColumnForCell(rowIndex, smartCol.field),
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome_outlined,
+                        size: 12, color: sparkleColor.withValues(alpha: 0.8)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Generate',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: sparkleColor.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final style = smartCol.cellStyle?.call(val, row) ??
+              theme.textTheme.bodyMedium?.copyWith(fontSize: 12);
+
+          return Tooltip(
+            message: 'AI Synthesized • Prompt: "${smartCol.promptTemplate}"',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_awesome, size: 12, color: sparkleColor),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    smartCol.formatDisplayValue(val),
+                    style: style,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+
+    return effectiveCol.toFitGridColumn();
+  }
+
+  /// Adds an AI smart column to the grid. If [autoRun] is true, triggers prompt evaluation.
+  void addSmartColumn(
+    AiGridSmartColumn column, {
+    bool autoRun = true,
+    AiGridConfig? aiConfig,
+  }) {
+    final existingIndex = _columns.indexWhere((c) => c.field == column.field);
+    if (existingIndex >= 0) {
+      _columns[existingIndex] = column;
+    } else {
+      _columns.add(column);
+    }
+    _syncEffectiveColumns();
+    notifyListeners();
+    if (autoRun) {
+      runSmartColumns(field: column.field, aiConfig: aiConfig);
+    }
+  }
+
+  /// Evaluates AI smart columns across all rows in the dataset.
+  /// If [field] is specified, only that smart column is evaluated.
+  /// If [force] is true, re-evaluates rows even if values already exist.
+  Future<void> runSmartColumns({
+    String? field,
+    bool force = false,
+    AiGridConfig? aiConfig,
+  }) async {
+    final targets =
+        smartColumns.where((c) => field == null || c.field == field).toList();
+    if (targets.isEmpty) return;
+
+    final allRows = List<Map<String, dynamic>>.from(rows);
+    if (allRows.isEmpty) return;
+
+    _isGeneratingSmartColumns = true;
+    for (final col in targets) {
+      _smartCellStatus.putIfAbsent(col.field, () => {});
+      for (var i = 0; i < allRows.length; i++) {
+        final existing = allRows[i][col.field];
+        if (force || existing == null || existing.toString().trim().isEmpty) {
+          _smartCellStatus[col.field]![i] = AiGridSmartCellStatus.generating;
+        }
+      }
+    }
+    notifyListeners();
+
+    try {
+      final llmConfig =
+          aiConfig?.llmConfig ?? AiGridEnvLoader.createLlmConfigFromEnv();
+
+      for (final col in targets) {
+        final rowIndices = <int>[];
+        for (var i = 0; i < allRows.length; i++) {
+          if (_smartCellStatus[col.field]?[i] ==
+              AiGridSmartCellStatus.generating) {
+            rowIndices.add(i);
+          }
+        }
+        if (rowIndices.isEmpty) continue;
+
+        final batchResults = await AiGridSmartColumnRunner.evaluateBatch(
+          column: col,
+          rows: allRows,
+          rowIndices: rowIndices,
+          llmConfig: llmConfig,
+        );
+
+        for (final entry in batchResults.entries) {
+          final idx = entry.key;
+          final value = entry.value;
+          allRows[idx][col.field] = value;
+          _smartCellStatus[col.field]![idx] = AiGridSmartCellStatus.generated;
+        }
+
+        // Apply updated rows back to FitGrid or DataSource
+        if (_fitController != null) {
+          _fitController!.data.rows = List<Map<String, dynamic>>.from(allRows);
+        } else if (_dataSource is LocalAiGridDataSource) {
+          (_dataSource as LocalAiGridDataSource).setData(allRows);
+        }
+
+        logEditEvent(AiGridEditEvent(
+          action: 'smart_column_generated',
+          rowIndex: 0,
+          message: 'Synthesized ${batchResults.length} values for "${col.title}"',
+        ));
+      }
+    } finally {
+      _isGeneratingSmartColumns = false;
+      notifyListeners();
+    }
+  }
+
+  /// Evaluates an AI smart column for a single specific cell.
+  Future<void> runSmartColumnForCell(
+    int rowIndex,
+    String field, {
+    AiGridConfig? aiConfig,
+  }) async {
+    final col = smartColumns.where((c) => c.field == field).firstOrNull;
+    if (col == null) return;
+    final allRows = List<Map<String, dynamic>>.from(rows);
+    if (rowIndex < 0 || rowIndex >= allRows.length) return;
+
+    _smartCellStatus.putIfAbsent(col.field, () => {});
+    _smartCellStatus[col.field]![rowIndex] = AiGridSmartCellStatus.generating;
+    notifyListeners();
+
+    try {
+      final llmConfig =
+          aiConfig?.llmConfig ?? AiGridEnvLoader.createLlmConfigFromEnv();
+      final results = await AiGridSmartColumnRunner.evaluateBatch(
+        column: col,
+        rows: allRows,
+        rowIndices: [rowIndex],
+        llmConfig: llmConfig,
+      );
+
+      if (results.containsKey(rowIndex)) {
+        allRows[rowIndex][col.field] = results[rowIndex];
+        _smartCellStatus[col.field]![rowIndex] = AiGridSmartCellStatus.generated;
+      } else {
+        _smartCellStatus[col.field]![rowIndex] = AiGridSmartCellStatus.error;
+      }
+
+      if (_fitController != null) {
+        _fitController!.data.rows = List<Map<String, dynamic>>.from(allRows);
+      } else if (_dataSource is LocalAiGridDataSource) {
+        (_dataSource as LocalAiGridDataSource).setData(allRows);
+      }
+    } catch (_) {
+      _smartCellStatus[col.field]![rowIndex] = AiGridSmartCellStatus.error;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  /// Clears generated AI values in smart columns and resets cell statuses to idle.
+  void clearSmartColumnValues([String? field]) {
+    final targets =
+        smartColumns.where((c) => field == null || c.field == field).toList();
+    if (targets.isEmpty) return;
+
+    final allRows = List<Map<String, dynamic>>.from(rows);
+    for (final col in targets) {
+      _smartCellStatus.remove(col.field);
+      for (final r in allRows) {
+        r.remove(col.field);
+      }
+    }
+
+    if (_fitController != null) {
+      _fitController!.data.rows = List<Map<String, dynamic>>.from(allRows);
+    } else if (_dataSource is LocalAiGridDataSource) {
+      (_dataSource as LocalAiGridDataSource).setData(allRows);
+    }
+    notifyListeners();
+  }
+
+  void _syncEffectiveColumns() {
+    if (_fitController == null) return;
+    final hidden = hiddenColumns.toSet();
+    _fitController!.columns.columns = _columns.map((c) {
+      final col = buildFitGridColumn(c);
+      if (hidden.contains(c.field)) {
+        return col.copyWith(visible: false);
+      }
+      return col;
+    }).toList();
   }
 
   /// Starts adding a new row, initializing draft values with column defaults or [initialValues].
@@ -403,6 +804,26 @@ class AiGridController extends ChangeNotifier {
   /// Grid columns defined for this DataGrid.
   List<AiGridColumn> get columns => _columns;
 
+  /// Active dataset rows.
+  List<Map<String, dynamic>> get rows {
+    if (_fitController != null) {
+      return _fitController!.data.rows;
+    } else if (_dataSource is LocalAiGridDataSource) {
+      return (_dataSource as LocalAiGridDataSource).data;
+    }
+    return const [];
+  }
+
+  /// Active filtered and sorted view rows.
+  List<Map<String, dynamic>> get viewRows {
+    if (_fitController != null) {
+      return _fitController!.data.view;
+    } else if (_dataSource is LocalAiGridDataSource) {
+      return (_dataSource as LocalAiGridDataSource).data;
+    }
+    return const [];
+  }
+
   /// Active data source if attached.
   AiGridDataSource? get dataSource => _dataSource;
 
@@ -487,6 +908,7 @@ class AiGridController extends ChangeNotifier {
       _fitController!.data.removeListener(_onFitControllerChanged);
       _fitController!.columns.removeListener(_onFitControllerChanged);
       _fitController!.filter.removeListener(_onFitFilterChanged);
+      _fitController!.range.removeListener(_onFitRangeChanged);
     }
     _fitController = fitController ??
         _fitController ??
@@ -507,9 +929,11 @@ class AiGridController extends ChangeNotifier {
     _fitController!.data.removeListener(_onFitControllerChanged);
     _fitController!.columns.removeListener(_onFitControllerChanged);
     _fitController!.filter.removeListener(_onFitFilterChanged);
+    _fitController!.range.removeListener(_onFitRangeChanged);
     _fitController!.data.addListener(_onFitControllerChanged);
     _fitController!.columns.addListener(_onFitControllerChanged);
     _fitController!.filter.addListener(_onFitFilterChanged);
+    _fitController!.range.addListener(_onFitRangeChanged);
 
     // Reapply active state if pre-configured
     if (_activeGrouping.isNotEmpty) {
@@ -632,6 +1056,24 @@ class AiGridController extends ChangeNotifier {
     return AiGridColumnsEditorDialog.show(context, controller: this);
   }
 
+  /// Updates grid column definitions and syncs with the underlying FitGrid.
+  void updateColumns(List<AiGridColumn> newColumns, {bool notify = true}) {
+    _columns = List<AiGridColumn>.from(newColumns);
+    if (_prePivotColumns != null) {
+      _prePivotColumns = List<AiGridColumn>.from(_columns);
+    }
+    if (_dataSource is LocalAiGridDataSource) {
+      _dataSource = LocalAiGridDataSource(
+        columns: _columns,
+        initialData: (_dataSource as LocalAiGridDataSource).data,
+      );
+    }
+    _syncEffectiveColumns();
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
   /// Updates all column definitions for this grid, syncing with the underlying engine,
   /// data source, and persisting updates to [AiGridDynamicStorage] if dynamic and writable.
   Future<bool> updateAllColumns(List<AiGridColumn> newColumns) async {
@@ -647,9 +1089,8 @@ class AiGridController extends ChangeNotifier {
       );
     }
 
+    _syncEffectiveColumns();
     if (_fitController != null) {
-      _fitController!.columns.columns =
-          _columns.map((c) => c.toFitGridColumn()).toList();
       for (final col in _columns) {
         if (col.width != null && col.width! > 0) {
           _fitController!.columns.setWidth(col.field, col.width!);
@@ -759,6 +1200,119 @@ class AiGridController extends ChangeNotifier {
     return true;
   }
 
+  /// The underlying cell range state, or null when not attached.
+  FitGridCellRangeState? get cellRangeState => _fitController?.range;
+
+  /// The active cell range selection rectangle, or null if no cells are selected.
+  FitGridCellRange? get selectedCellRange => _fitController?.range.range;
+
+  /// Whether a rectangular cell range is currently selected.
+  bool get hasCellRangeSelection => _fitController?.range.isActive ?? false;
+
+  /// Whether more than one cell is currently selected in the active range.
+  bool get isMultiCellRangeSelected => _fitController?.range.isMultiCell ?? false;
+
+  /// Selects a rectangular range of cells spanning from ([anchorRow], [anchorColumn])
+  /// to ([extentRow], [extentColumn]).
+  void selectCellRange({
+    required int anchorRow,
+    required String anchorColumn,
+    required int extentRow,
+    required String extentColumn,
+    bool notify = true,
+  }) {
+    if (_fitController == null) return;
+    _fitController!.range.range = FitGridCellRange(
+      anchorRow: anchorRow,
+      anchorColumnId: anchorColumn,
+      extentRow: extentRow,
+      extentColumnId: extentColumn,
+    );
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  /// Selects a single cell as the active range anchor.
+  void selectCell(int row, String columnField, {bool notify = true}) {
+    if (_fitController == null) return;
+    _fitController!.range.select(row, columnField);
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  /// Clears the active cell range selection.
+  void clearCellRangeSelection({bool notify = true}) {
+    if (_fitController == null) return;
+    _fitController!.range.clear();
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  /// Computes summary statistical metrics (Count, Sum, Avg, Min, Max)
+  /// for the currently selected cell range. Returns null if no range is active.
+  AiGridRangeSummary? calculateSelectedRangeSummary() {
+    final range = _fitController?.range.range;
+    if (range == null || _fitController == null) return null;
+
+    final displayedCols = _fitController!.columns.columns
+        .where((c) => c.visible)
+        .map((c) => c.id)
+        .toList();
+    final colFields = range.columnIdsIn(displayedCols);
+    if (colFields.isEmpty) return null;
+
+    final rows = _fitController!.data.view;
+    final selectedRows = <Map<String, dynamic>>[];
+    for (var r = range.firstRow; r <= range.lastRow && r < rows.length; r++) {
+      selectedRows.add(rows[r]);
+    }
+
+    return AiGridRangeSummary.fromValues(
+      rows: selectedRows,
+      columnFields: colFields,
+    );
+  }
+
+  /// Copies the currently selected rectangular cell range to the system clipboard
+  /// as tab-separated values (TSV), compatible with Microsoft Excel, Google Sheets, etc.
+  Future<bool> copySelectedRangeToClipboard({bool includeHeaders = false}) async {
+    final range = _fitController?.range.range;
+    if (range == null || _fitController == null) return false;
+
+    final displayed = _fitController!.columns.columns
+        .where((c) => c.visible)
+        .toList();
+    final colIds = range.columnIdsIn(displayed.map((c) => c.id).toList());
+    if (colIds.isEmpty) return false;
+
+    final buffer = StringBuffer();
+    if (includeHeaders) {
+      final headerTitles = colIds.map((id) {
+        final col = displayed.firstWhere(
+          (c) => c.id == id,
+          orElse: () => displayed.first,
+        );
+        return col.label;
+      }).join('\t');
+      buffer.writeln(headerTitles);
+    }
+
+    final rows = _fitController!.data.view;
+    for (var r = range.firstRow; r <= range.lastRow && r < rows.length; r++) {
+      final row = rows[r];
+      final line = colIds.map((id) => row[id]?.toString() ?? '').join('\t');
+      buffer.writeln(line);
+    }
+
+    final text = buffer.toString().trimRight();
+    if (text.isEmpty) return false;
+    await Clipboard.setData(ClipboardData(text: text));
+    return true;
+  }
+
   bool _disposed = false;
 
   @override
@@ -767,7 +1321,21 @@ class AiGridController extends ChangeNotifier {
     _fitController?.data.removeListener(_onFitControllerChanged);
     _fitController?.columns.removeListener(_onFitControllerChanged);
     _fitController?.filter.removeListener(_onFitFilterChanged);
+    _fitController?.range.removeListener(_onFitRangeChanged);
     super.dispose();
+  }
+
+  void _onFitRangeChanged() {
+    if (_disposed) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed) notifyListeners();
+      });
+    } else {
+      notifyListeners();
+    }
   }
 
   void _onFitFilterChanged() {
@@ -1716,6 +2284,8 @@ class AiGridController extends ChangeNotifier {
                 ]
               : <Map<String, dynamic>>[]),
       'filters': Map<String, dynamic>.from(activeFilters),
+      'conditionalFormats':
+          _conditionalFormats.map((f) => f.toJson()).toList(),
       'timestamp': DateTime.now().toIso8601String(),
     };
   }
@@ -1828,6 +2398,17 @@ class AiGridController extends ChangeNotifier {
     }
     if (settings.containsKey('showGroupPanel')) {
       _showGroupPanel = settings['showGroupPanel'] == true;
+    }
+
+    // 5. Conditional Formats
+    if (settings['conditionalFormats'] is List) {
+      _conditionalFormats.clear();
+      for (final item in settings['conditionalFormats'] as List) {
+        if (item is Map<String, dynamic>) {
+          _conditionalFormats.add(AiGridConditionalFormat.fromJson(item));
+        }
+      }
+      _syncEffectiveColumns();
     }
 
     notifyListeners();

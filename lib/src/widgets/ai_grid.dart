@@ -10,6 +10,7 @@ import '../config/ai_grid_settings_storage.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
+import '../models/ai_grid_conditional_format.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../theme/ai_grid_theme.dart';
@@ -90,7 +91,31 @@ class AiGrid extends StatefulWidget {
     this.columnGroups,
     this.dynamicGrid = false,
     this.assistantBuilder,
+    this.rowColor,
+    this.conditionalFormats,
+    this.cellSelection = false,
+    this.enableCopy = true,
+    this.enablePaste = true,
+    this.showSelectionStatusBar = false,
   });
+
+  /// Whether rectangular cell range selection is enabled.
+  final bool cellSelection;
+
+  /// Whether copying to clipboard (Ctrl+C / Cmd+C) is enabled.
+  final bool enableCopy;
+
+  /// Whether pasting from clipboard (Ctrl+V / Cmd+V) into editable columns is enabled.
+  final bool enablePaste;
+
+  /// Whether to display a floating or docked summary status bar when cells are selected.
+  final bool showSelectionStatusBar;
+
+  /// Optional row background color resolver for conditional formatting.
+  final Color? Function(Map<String, dynamic> row, int rowIndex)? rowColor;
+
+  /// Optional active conditional format rules.
+  final List<AiGridConditionalFormat>? conditionalFormats;
 
   /// Whether to enable dynamic DataGrid datasource management.
   final bool dynamicGrid;
@@ -150,6 +175,11 @@ class _AiGridState extends State<AiGrid> {
     }
     if (widget.editingOptions != null) {
       _controller.setEditingOptions(widget.editingOptions!, notify: false);
+    }
+    if (widget.conditionalFormats != null) {
+      for (final fmt in widget.conditionalFormats!) {
+        _controller.addConditionalFormat(fmt);
+      }
     }
 
     _lastEditMode = _controller.editingOptions.mode;
@@ -250,18 +280,15 @@ class _AiGridState extends State<AiGrid> {
     if (widget.dataSource != oldWidget.dataSource) {
       oldWidget.dataSource.removeListener(_onDataSourceChanged);
       widget.dataSource.addListener(_onDataSourceChanged);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _fitController.columns.columns = _buildFitColumns();
-        _lastColumns = List.of(_effectiveColumns);
-        _controller.attach(
-          fitController: _fitController,
-          columns: _effectiveColumns,
-          dataSource: widget.dataSource,
-          notify: false,
-        );
-        _loadData();
-      });
+      _controller.attach(
+        fitController: _fitController,
+        columns: widget.dataSource.columns,
+        dataSource: widget.dataSource,
+        notify: false,
+      );
+      _fitController.columns.columns = _buildFitColumns();
+      _lastColumns = List.of(widget.dataSource.columns);
+      _loadData();
     }
     if (widget.editingOptions != oldWidget.editingOptions &&
         widget.editingOptions != null) {
@@ -323,7 +350,9 @@ class _AiGridState extends State<AiGrid> {
 
   List<FitGridColumn<Map<String, dynamic>>> _buildFitColumns() {
     if (_controller.isPivotActive) {
-      return _controller.columns.map((c) => c.toFitGridColumn()).toList();
+      return _controller.columns
+          .map((c) => _controller.buildFitGridColumn(c))
+          .toList();
     }
     final isReadonly = _controller.activeDynamicDatasource?.isReadonly ?? false;
     final opts = _controller.editingOptions;
@@ -335,7 +364,7 @@ class _AiGridState extends State<AiGrid> {
       if (isRowMode && c.isEditable && !isReadonly) {
         return _buildRowEditableColumn(c);
       }
-      return c.toFitGridColumn();
+      return _controller.buildFitGridColumn(c);
     }).toList();
 
     if (isEditingEffective &&
@@ -478,8 +507,21 @@ class _AiGridState extends State<AiGrid> {
         if (col.cellBuilder != null) {
           return col.cellBuilder!(context, row, rowIndex);
         }
+        TextStyle? effectiveStyle;
+        if (col.cellStyle != null || col.cellColor != null) {
+          final val = row[col.field];
+          effectiveStyle = col.cellStyle?.call(val, row);
+          if (col.cellColor != null) {
+            final c = col.cellColor!(val, row);
+            if (c != null) {
+              effectiveStyle =
+                  (effectiveStyle ?? const TextStyle()).copyWith(color: c);
+            }
+          }
+        }
         return Text(
           col.formatDisplayValue(row[col.field]),
+          style: effectiveStyle,
           overflow: TextOverflow.ellipsis,
         );
       },
@@ -1142,6 +1184,7 @@ class _AiGridState extends State<AiGrid> {
         else ...[
           AiGridGroupPanel(controller: _controller),
           Expanded(child: _buildGrid(context, gridTheme)),
+          _buildSelectionStatusBar(context),
         ],
       ],
     );
@@ -1223,8 +1266,121 @@ class _AiGridState extends State<AiGrid> {
             ),
           AiGridGroupPanel(controller: _controller),
           Expanded(child: _buildGrid(context, gridTheme)),
+          _buildSelectionStatusBar(context),
         ],
       ),
+    );
+  }
+
+  Widget _buildSelectionStatusBar(BuildContext context) {
+    if (!widget.cellSelection || !widget.showSelectionStatusBar) {
+      return const SizedBox.shrink();
+    }
+    final summary = _controller.calculateSelectedRangeSummary();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    String fmt(num n) {
+      if (n == n.roundToDouble()) {
+        return NumberFormat('#,###').format(n);
+      }
+      return NumberFormat('#,##0.00').format(n);
+    }
+
+    final hasRange = summary != null && summary.cellCount > 1;
+
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+          ),
+        ),
+      ),
+      child: hasRange
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Icon(Icons.select_all_rounded, size: 14, color: theme.colorScheme.primary),
+                const SizedBox(width: 6),
+                Text(
+                  '${summary.rowCount} × ${summary.columnCount} (${summary.cellCount} cells)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFDDDDDD) : const Color(0xFF1E293B),
+                  ),
+                ),
+                if (summary.numericCount > 0) ...[
+                  const SizedBox(width: 12),
+                  Container(height: 12, width: 1, color: isDark ? Colors.grey[700] : Colors.grey[300]),
+                  const SizedBox(width: 12),
+                  if (summary.sum != null) ...[
+                    Text(
+                      'Sum: ${fmt(summary.sum!)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFEEEEEE) : const Color(0xFF0F172A),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  if (summary.average != null) ...[
+                    Text(
+                      'Avg: ${fmt(summary.average!)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  if (summary.min != null && summary.max != null) ...[
+                    Text(
+                      'Min: ${fmt(summary.min!)}  Max: ${fmt(summary.max!)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                ],
+                IconButton(
+                  icon: const Icon(Icons.copy_rounded, size: 13),
+                  tooltip: 'Copy range to clipboard (TSV)',
+                  splashRadius: 12,
+                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                  padding: EdgeInsets.zero,
+                  onPressed: () async {
+                    final ok = await _controller.copySelectedRangeToClipboard();
+                    if (ok && context.mounted) {
+                      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                        const SnackBar(
+                          content: Text('Selected range copied to clipboard (TSV)'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Text(
+                  'Ready',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? const Color(0xFF888888) : const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -1270,6 +1426,16 @@ class _AiGridState extends State<AiGrid> {
     final gridWidget = FitGrid<Map<String, dynamic>>(
       controller: _fitController,
       theme: gridTheme,
+      cellSelection: widget.cellSelection,
+      enableCopy: widget.enableCopy,
+      enablePaste: widget.enablePaste,
+      rowColor: (row, rowIndex) {
+        if (widget.rowColor != null) {
+          final c = widget.rowColor!(row, rowIndex);
+          if (c != null) return c;
+        }
+        return _controller.resolveRowColor(row, rowIndex);
+      },
       columnGroups: _controller.isPivotActive
           ? _controller.pivotColumnGroups
           : (widget.columnGroups ?? const <FitGridColumnGroup>[]),

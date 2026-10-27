@@ -87,12 +87,34 @@ class AiGridConfig {
   /// Optional custom system prompt overriding the default agent instructions.
   final String? systemPrompt;
 
+  /// Optional contextual sample prompts shown as quick-action suggestion chips in the AI Assistant panel.
+  final List<String>? suggestedPrompts;
+
   const AiGridConfig({
     this.llmConfig,
     this.enableAiAssistant = true,
     this.hideAiAssistantIfNoLlm = false,
     this.systemPrompt,
+    this.suggestedPrompts,
   });
+
+  /// Creates a copy of this [AiGridConfig] with specific fields replaced.
+  AiGridConfig copyWith({
+    LlmConfig? llmConfig,
+    bool? enableAiAssistant,
+    bool? hideAiAssistantIfNoLlm,
+    String? systemPrompt,
+    List<String>? suggestedPrompts,
+  }) {
+    return AiGridConfig(
+      llmConfig: llmConfig ?? this.llmConfig,
+      enableAiAssistant: enableAiAssistant ?? this.enableAiAssistant,
+      hideAiAssistantIfNoLlm:
+          hideAiAssistantIfNoLlm ?? this.hideAiAssistantIfNoLlm,
+      systemPrompt: systemPrompt ?? this.systemPrompt,
+      suggestedPrompts: suggestedPrompts ?? this.suggestedPrompts,
+    );
+  }
 
   /// Whether a valid LLM provider and credentials are configured.
   bool get isLlmConfigured =>

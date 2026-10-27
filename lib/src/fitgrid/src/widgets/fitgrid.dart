@@ -1142,19 +1142,19 @@ class _FitGridState<T> extends State<FitGrid<T>> {
 
     final body = rowsView.isEmpty
         ? (widget.emptyState ?? _defaultEmptyState(theme, source))
-        : _wrapGestures(
-            context: context,
-            columns: columns,
-            rows: rowsView,
-            theme: theme,
+        : Scrollbar(
+            controller: _verticalController,
+            notificationPredicate: (notification) =>
+                notification.metrics.axis == Axis.vertical,
             child: Scrollbar(
-              controller: _verticalController,
+              controller: _horizontalController,
               notificationPredicate: (notification) =>
-                  notification.metrics.axis == Axis.vertical,
-              child: Scrollbar(
-                controller: _horizontalController,
-                notificationPredicate: (notification) =>
-                    notification.metrics.axis == Axis.horizontal,
+                  notification.metrics.axis == Axis.horizontal,
+              child: _wrapGestures(
+                context: context,
+                columns: columns,
+                rows: rowsView,
+                theme: theme,
                 child: Scrollable(
                   controller: _verticalController,
                   axisDirection: AxisDirection.down,
@@ -2039,6 +2039,7 @@ class _FitGridState<T> extends State<FitGrid<T>> {
     FitGridRowsView<T> rows, {
     required bool openEditor,
   }) {
+    if (_isOverScrollbar(globalPosition)) return;
     final hit = _cellAt(globalPosition, columns, rows);
     if (hit == null) return;
     final (localRow, columnIndex) = hit;
@@ -2503,6 +2504,7 @@ class _FitGridState<T> extends State<FitGrid<T>> {
         event.buttons != kPrimaryMouseButton) {
       return;
     }
+    if (_isOverScrollbar(event.position)) return;
     final render = _sectionKey.currentContext?.findRenderObject();
     if (render is RenderFitGridSection &&
         render.hitsFillHandle(render.globalToLocal(event.position))) {
@@ -2582,6 +2584,7 @@ class _FitGridState<T> extends State<FitGrid<T>> {
     FitGridRowsView<T> rows, {
     bool clamp = false,
   }) {
+    if (!clamp && _isOverScrollbar(globalPosition)) return null;
     final render = _sectionKey.currentContext?.findRenderObject();
     if (render is! RenderFitGridSection || rows.isEmpty) return null;
     final local = render.globalToLocal(globalPosition);
@@ -2703,11 +2706,48 @@ class _FitGridState<T> extends State<FitGrid<T>> {
     return result.path.any((entry) => entry.target is RenderPointerListener);
   }
 
+  /// Returns whether a pointer position is inside the active scrollbar area
+  /// (bottom for horizontal scrollbar, trailing edge for vertical scrollbar).
+  bool _isOverScrollbar(Offset globalPosition) {
+    final render = _sectionKey.currentContext?.findRenderObject();
+    if (render is! RenderFitGridSection) return false;
+    final local = render.globalToLocal(globalPosition);
+    final size = render.size;
+    const scrollbarHitMargin = 20.0;
+
+    // Check horizontal scrollbar
+    if (_horizontalController.hasClients &&
+        _horizontalController.position.maxScrollExtent > 0) {
+      if (local.dy >= size.height - scrollbarHitMargin &&
+          local.dy <= size.height &&
+          local.dx >= 0 &&
+          local.dx <= size.width) {
+        return true;
+      }
+    }
+
+    // Check vertical scrollbar
+    if (_verticalController.hasClients &&
+        _verticalController.position.maxScrollExtent > 0) {
+      final rtl = Directionality.of(context) == TextDirection.rtl;
+      final inVertical = rtl
+          ? (local.dx >= 0 && local.dx <= scrollbarHitMargin)
+          : (local.dx >= size.width - scrollbarHitMargin &&
+              local.dx <= size.width);
+      if (inVertical && local.dy >= 0 && local.dy <= size.height) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   (int, int)? _cellAt(
     Offset globalPosition,
     List<FitGridColumn<T>> columns,
     FitGridRowsView<T> rows,
   ) {
+    if (_isOverScrollbar(globalPosition)) return null;
     final render = _sectionKey.currentContext?.findRenderObject();
     if (render is! RenderFitGridSection) return null;
     final local = render.globalToLocal(globalPosition);

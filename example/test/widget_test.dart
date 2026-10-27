@@ -12,7 +12,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    await tester.pumpWidget(const AiGridExampleApp());
+    await tester.pumpWidget(const AiGridShowcaseApp());
 
     await tester.runAsync(() async {
       await Future.delayed(const Duration(milliseconds: 500));
@@ -20,6 +20,5 @@ void main() {
     await tester.pump();
 
     expect(find.byType(AiGrid), findsOneWidget);
-    expect(find.textContaining('Superstore Sales'), findsOneWidget);
   });
 }

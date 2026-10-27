@@ -1,6 +1,6 @@
 # AI Grid (`ai_grid`)
 
-[![pub version](https://img.shields.io/badge/pub-v0.4.0-blue.svg)](https://pub.dev/packages/ai_grid)
+[![pub version](https://img.shields.io/badge/pub-v0.8.0-blue.svg)](https://pub.dev/packages/ai_grid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.24.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![WASM Ready](https://img.shields.io/badge/WebAssembly-WASM%20Compatible-success.svg)](https://flutter.dev/to/wasm)
@@ -8,6 +8,10 @@
 **AI Grid** is an intelligent, high-performance DataGrid for Flutter that bridges enterprise tabular virtualization with native AI assistant controls and Model Context Protocol (MCP) tool execution.
 
 ![AI Grid Showcase](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_1.png)
+
+| AI Smart Synthesis Columns | Range Selection & Multi-Cell Copy |
+| :---: | :---: |
+| ![AI Smart Synthesis Columns](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_combined_ai_synth_column.png) | ![Range Selection & Multi-Cell Copy](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_combined_range_selection.png) |
 
 ![AI Grid Live Demo](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_grid_example1.gif)
 
@@ -77,7 +81,44 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
   * Run prompts like *"create pivot table, rows category and subcategory, columns segment, data fields sales (sum), profit (sum)"*.
   * Deactivate or restore standard view anytime via toolbar button or *"reset pivot table"*.
 
-### 4. 🧠 Native AI Assistant & Model Context Protocol (MCP)
+### 4. 🎨 In-Grid Visual Analytics & Conditional Formatting
+* **Direct Canvas Cell Visuals**:
+  * **Data Bars (`AiGridColumn.dataBar`)**: Horizontal bars painted on canvas behind cell text with customizable positive and negative colors, minimums, maximums, and zero-line alignment.
+  * **Progress Tracks (`AiGridColumn.progress`)**: Proportional progress tracks filled to a fraction between 0.0 and 1.0.
+  * **In-Cell Sparklines (`AiGridColumnType.sparkline` & `AiGridColumn.sparkline`)**: High-performance mini line and area charts painted directly inside cells from row value arrays without widget overhead.
+* **Declarative & Dynamic Conditional Formatting (`AiGridConditionalFormat`)**:
+  * Rule-based cell and row highlighting supporting `>`, `<`, `>=`, `<=`, `==`, `!=`, `contains`, `between`, and custom predicates.
+  * Entire-row background alerts (`applyToRow: true`) and custom text color/font weight styling.
+  * Color scale / heatmap gradient interpolation across minimum to maximum values.
+* **Controller Orchestration & Auto-Save**:
+  * Programmatic and natural language formatting controls via `controller.addConditionalFormat()` and `controller.clearConditionalFormats()`.
+  * Preserved automatically across grid layout persistence and JSON export/restore.
+
+### 5. 📋 Cell Range Selection & Bidirectional Spreadsheet Copy/Paste
+* **Desktop-Grade Ergonomics**:
+  * Rectangular cell selection via mouse drag and keyboard navigation.
+  * `Shift + Arrow` keys dynamically expand and contract active cell boundaries.
+  * `Ctrl+C` (or Cmd+C) copies selected rectangular cells into standard Tab-Separated Values (TSV), directly pasteable into Microsoft Excel, Google Sheets, and LibreOffice.
+  * `Ctrl+V` (or Cmd+V) parses clipboard TSV matrices and batch-writes into editable columns starting at the active anchor cell.
+* **Excel-Style Selection Status Bar**:
+  * Real-time metrics computed directly over the active selection: Cell Count, Row/Column Dimensions, Numeric Sum, Average (Mean), Min, and Max.
+  * Cleanly docked at the footer of the DataGrid on desktop and mobile.
+  * Quick-action copy button with toast notification.
+* **Controller APIs & Introspection**:
+  * Programmatic range selection via `controller.selectCellRange()`, `controller.selectCell()`, and `controller.clearCellRangeSelection()`.
+  * Real-time statistical analysis via `controller.calculateSelectedRangeSummary()` returning `AiGridRangeSummary`.
+  * Direct clipboard export via `controller.copySelectedRangeToClipboard()`.
+* **MCP Range Tools**:
+  * `grid_get_selected_range`: Inspects active selection coordinates, dimensions, and computed statistics.
+  * `grid_select_range`: Programmatically selects rectangular cell ranges by row index and column fields.
+
+### 6. ✨ AI Smart / Prompt Columns (LLM Synthesis)
+* **LLM-Synthesized Columns (`AiGridSmartColumn`)**: Define columns dynamically evaluated by any configured LLM using per-row prompt template interpolation (e.g. `"Classify sentiment of '{feedback}'"`).
+* **Interactive & Batch Execution**: Generate values cell-by-cell on click with interactive sparkle buttons or execute batch synthesis asynchronously across rows with `AiGridSmartColumnRunner`.
+* **Discrete Categories & Offline Fallback**: Restrict outputs to categorical enums (`options: ['Positive', 'Neutral', 'Negative']`) with built-in heuristic fallbacks when working offline without active API keys.
+* **Autonomous MCP Tools**: AI agents can inspect, add, and run smart columns dynamically via `grid_add_smart_column` and `grid_run_smart_columns`.
+
+### 7. 🧠 Native AI Assistant & Model Context Protocol (MCP)
 * **Embedded AI Chat**: Conversational interface that understands your tabular schema, column types, and data distributions.
 * **Hallucination-Free Math Engine (`grid_calculate`)**: Calculations (sum, average, minimum, maximum, count, median) are executed strictly inside the Dart engine—ensuring 100% mathematical accuracy without LLM arithmetic errors.
 * **Multi-Column AND Filtering**: Seamlessly parses and applies complex queries across multiple columns simultaneously (e.g. *"filter region East and category Furniture"*).
@@ -85,7 +126,7 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
 * **Context-Aware Suggestions**: Proactive quick-action chips generated dynamically based on active columns.
 * **LLM Provider Agnostic**: Connects seamlessly with Mistral, OpenAI, Anthropic Claude, Google Gemini, Ollama, custom OpenAI-compatible endpoints, or built-in local heuristics.
 
-### 5. 💾 Save & Restore Grid Settings (Auto-Save)
+### 8. 💾 Save & Restore Grid Settings (Auto-Save)
 * **Full State Persistence**: Export or restore grid configuration including:
   * `visibleColumns` & `hiddenColumns`
   * `groupColumns` (hierarchical row grouping)
@@ -95,7 +136,7 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
 * **Automatic Layout Restoration (`autoSave`)**: Pass `autoSave: true` and a `persistenceKey` to automatically persist all user layout changes and restore them on startup.
 * **JSON Import/Export**: Export settings to JSON string or save to file via `controller.exportSettingsJson()` and restore via `controller.restoreSettingsJson(str)`.
 * **In-Memory Cache**: Built-in `AiGridSettingsStorage` handles session-level caching and retrieval.
-### 6. 🌐 Dynamic AI DataGrid (Files, Web GET & Clipboard Ingestion)
+### 9. 🌐 Dynamic AI DataGrid (Files, Web GET & Clipboard Ingestion)
 
 Instantly generate, inspect, and interact with dynamic DataGrids from external files, public web APIs, or clipboard content without hardcoding data models:
 
@@ -181,7 +222,7 @@ Instantly generate, inspect, and interact with dynamic DataGrids from external f
 
 ## 🛠️ MCP Tool Reference
 
-`ai_grid` exposes 25 specialized MCP tools through `AiGridSkill`:
+`ai_grid` exposes 27 specialized MCP tools through `AiGridSkill`:
 
 | Tool Name | Description |
 | :--- | :--- |
@@ -209,6 +250,8 @@ Instantly generate, inspect, and interact with dynamic DataGrids from external f
 | `grid_delete_datasource` | Deletes a dynamic dataset and its associated YAML model from storage. |
 | `grid_fetch_web_data` | Fetches, inspects, and previews tabular data from a public HTTP GET URL. |
 | `grid_export_datasource_yaml` | Exports a dynamic dataset package (model and data rows) as a YAML formatted string. |
+| `grid_set_conditional_format` | Applies conditional formatting (data bars, color scales, or highlight rules) to a column or row. |
+| `grid_clear_conditional_formats` | Clears active conditional formatting rules for a column or the entire grid. |
 | `grid_reset` | Resets grouping, filters, sorting, search, and restores all column visibility. |
 
 ---

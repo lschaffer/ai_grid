@@ -149,6 +149,7 @@ class _AiGridColumnEditorDialogState extends State<AiGridColumnEditorDialog> {
       case AiGridColumnType.select:
         return AiGridEditorType.select;
       case AiGridColumnType.text:
+      case AiGridColumnType.sparkline:
         return AiGridEditorType.text;
     }
   }
@@ -167,6 +168,7 @@ class _AiGridColumnEditorDialogState extends State<AiGridColumnEditorDialog> {
       case AiGridColumnType.select:
         return const [AiGridEditorType.select, AiGridEditorType.text];
       case AiGridColumnType.text:
+      case AiGridColumnType.sparkline:
         return const [AiGridEditorType.text, AiGridEditorType.select];
     }
   }

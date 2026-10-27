@@ -13,6 +13,7 @@ enum AiGridColumnType {
   datetime,
   boolean,
   select,
+  sparkline,
 }
 
 /// Aggregate calculation type for column footers and group summaries.
@@ -77,6 +78,15 @@ class AiGridColumn {
   /// Optional custom widget cell builder.
   final FitGridCellBuilder<Map<String, dynamic>>? cellBuilder;
 
+  /// A chart painted directly on canvas into each cell of this column: a data bar, a progress track or a sparkline.
+  final FitGridCellVisual<Map<String, dynamic>>? visual;
+
+  /// Per-cell text style override for conditional formatting.
+  final TextStyle? Function(dynamic value, Map<String, dynamic> row)? cellStyle;
+
+  /// Per-cell text color override for conditional formatting.
+  final Color? Function(dynamic value, Map<String, dynamic> row)? cellColor;
+
   const AiGridColumn({
     required this.field,
     required this.title,
@@ -102,7 +112,52 @@ class AiGridColumn {
     this.numberFormat,
     this.selectOptions,
     this.cellBuilder,
+    this.visual,
+    this.cellStyle,
+    this.cellColor,
   });
+
+  /// Creates a horizontal data bar visual behind the cell's text.
+  static FitGridCellVisual<Map<String, dynamic>> dataBar({
+    num? Function(Map<String, dynamic> row)? valueOf,
+    num? min,
+    num? max,
+    Color? color,
+    Color? negativeColor,
+    bool showText = true,
+  }) =>
+      FitGridCellVisual.bar(
+        valueOf ?? (row) => null,
+        min: min,
+        max: max,
+        color: color,
+        negativeColor: negativeColor,
+        showText: showText,
+      );
+
+  /// Creates a progress track visual filled to a fraction between 0 and 1.
+  static FitGridCellVisual<Map<String, dynamic>> progress({
+    required double? Function(Map<String, dynamic> row) fractionOf,
+    Color? color,
+    bool showText = true,
+  }) =>
+      FitGridCellVisual.progress(
+        fractionOf,
+        color: color,
+        showText: showText,
+      );
+
+  /// Creates a sparkline visual through a series of values, scaled to the cell.
+  static FitGridCellVisual<Map<String, dynamic>> sparkline({
+    required List<num> Function(Map<String, dynamic> row) valuesOf,
+    Color? color,
+    bool filled = true,
+  }) =>
+      FitGridCellVisual.sparkline(
+        valuesOf,
+        color: color,
+        filled: filled,
+      );
 
   /// Whether this column can be edited.
   bool get isEditable => editable ?? enableEditingMode;
@@ -144,6 +199,8 @@ class AiGridColumn {
           break;
         case AiGridColumnType.text:
           filterSpec = const FitGridFilterSpec.text();
+          break;
+        case AiGridColumnType.sparkline:
           break;
       }
     }
@@ -382,6 +439,36 @@ class AiGridColumn {
       );
     }
 
+    FitGridCellVisual<Map<String, dynamic>>? effectiveVisual = visual;
+    if (effectiveVisual == null && type == AiGridColumnType.sparkline) {
+      effectiveVisual = FitGridCellVisual.sparkline(
+        (row) {
+          final raw = row[field];
+          if (raw is List) {
+            return raw
+                .map((e) => e is num ? e : num.tryParse(e.toString()) ?? 0)
+                .toList();
+          }
+          return const <num>[];
+        },
+      );
+    }
+
+    FitGridCellStyle<Map<String, dynamic>>? effectiveCellStyle;
+    if (cellStyle != null || cellColor != null) {
+      effectiveCellStyle = (row, index) {
+        final val = row[field];
+        TextStyle? style = cellStyle?.call(val, row);
+        if (cellColor != null) {
+          final c = cellColor!(val, row);
+          if (c != null) {
+            style = (style ?? const TextStyle()).copyWith(color: c);
+          }
+        }
+        return style;
+      };
+    }
+
     final effectiveWidth = columnWidth ??
         (!resizable && width != null && width! > 0
             ? FitGridColumnWidth.fixed(width!)
@@ -401,6 +488,8 @@ class AiGridColumn {
       footerLabel: footLabel,
       editor: editor,
       cellBuilder: cellBuilder,
+      visual: effectiveVisual,
+      cellStyle: effectiveCellStyle,
     );
   }
 
@@ -409,6 +498,10 @@ class AiGridColumn {
 
   String _formatDisplayValue(dynamic raw) {
     if (raw == null) return '';
+    if (type == AiGridColumnType.sparkline) {
+      if (raw is List) return raw.join(', ');
+      return raw.toString();
+    }
     if (type == AiGridColumnType.currency) {
       final n = _extractNum(raw);
       if (n != null) {
@@ -484,6 +577,9 @@ class AiGridColumn {
     String? numberFormat,
     List<String>? selectOptions,
     FitGridCellBuilder<Map<String, dynamic>>? cellBuilder,
+    FitGridCellVisual<Map<String, dynamic>>? visual,
+    TextStyle? Function(dynamic value, Map<String, dynamic> row)? cellStyle,
+    Color? Function(dynamic value, Map<String, dynamic> row)? cellColor,
   }) {
     return AiGridColumn(
       field: field ?? this.field,
@@ -510,6 +606,9 @@ class AiGridColumn {
       numberFormat: numberFormat ?? this.numberFormat,
       selectOptions: selectOptions ?? this.selectOptions,
       cellBuilder: cellBuilder ?? this.cellBuilder,
+      visual: visual ?? this.visual,
+      cellStyle: cellStyle ?? this.cellStyle,
+      cellColor: cellColor ?? this.cellColor,
     );
   }
 

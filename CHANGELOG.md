@@ -1,5 +1,92 @@
 # Changelog
 
+## 0.8.0
+
+Enhanced Scrollbar Interaction Isolation, Non-Displacing Selection Status Bar, Dependency Updates (`material_ui: ^1.8.0`, `dart_mcp_core: ^1.4.0`), and Showcase UI Ergonomics.
+
+### 🛡️ Scrollbar Hit-Testing & Gesture Isolation
+* **Zero Collision with Scrollbar**: Wrapped `Scrollbar` around cell gestures and added boundary checks (`_isOverScrollbar`) in `FitGrid`. Dragging or clicking horizontal or vertical scrollbar thumbs no longer triggers cell selections, range dragging, or inline edit mode.
+* **Non-Displacing Selection Status Bar**: When `showSelectionStatusBar` is enabled, the status bar now maintains a fixed 28px height with a subtle `'Ready'` idle indicator, completely preventing the grid viewport from jumping upwards upon selecting multiple cells.
+* **Safe Default Behavior**: `cellSelection` and `showSelectionStatusBar` default to `false` in `AiGrid`, ensuring standard table usage remains lightweight and row-focused.
+* **Refined Showcase Examples**: Disabled inline cell editing across feature showcase grids (`Smart Columns`, `Conditional Formatting`, `Range Selection`) for a cleaner demonstration experience.
+* **Dependency Updates**: Upgraded to `material_ui: ^1.8.0` and `dart_mcp_core: ^1.4.0`.
+
+## 0.7.0
+
+AI Smart / Prompt Columns (LLM-synthesized columns, per-row prompt interpolation, high-speed batch evaluation via `McpAgentEngine`, intelligent local heuristic fallback, inline sparkle indicators, interactive per-cell generation buttons), 2 new Model Context Protocol (MCP) tools, and dedicated showcase gallery demo.
+
+### ✨ AI Smart / Prompt Columns
+* **LLM-Synthesized Columns (`AiGridSmartColumn`)**:
+  * Evaluates dynamic column values on-demand using any configured LLM (OpenAI, Gemini, Claude, Mistral, Ollama) or offline heuristic rules.
+  * Formatted with `{fieldName}` variable interpolation (e.g. `"Classify customer sentiment of '{notes}'"`).
+  * Optional discrete categorical `options` constraint (`['Positive', 'Neutral', 'Negative']`).
+  * Custom `localEvaluator` callback hook for client-side evaluation pipelines.
+* **Batch Evaluation Engine (`AiGridSmartColumnRunner`)**:
+  * Evaluates multi-row chunks asynchronously via `McpAgentEngine`.
+  * Built-in intelligent local heuristic fallback for sentiment analysis, urgency rating, ticket categorization, and next action recommendations when offline.
+* **Inline Cell Visuals & Sparkle Indicators**:
+  * Real-time generating state with animated spinner and shimmering `"Synthesizing..."` label.
+  * Generated state with purple sparkle badge (`Icons.auto_awesome`), tooltip showing source prompt, and custom styling.
+  * Idle / empty state with interactive `✨ Generate` button allowing per-cell generation on click.
+* **Controller Orchestration & Introspection**:
+  * `controller.addSmartColumn(column, {autoRun: true})`.
+  * `controller.runSmartColumns({force: false, field})`.
+  * `controller.runSmartColumnForCell(rowIndex, field)`.
+  * `controller.clearSmartColumnValues(field)`.
+  * `controller.isGeneratingSmartColumns`, `controller.smartColumns`, `controller.isSmartColumn(field)`, `controller.getSmartCellStatus(field, rowIndex)`.
+* **2 New MCP Tools (`AiGridSkill`)**:
+  * `grid_add_smart_column`: Adds or registers a prompt-driven smart column via natural language.
+  * `grid_run_smart_columns`: Triggers batch synthesis across all rows or a targeted smart column.
+* **Showcase Demo (`example/lib/examples/smart_columns_example.dart`)**:
+  * Customer support tickets dataset demonstrating 3 preconfigured smart columns: AI Sentiment, AI Urgency, and AI Recommended Action.
+  * Toolbar buttons for running all columns, adding custom prompt columns, clearing values, and preconfigured contextual prompt suggestions.
+
+
+Cell Range Selection, bidirectional spreadsheet clipboard interoperability (`Ctrl+C` TSV export / `Ctrl+V` paste), real-time Excel-style Selection Status Bar, summary statistics model, 2 new Model Context Protocol (MCP) tools, and interactive showcase demo.
+
+### 📋 Cell Range Selection & Bidirectional Spreadsheet Copy/Paste
+* **Desktop-Grade Range Selection**:
+  * Rectangular cell selection via mouse drag and keyboard navigation.
+  * `Shift + Arrow` keys dynamically expand and contract active cell boundaries.
+  * `Ctrl+C` (or Cmd+C) copies selected ranges directly into Tab-Separated Values (TSV), cleanly pasteable into Microsoft Excel, Google Sheets, and LibreOffice.
+  * `Ctrl+V` (or Cmd+V) parses clipboard TSV matrices and batch-writes into editable columns starting at the selected anchor.
+* **Excel-Style Selection Status Bar**:
+  * Real-time metrics computed directly over the active selection: Cell Count, Row/Column Dimensions, Numeric Sum, Average (Mean), Min, and Max.
+  * Docked cleanly at the footer of the DataGrid on desktop and mobile.
+  * Quick-action copy button with toast notification.
+* **Controller APIs & Introspection**:
+  * `controller.selectCellRange(anchorRow, anchorColumn, extentRow, extentColumn)`.
+  * `controller.selectCell(row, columnField)` & `controller.clearCellRangeSelection()`.
+  * `controller.calculateSelectedRangeSummary()` returning `AiGridRangeSummary`.
+  * `controller.copySelectedRangeToClipboard({includeHeaders: true})`.
+* **2 New MCP Tools (`AiGridSkill`)**:
+  * `grid_get_selected_range`: Inspects active selection coordinates, dimensions, and computed statistics.
+  * `grid_select_range`: Programmatically selects rectangular cell ranges by row index and column fields.
+* **Feature Showcase Demo (`example/lib/examples/range_selection_example.dart`)**:
+  * Financial quarterly revenue matrix demonstrating multi-cell selection, in-cell editing, copy/paste shortcuts, and AI-driven range highlights.
+
+## 0.5.0
+
+In-grid Visual Analytics & Conditional Formatting (canvas-painted data bars, bidirectional profit bars, progress tracks, sparklines, and row highlights), dynamic format persistence, 2 new Model Context Protocol (MCP) tools, and the modular Example Showcase Gallery.
+
+### 🎨 In-Grid Visual Analytics & Conditional Formatting
+* **Direct Canvas Cell Painting**:
+  * **Data Bars (`AiGridColumn.dataBar`)**: Horizontal data bars painted on canvas behind cell text with customizable positive and negative colors, minimums, maximums, and zero-line alignment.
+  * **Progress Tracks (`AiGridColumn.progress`)**: Proportional progress tracks filled to a fraction between 0.0 and 1.0.
+  * **In-Cell Sparklines (`AiGridColumnType.sparkline` & `AiGridColumn.sparkline`)**: High-performance mini line and area charts painted directly inside cells from row value arrays without widget overhead.
+* **Declarative & Dynamic Conditional Formatting (`AiGridConditionalFormat`)**:
+  * Rule-based highlighting supporting `>`, `<`, `>=`, `<=`, `==`, `!=`, `contains`, `between`, and custom predicates.
+  * Cell-level and row-level background highlighting (`applyToRow: true`).
+  * Custom text colors, font weights, and color scale / heatmap gradients.
+* **Controller Orchestration & Layout Persistence**:
+  * `controller.addConditionalFormat()`, `controller.removeConditionalFormat()`, `controller.clearConditionalFormats()`.
+  * Preserved across grid serialization, JSON export/restore, and `autoSave: true`.
+* **2 New MCP Tools (`AiGridSkill`)**:
+  * `grid_set_conditional_format`: Enables AI assistants to apply data bars, color scales, or highlight rules via natural language.
+  * `grid_clear_conditional_formats`: Clears active formatting rules for a column or the entire grid.
+* **Modular Example Showcase Gallery (`example/lib/main.dart`)**:
+  * Refactored example launcher featuring an interactive dropdown gallery switcher between Flagship Superstore Grid, Dynamic Ingestion Grid, and the new Conditional Formatting & Visuals Showcase, with architectural roadmap cards for upcoming features.
+
 ## 0.4.0
 
 Dynamic AI DataGrid with multi-source tabular ingestion (files, public HTTP GET APIs, and system clipboard), persistent YAML/JSON data models, portable bundle export/import, DevExtreme editing write-back, Option C Hybrid Composable Architecture, and 6 new Model Context Protocol (MCP) tools.

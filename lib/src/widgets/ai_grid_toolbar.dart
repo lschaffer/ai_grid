@@ -188,6 +188,7 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
             rows,
           );
 
+          if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -285,6 +286,7 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
             model.toColumns(),
             rows,
           );
+          if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(

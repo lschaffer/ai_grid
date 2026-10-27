@@ -1,11 +1,14 @@
 import 'dart:convert';
+import 'package:material_ui/material_ui.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 import '../config/ai_grid_dynamic_storage.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../data/web_table_fetcher.dart';
 import '../models/ai_grid_column.dart';
+import '../models/ai_grid_conditional_format.dart';
 import '../models/ai_grid_dynamic_datasource.dart';
 import '../models/ai_grid_pivot.dart';
+import '../models/ai_grid_smart_column.dart';
 
 /// Exposes all local tools and skill manifest for [AiGrid] control via MCP.
 class AiGridSkill {
@@ -43,6 +46,12 @@ class AiGridSkill {
       GridDeleteDatasourceTool(controller),
       GridFetchWebDataTool(controller),
       GridExportDatasourceYamlTool(controller),
+      GridSetConditionalFormatTool(controller),
+      GridClearConditionalFormatsTool(controller),
+      GridGetSelectedRangeTool(controller),
+      GridSelectRangeTool(controller),
+      GridAddSmartColumnTool(controller),
+      GridRunSmartColumnsTool(controller),
     ];
   }
 
@@ -53,6 +62,31 @@ Always start by checking the schema or current state if you need context on colu
 
 IMPORTANT RULES FOR CALCULATIONS:
 • When the user asks to calculate, average, mean, sum, total, minimum, maximum, count, or median (e.g. "calculate avg sale amount", "what is the total profit", "calculate average discount by category"), ALWAYS use the `grid_calculate` tool. DO NOT calculate numbers in your head or hallucinate math. The grid engine calculates exact values in Dart.
+
+IMPORTANT RULES FOR AI SMART / SYNTHESIZED COLUMNS:
+• When the user asks to add or create a column that analyzes, classifies, scores, summarizes, or translates existing row data (e.g. "add a sentiment column based on feedback", "create an urgency column from P1 to P4 based on issue", "add a column summarizing each row", "translate comments to Spanish"):
+  ALWAYS use `grid_add_smart_column`!
+  - `field`: clean column identifier (e.g. "sentiment", "urgency", "summary", "translated_notes")
+  - `title`: descriptive column header title (e.g. "AI Sentiment", "Urgency")
+  - `promptTemplate`: the instruction with `{field_name}` placeholders (e.g. "Classify sentiment of '{feedback}' as Positive, Neutral, or Negative")
+  - `options`: optional list of allowed category strings if constrained (e.g. ["Positive", "Neutral", "Negative"])
+  - `autoRun`: true to start evaluation immediately
+• When the user asks to "run smart columns", "evaluate AI columns", "re-run smart column analysis", or "synthesize values":
+  Use `grid_run_smart_columns`.
+
+IMPORTANT RULES FOR CELL SELECTION VS FILTERING:
+• CRITICAL: "SELECT", "SELECT CELLS", "HIGHLIGHT CELLS", "RANGE SELECTION" mean selecting interactive cells on the canvas using `grid_select_range`.
+  DO NOT use `grid_set_filter` when the user asks to "select" or "highlight" cells! Filtering hides rows from view, whereas selecting highlights cells on the canvas, opens the selection summary in the status bar, and enables Excel copy/paste.
+• When the user asks to "select low margin cells", "select lowest margin", "select high margin cells", "select highest profit", "select sales cells", "select negative values":
+  ALWAYS use `grid_select_range` with semantic arguments:
+  - `field`: The column name (e.g. "margin", "profit", "sales")
+  - `condition`: "lowest", "highest", "lessThan", "greaterThan", or "negative"
+  - `targetValue`: Numeric threshold if specified (e.g. 0.20 or 0)
+  - `count`: Number of rows to select (e.g. 3, 5, or omitted for defaults)
+• When the user specifies rectangular cell coordinates or column ranges (e.g. "select rows 0 to 3 for Q1 to Q2 revenue", "select all cells"):
+  Use `grid_select_range` with `startRow`, `startColumn`, `endRow`, `endColumn`.
+• When the user asks for "selected cells summary" or "what is the sum/avg of selected cells":
+  Use `grid_get_selected_range` to inspect active selection stats.
 
 IMPORTANT RULES FOR FILTERS:
 • When the user specifies multiple filter conditions on DIFFERENT columns (e.g. "filter region South and Category Furniture"), use `grid_set_filter` with the `filters` array to apply ALL conditions joined by AND.
@@ -196,7 +230,10 @@ class GridGetSampleTool extends McpLocalTool {
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final limit = (arguments['limit'] as num?)?.toInt() ?? 5;
+    final rawLimit = arguments['limit'];
+    final limit = (rawLimit is num)
+        ? rawLimit.toInt()
+        : int.tryParse(rawLimit?.toString() ?? '') ?? 5;
     final samples = await controller.getSampleData(limit: limit.clamp(1, 10));
     return MCPToolResult(
       content: [MCPContent(type: 'text', text: jsonEncode(samples))],
@@ -1748,4 +1785,644 @@ class GridExportDatasourceYamlTool extends McpLocalTool {
     return MCPToolResult.text(yamlString);
   }
 }
+
+/// Tool for applying conditional formatting, data bars, and highlights.
+class GridSetConditionalFormatTool extends McpLocalTool {
+  final AiGridController controller;
+
+  GridSetConditionalFormatTool(this.controller);
+
+  @override
+  String get name => 'grid_set_conditional_format';
+
+  @override
+  String get description =>
+      'Applies conditional formatting to a column or row. Supports data bars ("data_bar"), rule-based highlights ("highlight"), and color scale gradients ("color_scale").';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'field': {
+            'type': 'string',
+            'description': 'Column field name to format, or "*" to highlight the full row.',
+          },
+          'format_type': {
+            'type': 'string',
+            'enum': ['data_bar', 'highlight', 'color_scale'],
+            'description': 'Type of conditional format: "data_bar", "highlight", or "color_scale".',
+          },
+          'operator': {
+            'type': 'string',
+            'description': 'Comparison operator for highlights: ">", "<", ">=", "<=", "==", "!=", "between", "contains".',
+          },
+          'value': {
+            'description': 'Target value for comparison.',
+          },
+          'secondary_value': {
+            'description': 'Secondary value for "between" operator.',
+          },
+          'color': {
+            'type': 'string',
+            'description': 'Hex color code or name (e.g. "#4CAF50", "green", "red", "blue") for bar or highlight.',
+          },
+          'negative_color': {
+            'type': 'string',
+            'description': 'Color for negative data bars.',
+          },
+          'text_color': {
+            'type': 'string',
+            'description': 'Color for cell text in highlights.',
+          },
+          'bold': {
+            'type': 'boolean',
+            'description': 'Whether text should be bold in highlights.',
+          },
+          'apply_to_row': {
+            'type': 'boolean',
+            'description': 'Whether highlight background color applies to the entire row.',
+          },
+        },
+        'required': ['field', 'format_type'],
+      };
+
+  Color? _parseColor(String? input) {
+    if (input == null || input.isEmpty) return null;
+    final lower = input.toLowerCase().trim();
+    switch (lower) {
+      case 'red':
+        return const Color(0xFFE53935);
+      case 'green':
+        return const Color(0xFF43A047);
+      case 'blue':
+        return const Color(0xFF1E88E5);
+      case 'amber':
+      case 'yellow':
+        return const Color(0xFFFFB300);
+      case 'orange':
+        return const Color(0xFFFB8C00);
+      case 'purple':
+        return const Color(0xFF8E24AA);
+      case 'teal':
+        return const Color(0xFF00897B);
+    }
+    final hex = lower.replaceAll('#', '');
+    final val = int.tryParse(hex, radix: 16);
+    if (val == null) return null;
+    return Color(hex.length <= 6 ? (0xFF000000 | val) : val);
+  }
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final field = arguments['field']?.toString().trim() ?? '';
+    final typeStr = arguments['format_type']?.toString().toLowerCase().trim() ?? 'highlight';
+
+    if (field.isEmpty) {
+      return MCPToolResult.error('Field parameter is required.');
+    }
+
+    final color = _parseColor(arguments['color']?.toString());
+    final negColor = _parseColor(arguments['negative_color']?.toString());
+    final textColor = _parseColor(arguments['text_color']?.toString());
+    final bold = arguments['bold'] == true;
+    final applyToRow = arguments['apply_to_row'] == true;
+
+    AiGridConditionalFormat format;
+    if (typeStr == 'data_bar') {
+      format = AiGridConditionalFormat.dataBar(
+        field: field,
+        color: color ?? const Color(0xFF1E88E5),
+        negativeColor: negColor ?? const Color(0xFFE53935),
+      );
+    } else if (typeStr == 'color_scale') {
+      format = AiGridConditionalFormat.colorScale(
+        field: field,
+        minColor: _parseColor(arguments['min_color']?.toString()) ?? const Color(0xFFE53935),
+        maxColor: _parseColor(arguments['max_color']?.toString()) ?? const Color(0xFF43A047),
+      );
+    } else {
+      final op = arguments['operator']?.toString() ?? '>';
+      final targetVal = arguments['value'] ?? 0;
+      final secondVal = arguments['secondary_value'];
+      format = AiGridConditionalFormat.highlight(
+        field: field,
+        operator: op,
+        targetValue: targetVal,
+        secondaryValue: secondVal,
+        backgroundColor: color ?? const Color(0x3343A047),
+        textColor: textColor,
+        fontWeight: bold ? FontWeight.bold : null,
+        applyToRow: applyToRow,
+      );
+    }
+
+    controller.addConditionalFormat(format);
+    return MCPToolResult.text('Successfully applied conditional format ($typeStr) to "$field".');
+  }
+}
+
+/// Tool for clearing conditional formats.
+class GridClearConditionalFormatsTool extends McpLocalTool {
+  final AiGridController controller;
+
+  GridClearConditionalFormatsTool(this.controller);
+
+  @override
+  String get name => 'grid_clear_conditional_formats';
+
+  @override
+  String get description => 'Clears active conditional formatting rules.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'field': {
+            'type': 'string',
+            'description': 'Optional field name to clear rules for. If omitted, clears all rules.',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final field = arguments['field']?.toString().trim();
+    if (field != null && field.isNotEmpty) {
+      controller.clearConditionalFormats(field);
+      return MCPToolResult.text('Cleared conditional formatting for column "$field".');
+    } else {
+      controller.clearConditionalFormats();
+      return MCPToolResult.text('Cleared all conditional formatting.');
+    }
+  }
+}
+
+/// Tool for inspecting the currently selected rectangular cell range and its summary metrics.
+class GridGetSelectedRangeTool extends McpLocalTool {
+  final AiGridController controller;
+
+  GridGetSelectedRangeTool(this.controller);
+
+  @override
+  String get name => 'grid_get_selected_range';
+
+  @override
+  String get description =>
+      'Retrieves the currently selected rectangular cell range coordinates, dimensions, and computed statistics (count, sum, average, min, max).';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final range = controller.selectedCellRange;
+    if (range == null) {
+      return MCPToolResult.text(jsonEncode({
+        'hasSelection': false,
+        'message': 'No cell range is currently selected.',
+      }));
+    }
+
+    final summary = controller.calculateSelectedRangeSummary();
+    return MCPToolResult.text(jsonEncode({
+      'hasSelection': true,
+      'anchorRow': range.anchorRow,
+      'anchorColumn': range.anchorColumnId,
+      'extentRow': range.extentRow,
+      'extentColumn': range.extentColumnId,
+      'firstRow': range.firstRow,
+      'lastRow': range.lastRow,
+      'isSingleCell': range.isSingleCell,
+      'summary': summary?.toJson(),
+    }));
+  }
+}
+
+/// Tool for programmatically selecting a rectangular cell range.
+class GridSelectRangeTool extends McpLocalTool {
+  final AiGridController controller;
+
+  GridSelectRangeTool(this.controller);
+
+  @override
+  String get name => 'grid_select_range';
+
+  @override
+  String get description =>
+      'Selects an interactive rectangular range of cells on the DataGrid canvas. Can select by explicit coordinates (startRow, startColumn, endRow, endColumn) OR semantically by column condition (field, condition: "lowest"|"highest"|"lessThan"|"greaterThan"|"negative"|"equals"|"contains"|"all", targetValue, count). Selected cells are highlighted with real-time stats (Sum, Avg, Min, Max, Count) in the status bar. NOTE: ALWAYS use this tool (NOT grid_set_filter) whenever the user asks to "select", "highlight", or "focus" cells!';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'field': {
+            'type': 'string',
+            'description':
+                'Target column field name or title to evaluate (e.g. "urgency", "margin", "profit", "sales").',
+          },
+          'condition': {
+            'type': 'string',
+            'description':
+                'Selection criterion: "lowest", "highest", "lessThan", "greaterThan", "negative", "equals", "contains", or "all".',
+          },
+          'targetValue': {
+            'description':
+                'Target threshold or category value for criteria (can be a number like 0.20 or a string like "Critical", "P1", "Positive").',
+          },
+          'entireRow': {
+            'type': 'boolean',
+            'description':
+                'Whether to select all columns across the matching rows rather than just the target column.',
+          },
+          'count': {
+            'type': 'integer',
+            'description':
+                'Optional number of cells/rows to select (e.g. 3, 5). Defaults to 3 or matching count.',
+          },
+          'startRow': {
+            'type': 'integer',
+            'description': '0-indexed starting row index for coordinate selection.',
+          },
+          'startColumn': {
+            'type': 'string',
+            'description': 'Starting column field name for coordinate selection.',
+          },
+          'endRow': {
+            'type': 'integer',
+            'description': '0-indexed ending row index for coordinate selection.',
+          },
+          'endColumn': {
+            'type': 'string',
+            'description': 'Ending column field name for coordinate selection.',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    // 1. Direct coordinate mode:
+    final rawStartRow = arguments['startRow'];
+    final startRow = (rawStartRow is num)
+        ? rawStartRow.toInt()
+        : int.tryParse(rawStartRow?.toString() ?? '');
+    final startColumn = arguments['startColumn']?.toString().trim();
+    final rawEndRow = arguments['endRow'];
+    final endRow = (rawEndRow is num)
+        ? rawEndRow.toInt()
+        : int.tryParse(rawEndRow?.toString() ?? '');
+    final endColumn = arguments['endColumn']?.toString().trim();
+
+    if (startRow != null &&
+        startColumn != null &&
+        endRow != null &&
+        endColumn != null) {
+      controller.selectCellRange(
+        anchorRow: startRow,
+        anchorColumn: startColumn,
+        extentRow: endRow,
+        extentColumn: endColumn,
+      );
+
+      final summary = controller.calculateSelectedRangeSummary();
+      return MCPToolResult.text(jsonEncode({
+        'status': 'selected',
+        'mode': 'coordinates',
+        'anchorRow': startRow,
+        'anchorColumn': startColumn,
+        'extentRow': endRow,
+        'extentColumn': endColumn,
+        'summary': summary?.toJson(),
+        'message':
+            'Selected cells from ($startRow, $startColumn) to ($endRow, $endColumn).',
+      }));
+    }
+
+    // 2. Semantic query mode (e.g. "select all Critical urgency tickets" or "select low margin cells"):
+    final field = arguments['field']?.toString().trim();
+    final condition =
+        (arguments['condition']?.toString().trim().toLowerCase()) ?? 'lowest';
+    final rawTarget = arguments['targetValue'];
+    final num? targetNum = (rawTarget is num)
+        ? rawTarget
+        : num.tryParse(rawTarget?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '');
+    final String? targetString = (rawTarget != null) ? rawTarget.toString().trim() : null;
+    final rawCount = arguments['count'];
+    final count = (rawCount is num)
+        ? rawCount.toInt()
+        : int.tryParse(rawCount?.toString() ?? '');
+    final bool entireRow = arguments['entireRow'] == true ||
+        arguments['entireRow']?.toString().toLowerCase() == 'true' ||
+        arguments['allColumns'] == true;
+
+    // Match column
+    AiGridColumn? targetCol;
+    if (field != null && field.isNotEmpty) {
+      final fLower = field.toLowerCase();
+      for (final col in controller.columns) {
+        if (col.field.toLowerCase() == fLower ||
+            col.title.toLowerCase() == fLower) {
+          targetCol = col;
+          break;
+        }
+      }
+    }
+    targetCol ??= controller.columns
+        .where((c) =>
+            c.type == AiGridColumnType.number ||
+            c.type == AiGridColumnType.currency)
+        .firstOrNull ??
+        (controller.columns.isNotEmpty ? controller.columns.first : null);
+
+    if (targetCol == null || controller.rows.isEmpty) {
+      return MCPToolResult.error(
+          'No rows or valid column found to select cells.');
+    }
+
+    final totalRows = controller.rows.length;
+    if (condition == 'all' && (targetString == null || targetString.isEmpty)) {
+      final firstCol = controller.columns.first.field;
+      final lastCol = controller.columns.last.field;
+      controller.selectCellRange(
+        anchorRow: 0,
+        anchorColumn: firstCol,
+        extentRow: totalRows - 1,
+        extentColumn: lastCol,
+      );
+      final summary = controller.calculateSelectedRangeSummary();
+      return MCPToolResult.text(jsonEncode({
+        'status': 'selected',
+        'mode': 'all',
+        'rowCount': totalRows,
+        'summary': summary?.toJson(),
+        'message': 'Selected all cells across $totalRows rows.',
+      }));
+    }
+
+    // 2a. Text / Categorical matching (e.g. "Critical", "P1 (Critical)", "Positive", "Refund"):
+    final bool isTextCondition = targetString != null &&
+        targetString.isNotEmpty &&
+        (targetNum == null || condition == 'equals' || condition == 'contains');
+
+    if (isTextCondition) {
+      final targetLower = targetString.toLowerCase();
+      int matching = 0;
+      for (final row in controller.rows) {
+        final val = row[targetCol.field]?.toString().toLowerCase() ?? '';
+        if (val.contains(targetLower)) matching++;
+      }
+
+      // Sort grid so matching items cluster contiguously at top
+      controller.setSorting(targetCol.field, descending: false);
+
+      final selectCount = count != null
+          ? count.clamp(1, totalRows)
+          : (matching > 0 ? matching : 1);
+      final extentRow = (selectCount - 1).clamp(0, totalRows - 1);
+
+      final startCol = (startColumn != null && startColumn.isNotEmpty)
+          ? startColumn
+          : (entireRow ? controller.columns.first.field : targetCol.field);
+      final endCol = (endColumn != null && endColumn.isNotEmpty)
+          ? endColumn
+          : (entireRow ? controller.columns.last.field : targetCol.field);
+
+      controller.selectCellRange(
+        anchorRow: 0,
+        anchorColumn: startCol,
+        extentRow: extentRow,
+        extentColumn: endCol,
+      );
+
+      final summary = controller.calculateSelectedRangeSummary();
+      return MCPToolResult.text(jsonEncode({
+        'status': 'selected',
+        'mode': 'categorical',
+        'field': targetCol.field,
+        'columnTitle': targetCol.title,
+        'targetValue': targetString,
+        'selectedCount': extentRow + 1,
+        'summary': summary?.toJson(),
+        'message':
+            'Selected ${extentRow + 1} rows matching "$targetString" in "${targetCol.title}".',
+      }));
+    }
+
+    // 2b. Numeric condition matching (e.g. "lowest", "highest", "lessThan", "greaterThan"):
+    final bool isDescending = (condition == 'highest' ||
+        condition == 'greaterthan' ||
+        condition == 'top');
+
+    // Sort grid so matching cells cluster contiguously at top (rows 0..N)
+    controller.setSorting(targetCol.field, descending: isDescending);
+
+    // Determine selection row count
+    int selectCount = count ?? 3;
+    if (targetNum != null) {
+      final targetValue = targetNum.toDouble();
+      int matching = 0;
+      for (final row in controller.rows) {
+        final val = row[targetCol.field];
+        final num? nVal = (val is num)
+            ? val
+            : num.tryParse(val?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '');
+        if (nVal != null) {
+          if (condition == 'lessthan' && nVal < targetValue) matching++;
+          if (condition == 'greaterthan' && nVal > targetValue) matching++;
+          if (condition == 'negative' && nVal < 0) matching++;
+        }
+      }
+      if (matching > 0) {
+        selectCount = count != null ? count.clamp(1, matching) : matching;
+      }
+    } else if (condition == 'negative') {
+      int matching = 0;
+      for (final row in controller.rows) {
+        final val = row[targetCol.field];
+        final num? nVal = (val is num)
+            ? val
+            : num.tryParse(val?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '');
+        if (nVal != null && nVal < 0) matching++;
+      }
+      if (matching > 0) {
+        selectCount = count != null ? count.clamp(1, matching) : matching;
+      }
+    }
+
+    final int extentRow = selectCount.clamp(1, totalRows).toInt() - 1;
+    final startCol = (startColumn != null && startColumn.isNotEmpty)
+        ? startColumn
+        : (entireRow ? controller.columns.first.field : targetCol.field);
+    final endCol = (endColumn != null && endColumn.isNotEmpty)
+        ? endColumn
+        : (entireRow ? controller.columns.last.field : targetCol.field);
+
+    controller.selectCellRange(
+      anchorRow: 0,
+      anchorColumn: startCol,
+      extentRow: extentRow,
+      extentColumn: endCol,
+    );
+
+    final summary = controller.calculateSelectedRangeSummary();
+    return MCPToolResult.text(jsonEncode({
+      'status': 'selected',
+      'mode': 'semantic',
+      'field': targetCol.field,
+      'columnTitle': targetCol.title,
+      'condition': condition,
+      'selectedCellsCount': (extentRow + 1),
+      'summary': summary?.toJson(),
+      'message':
+          'Selected ${extentRow + 1} ${isDescending ? "highest" : "lowest"} cells in "${targetCol.title}". Selection stats: Count: ${summary?.cellCount}, Sum: ${summary?.sum}, Avg: ${summary?.average}, Min: ${summary?.min}, Max: ${summary?.max}.',
+    }));
+  }
+}
+
+/// Tool allowing AI or users to dynamically create an AI-synthesized smart column.
+class GridAddSmartColumnTool extends McpLocalTool {
+  final AiGridController controller;
+  GridAddSmartColumnTool(this.controller);
+
+  @override
+  String get name => 'grid_add_smart_column';
+
+  @override
+  String get description =>
+      'Adds a new AI-synthesized smart column to the DataGrid. Values are evaluated automatically by an LLM prompt template based on row context (e.g. sentiment classification, urgency scoring, translation, summarization, or categorization).';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'required': ['field', 'title', 'promptTemplate'],
+        'properties': {
+          'field': {
+            'type': 'string',
+            'description':
+                'Unique identifier for the new smart column (e.g. "sentiment", "urgency").',
+          },
+          'title': {
+            'type': 'string',
+            'description':
+                'Display header title for the column (e.g. "AI Sentiment", "Urgency").',
+          },
+          'promptTemplate': {
+            'type': 'string',
+            'description':
+                'Prompt template with {fieldName} interpolation placeholders (e.g. "Classify sentiment of \'{feedback}\' into Positive, Neutral, or Negative").',
+          },
+          'options': {
+            'type': 'array',
+            'items': {'type': 'string'},
+            'description':
+                'Optional list of discrete allowed option values (e.g. ["Positive", "Neutral", "Negative"]).',
+          },
+          'autoRun': {
+            'type': 'boolean',
+            'description':
+                'Whether to immediately trigger LLM evaluation across all rows (default: true).',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final field = arguments['field']?.toString().trim();
+    final title = arguments['title']?.toString().trim();
+    final promptTemplate = arguments['promptTemplate']?.toString().trim();
+    final autoRun = arguments['autoRun'] as bool? ?? true;
+
+    if (field == null ||
+        field.isEmpty ||
+        title == null ||
+        title.isEmpty ||
+        promptTemplate == null ||
+        promptTemplate.isEmpty) {
+      return MCPToolResult.error(
+          'Parameters "field", "title", and "promptTemplate" are required.');
+    }
+
+    List<String>? options;
+    if (arguments['options'] is List) {
+      options =
+          (arguments['options'] as List).map((e) => e.toString()).toList();
+    }
+
+    final smartCol = AiGridSmartColumn(
+      field: field,
+      title: title,
+      promptTemplate: promptTemplate,
+      options: options,
+      autoExecute: autoRun,
+    );
+
+    controller.addSmartColumn(smartCol, autoRun: autoRun);
+
+    return MCPToolResult.text(jsonEncode({
+      'status': 'added',
+      'field': field,
+      'title': title,
+      'promptTemplate': promptTemplate,
+      'options': options,
+      'autoRun': autoRun,
+      'message':
+          'Successfully added AI Smart Column "$title" ($field). Evaluation initiated.',
+    }));
+  }
+}
+
+/// Tool executing prompt evaluation for AI smart columns across all rows.
+class GridRunSmartColumnsTool extends McpLocalTool {
+  final AiGridController controller;
+  GridRunSmartColumnsTool(this.controller);
+
+  @override
+  String get name => 'grid_run_smart_columns';
+
+  @override
+  String get description =>
+      'Executes prompt evaluation for all or a specific AI smart column across all rows in the DataGrid.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'field': {
+            'type': 'string',
+            'description':
+                'Optional field name to run. If omitted, all smart columns are evaluated.',
+          },
+          'force': {
+            'type': 'boolean',
+            'description':
+                'Whether to re-evaluate cells that already have generated values (default: false).',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final field = arguments['field']?.toString().trim();
+    final force = arguments['force'] as bool? ?? false;
+
+    if (controller.smartColumns.isEmpty) {
+      return MCPToolResult.error(
+          'No AI Smart Columns found in the current DataGrid.');
+    }
+
+    await controller.runSmartColumns(field: field, force: force);
+
+    return MCPToolResult.text(jsonEncode({
+      'status': 'completed',
+      'targetField': field ?? 'all',
+      'force': force,
+      'smartColumnsCount': controller.smartColumns.length,
+      'message': 'Completed AI smart column evaluation across all rows.',
+    }));
+  }
+}
+
+
 

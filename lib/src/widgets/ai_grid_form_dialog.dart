@@ -159,6 +159,7 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
       case AiGridColumnType.select:
         return AiGridEditorType.select;
       case AiGridColumnType.text:
+      case AiGridColumnType.sparkline:
         return AiGridEditorType.text;
     }
   }
