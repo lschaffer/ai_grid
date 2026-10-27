@@ -259,8 +259,9 @@ class _ConditionalFormattingExamplePageState
     final colorScheme = theme.colorScheme;
     final isDark = widget.isDarkMode;
 
-    return Scaffold(
-      backgroundColor: isDark
+    return ScaffoldMessenger(
+      child: Scaffold(
+        backgroundColor: isDark
           ? const Color(0xFF121418)
           : const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -389,6 +390,7 @@ class _ConditionalFormattingExamplePageState
           ),
         ],
       ),
+    ),
     );
   }
 }

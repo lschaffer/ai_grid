@@ -216,8 +216,9 @@ class _RangeSelectionExamplePageState extends State<RangeSelectionExamplePage> {
     final theme = Theme.of(context);
     final isDark = widget.isDarkMode;
 
-    return Scaffold(
-      body: Column(
+    return ScaffoldMessenger(
+      child: Scaffold(
+        body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Header Banner
@@ -383,6 +384,7 @@ class _RangeSelectionExamplePageState extends State<RangeSelectionExamplePage> {
           ),
         ],
       ),
+    ),
     );
   }
 }
