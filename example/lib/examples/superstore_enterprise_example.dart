@@ -399,59 +399,123 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
 
   void _showRestoreSettingsDialog() {
     final textController = TextEditingController(text: _controller.exportSettingsJson());
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restore Grid Layout Settings'),
-        content: SizedBox(
-          width: 500,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Paste or edit a valid FitGrid JSON configuration below (supports columnOrder, widths, frozen, sorts, filters, and groupColumns):',
-                style: TextStyle(fontSize: 12),
+      builder: (ctx) {
+        if (isMobile) {
+          return Dialog.fullscreen(
+            child: Scaffold(
+              appBar: AppBar(
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+                title: const Text('Restore Layout Settings'),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilledButton.tonal(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _controller.restoreSettingsJson(textController.text);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Grid layout successfully restored!'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                      child: const Text('Apply'),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: textController,
-                maxLines: 10,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  filled: true,
+              body: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Paste or edit a valid FitGrid JSON configuration below (supports columnOrder, widths, frozen, sorts, filters, and groupColumns):',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: textController,
+                        maxLines: null,
+                        expands: true,
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          filled: true,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton.icon(
-            icon: const Icon(Icons.restore, size: 16),
-            label: const Text('Apply Layout'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _controller.restoreSettingsJson(textController.text);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Grid layout successfully restored!'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        return AlertDialog(
+          title: const Text('Restore Grid Layout Settings'),
+          content: SizedBox(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Paste or edit a valid FitGrid JSON configuration below (supports columnOrder, widths, frozen, sorts, filters, and groupColumns):',
+                  style: TextStyle(fontSize: 12),
                 ),
-              );
-            },
+                const SizedBox(height: 12),
+                TextField(
+                  controller: textController,
+                  maxLines: 10,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.restore, size: 16),
+              label: const Text('Apply Layout'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _controller.restoreSettingsJson(textController.text);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Grid layout successfully restored!'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
   void _showEditingEventLogDialog(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
     showDialog(
       context: context,
       builder: (ctx) {
@@ -503,37 +567,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
               }
             }
 
-            return AlertDialog(
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.receipt_long, size: 20, color: colorScheme.onPrimaryContainer),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text('Editing Event Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${events.length} events',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
-                    ),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 620,
-                height: 460,
-                child: events.isEmpty
+            final contentBody = events.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -638,7 +672,65 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                             ),
                           );
                         },
-                      ),
+                      );
+
+            if (isMobile) {
+              return Dialog.fullscreen(
+                child: Scaffold(
+                  appBar: AppBar(
+                    leading: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                    title: Text('Editing Event Log (${events.length})'),
+                    actions: [
+                      if (events.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.delete_sweep_outlined),
+                          tooltip: 'Clear Log',
+                          onPressed: () {
+                            _controller.clearEditEvents();
+                            setDialogState(() {});
+                          },
+                        ),
+                    ],
+                  ),
+                  body: contentBody,
+                ),
+              );
+            }
+
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.receipt_long, size: 20, color: colorScheme.onPrimaryContainer),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Editing Event Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${events.length} events',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 620,
+                height: 460,
+                child: contentBody,
               ),
               actions: [
                 if (events.isNotEmpty)
@@ -662,153 +754,322 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final isMobile = MediaQuery.sizeOf(context).width < 700;
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
+        titleSpacing: isMobile ? 8 : 12,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.table_chart_outlined, size: 20),
             const SizedBox(width: 8),
-            const Flexible(
+            Flexible(
               child: Text(
-                'Superstore Sales (1,000 JSON)',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                isMobile ? 'Superstore' : 'Superstore Sales (1,000 JSON)',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _aiConfig?.llmConfig != null &&
-                        _aiConfig!.llmConfig!.isConfigured
-                    ? '${_aiConfig!.llmConfig!.provider.displayName} Active'
-                    : 'Local Heuristic AI',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onPrimaryContainer,
+            if (!isMobile) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _aiConfig?.llmConfig != null &&
+                          _aiConfig!.llmConfig!.isConfigured
+                      ? '${_aiConfig!.llmConfig!.provider.displayName} Active'
+                      : 'Local Heuristic AI',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
         backgroundColor: colorScheme.surface,
         elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            child: FilledButton.tonalIcon(
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              icon: const Icon(Icons.auto_awesome, size: 16),
-              label: const Text('Dynamic AI Grid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DynamicGridHomePage(
-                      isDarkMode: widget.isDarkMode,
-                      onToggleTheme: widget.onToggleTheme,
+        actions: isMobile
+            ? [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded),
+                  tooltip: 'Menu & Options',
+                  onSelected: (val) async {
+                    if (val == 'dynamic_ai_grid') {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => DynamicGridHomePage(
+                            isDarkMode: widget.isDarkMode,
+                            onToggleTheme: widget.onToggleTheme,
+                          ),
+                        ),
+                      );
+                    } else if (val == 'edit_mode_row') {
+                      setState(() {
+                        _editMode = AiGridEditMode.row;
+                        _controller.editingOptions =
+                            _controller.editingOptions.copyWith(mode: AiGridEditMode.row);
+                      });
+                    } else if (val == 'edit_mode_cell') {
+                      setState(() {
+                        _editMode = AiGridEditMode.cell;
+                        _controller.editingOptions =
+                            _controller.editingOptions.copyWith(mode: AiGridEditMode.cell);
+                      });
+                    } else if (val == 'edit_mode_form') {
+                      setState(() {
+                        _editMode = AiGridEditMode.form;
+                        _controller.editingOptions =
+                            _controller.editingOptions.copyWith(mode: AiGridEditMode.form);
+                      });
+                    } else if (val == 'event_log') {
+                      _showEditingEventLogDialog(context);
+                    } else if (val == 'preset_pivot_category_region') {
+                      _controller.setPivot(const AiGridPivotConfig(
+                        rowFieldIds: ['Category', 'SubCategory'],
+                        columnFieldIds: ['Region'],
+                        values: [
+                          AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
+                          AiGridPivotValueConfig(columnId: 'Profit', aggregation: AiGridPivotAggregation.average),
+                        ],
+                        showChart: true,
+                        chartType: AiGridPivotChartType.column,
+                        showRowTotals: true,
+                        showColumnTotals: true,
+                      ));
+                    } else if (val == 'preset_pivot_segment_ship') {
+                      _controller.setPivot(const AiGridPivotConfig(
+                        rowFieldIds: ['Segment'],
+                        columnFieldIds: ['ShipMode'],
+                        values: [
+                          AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
+                          AiGridPivotValueConfig(columnId: 'OrderID', aggregation: AiGridPivotAggregation.count),
+                        ],
+                        showChart: true,
+                        chartType: AiGridPivotChartType.groupedBar,
+                        showRowTotals: true,
+                        showColumnTotals: true,
+                      ));
+                    } else if (val == 'export_json_file') {
+                      await _exportSettingsToJsonFile();
+                    } else if (val == 'restore_json') {
+                      _showRestoreSettingsDialog();
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'dynamic_ai_grid',
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_awesome, size: 18),
+                          SizedBox(width: 10),
+                          Text('Dynamic AI Grid'),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // Top bar switch among editing modes (Row, Cell, Form)
-          Container(
-            height: 36,
-            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: colorScheme.outlineVariant),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<AiGridEditMode>(
-                value: _editMode,
-                icon: const Icon(Icons.arrow_drop_down, size: 18),
-                borderRadius: BorderRadius.circular(8),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
+                    const PopupMenuDivider(),
+                    CheckedPopupMenuItem(
+                      value: 'edit_mode_row',
+                      checked: _editMode == AiGridEditMode.row,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.edit_note, size: 18),
+                          SizedBox(width: 10),
+                          Text('Row Edit Mode'),
+                        ],
+                      ),
+                    ),
+                    CheckedPopupMenuItem(
+                      value: 'edit_mode_cell',
+                      checked: _editMode == AiGridEditMode.cell,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.grid_on, size: 18),
+                          SizedBox(width: 10),
+                          Text('Cell Edit Mode'),
+                        ],
+                      ),
+                    ),
+                    CheckedPopupMenuItem(
+                      value: 'edit_mode_form',
+                      checked: _editMode == AiGridEditMode.form,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.dynamic_form_outlined, size: 18),
+                          SizedBox(width: 10),
+                          Text('Form (Popup) Mode'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'event_log',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.receipt_long_outlined, size: 18),
+                          const SizedBox(width: 10),
+                          Text('Editing Events (${_controller.editEvents.length})'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'preset_pivot_category_region',
+                      child: Row(
+                        children: [
+                          Icon(Icons.pivot_table_chart, size: 18),
+                          SizedBox(width: 10),
+                          Text('Pivot: Category x Region'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'preset_pivot_segment_ship',
+                      child: Row(
+                        children: [
+                          Icon(Icons.pie_chart_outline, size: 18),
+                          SizedBox(width: 10),
+                          Text('Pivot: Segment x Ship'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'export_json_file',
+                      child: Row(
+                        children: [
+                          Icon(Icons.file_download_outlined, size: 18),
+                          SizedBox(width: 10),
+                          Text('Export Settings JSON'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'restore_json',
+                      child: Row(
+                        children: [
+                          Icon(Icons.file_upload_outlined, size: 18),
+                          SizedBox(width: 10),
+                          Text('Restore Settings JSON'),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                items: const [
-                  DropdownMenuItem(
-                    value: AiGridEditMode.row,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.edit_note, size: 16),
-                        SizedBox(width: 6),
-                        Text('Row Edit Mode'),
-                      ],
+              ]
+            : [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  child: FilledButton.tonalIcon(
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
+                    icon: const Icon(Icons.auto_awesome, size: 16),
+                    label: const Text('Dynamic AI Grid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => DynamicGridHomePage(
+                            isDarkMode: widget.isDarkMode,
+                            onToggleTheme: widget.onToggleTheme,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  DropdownMenuItem(
-                    value: AiGridEditMode.cell,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.grid_on, size: 16),
-                        SizedBox(width: 6),
-                        Text('Cell Edit Mode'),
-                      ],
-                    ),
-                  ),
-                  DropdownMenuItem(
-                    value: AiGridEditMode.form,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.dynamic_form_outlined, size: 16),
-                        SizedBox(width: 6),
-                        Text('Form (Popup) Mode'),
-                      ],
-                    ),
-                  ),
-                ],
-                onChanged: (mode) {
-                  if (mode != null) {
-                    setState(() {
-                      _editMode = mode;
-                      _controller.editingOptions =
-                          _controller.editingOptions.copyWith(mode: mode);
-                    });
-                  }
-                },
-              ),
-            ),
-          ),
-          ListenableBuilder(
-            listenable: _controller,
-            builder: (context, _) {
-              final count = _controller.editEvents.length;
-              return IconButton(
-                icon: Badge(
-                  isLabelVisible: count > 0,
-                  label: Text(count > 99 ? '99+' : '$count'),
-                  child: const Icon(Icons.receipt_long_outlined),
                 ),
-                tooltip: 'Editing Events Log ($count)',
-                onPressed: () => _showEditingEventLogDialog(context),
-              );
-            },
-          ),
-          PopupMenuButton<String>(
+                // Top bar switch among editing modes (Row, Cell, Form)
+                Container(
+                  height: 36,
+                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<AiGridEditMode>(
+                      value: _editMode,
+                      icon: const Icon(Icons.arrow_drop_down, size: 18),
+                      borderRadius: BorderRadius.circular(8),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: AiGridEditMode.row,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.edit_note, size: 16),
+                              SizedBox(width: 6),
+                              Text('Row Edit Mode'),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: AiGridEditMode.cell,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.grid_on, size: 16),
+                              SizedBox(width: 6),
+                              Text('Cell Edit Mode'),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: AiGridEditMode.form,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.dynamic_form_outlined, size: 16),
+                              SizedBox(width: 6),
+                              Text('Form (Popup) Mode'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (mode) {
+                        if (mode != null) {
+                          setState(() {
+                            _editMode = mode;
+                            _controller.editingOptions =
+                                _controller.editingOptions.copyWith(mode: mode);
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                ListenableBuilder(
+                  listenable: _controller,
+                  builder: (context, _) {
+                    final count = _controller.editEvents.length;
+                    return IconButton(
+                      icon: Badge(
+                        isLabelVisible: count > 0,
+                        label: Text(count > 99 ? '99+' : '$count'),
+                        child: const Icon(Icons.receipt_long_outlined),
+                      ),
+                      tooltip: 'Editing Events Log ($count)',
+                      onPressed: () => _showEditingEventLogDialog(context),
+                    );
+                  },
+                ),
+                PopupMenuButton<String>(
             icon: const Icon(Icons.tune_outlined),
             tooltip: 'Layout Presets & Settings',
             constraints: const BoxConstraints(minWidth: 340, maxWidth: 400),

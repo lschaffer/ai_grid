@@ -186,46 +186,11 @@ class _AiGridDatasourceManagerDialogState
           d.sourceType.toLowerCase().contains(q);
     }).toList();
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 600),
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.table_view_outlined,
-                    color: theme.colorScheme.primary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Dynamic Datasources',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.file_upload_outlined, size: 16),
-                    label: const Text('Import YAML'),
-                    onPressed: _handleImportYaml,
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
-            // Search Filter
+    final bodyContent = Column(
+      children: [
+        // Search Filter
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextField(
@@ -407,6 +372,70 @@ class _AiGridDatasourceManagerDialogState
                       },
                     ),
             ),
+      ],
+    );
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: const Text('Dynamic Datasources'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.file_upload_outlined),
+                tooltip: 'Import YAML',
+                onPressed: _handleImportYaml,
+              ),
+            ],
+          ),
+          body: bodyContent,
+        ),
+      );
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 600),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.table_view_outlined,
+                    color: theme.colorScheme.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Dynamic Datasources',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.file_upload_outlined, size: 16),
+                    label: const Text('Import YAML'),
+                    onPressed: _handleImportYaml,
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(child: bodyContent),
           ],
         ),
       ),
@@ -565,6 +594,128 @@ class _AiGridWebDataSourceDialogState extends State<AiGridWebDataSourceDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
+    final formFields = [
+      const Text(
+        'Enter a public HTTP/HTTPS URL returning tabular JSON array, CSV, or HTML table. Note: Web sources are read-only.',
+        style: TextStyle(fontSize: 12),
+      ),
+      const SizedBox(height: 12),
+      TextField(
+        controller: _urlCtrl,
+        decoration: const InputDecoration(
+          labelText: 'HTTP GET URL',
+          hintText: 'https://api.example.com/data',
+          border: OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+      const SizedBox(height: 10),
+      TextField(
+        controller: _nameCtrl,
+        decoration: const InputDecoration(
+          labelText: 'Datasource Name (Optional)',
+          hintText: 'e.g. posts, user_data',
+          border: OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+      const SizedBox(height: 12),
+      ElevatedButton.icon(
+        icon: _isLoading
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.preview_outlined, size: 16),
+        label: const Text('Fetch & Inspect'),
+        onPressed: _isLoading ? null : _fetchAndPreview,
+      ),
+      if (_error != null) ...[
+        const SizedBox(height: 10),
+        Text(
+          _error!,
+          style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+        ),
+      ],
+      if (_preview != null) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withValues(
+              alpha: 0.25,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ready: ${_preview!.rows.length} rows, ${_preview!.columns.length} columns detected',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Columns: ${_preview!.columns.map((c) => "${c.field} (${c.type.name})").join(", ")}',
+                style: const TextStyle(fontSize: 11),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ];
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: const Text('New Web Datasource'),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilledButton.tonal(
+                  onPressed: _preview != null && !_isLoading ? _createAndLoad : null,
+                  child: const Text('Create'),
+                ),
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...formFields,
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  icon: const Icon(Icons.table_chart_outlined, size: 18),
+                  label: const Text('Create DataGrid'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: _preview != null && !_isLoading ? _createAndLoad : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return AlertDialog(
       title: const Row(
@@ -579,85 +730,7 @@ class _AiGridWebDataSourceDialogState extends State<AiGridWebDataSourceDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter a public HTTP/HTTPS URL returning tabular JSON array, CSV, or HTML table. Note: Web sources are read-only.',
-              style: TextStyle(fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _urlCtrl,
-              decoration: const InputDecoration(
-                labelText: 'HTTP GET URL',
-                hintText: 'https://api.example.com/data',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Datasource Name (Optional)',
-                hintText: 'e.g. posts, user_data',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              icon: _isLoading
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.preview_outlined, size: 16),
-              label: const Text('Fetch & Inspect'),
-              onPressed: _isLoading ? null : _fetchAndPreview,
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _error!,
-                style: TextStyle(color: Colors.red.shade700, fontSize: 12),
-              ),
-            ],
-            if (_preview != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
-                    alpha: 0.25,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ready: ${_preview!.rows.length} rows, ${_preview!.columns.length} columns detected',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Columns: ${_preview!.columns.map((c) => "${c.field} (${c.type.name})").join(", ")}',
-                      style: const TextStyle(fontSize: 11),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
+          children: formFields,
         ),
       ),
       actions: [

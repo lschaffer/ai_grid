@@ -22,6 +22,7 @@ class _SmartColumnsExamplePageState extends State<SmartColumnsExamplePage> {
   late final AiGridController _controller;
   late LocalAiGridDataSource _dataSource;
   AiGridConfig? _aiConfig;
+  bool _isHeaderExpanded = false;
 
   @override
   void initState() {
@@ -293,6 +294,103 @@ class _SmartColumnsExamplePageState extends State<SmartColumnsExamplePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
+        final isMobile = MediaQuery.sizeOf(ctx).width < 600;
+
+        final formFields = [
+          const Text(
+            'Define a new synthesized column evaluated per-row by the LLM using variables like {feedback}, {customer}, or {channel}.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: titleCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Column Title',
+              hintText: 'e.g. AI Category',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (val) {
+              fieldCtrl.text = val
+                  .trim()
+                  .toLowerCase()
+                  .replaceAll(RegExp(r'[^a-z0-9_]'), '_');
+            },
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: fieldCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Field ID',
+              hintText: 'e.g. category',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: promptCtrl,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Prompt Template',
+              hintText: "e.g. Classify '{feedback}' into Category",
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: optionsCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Allowed Options (comma-separated, optional)',
+              hintText: 'e.g. Bug, Feature, Billing',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ];
+
+        if (isMobile) {
+          return Dialog.fullscreen(
+            child: Scaffold(
+              appBar: AppBar(
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                ),
+                title: const Text('Add AI Smart Column'),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilledButton.tonal(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Add & Run'),
+                    ),
+                  ),
+                ],
+              ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ...formFields,
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add & Run Column'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         return AlertDialog(
           title: const Row(
             children: [
@@ -307,59 +405,7 @@ class _SmartColumnsExamplePageState extends State<SmartColumnsExamplePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Define a new synthesized column evaluated per-row by the LLM using variables like {feedback}, {customer}, or {channel}.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Column Title',
-                      hintText: 'e.g. AI Category',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (val) {
-                      fieldCtrl.text = val
-                          .trim()
-                          .toLowerCase()
-                          .replaceAll(RegExp(r'[^a-z0-9_]'), '_');
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: fieldCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Field ID',
-                      hintText: 'e.g. category',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: promptCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Prompt Template',
-                      hintText: "e.g. Classify '{feedback}' into Category",
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: optionsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Allowed Options (comma-separated, optional)',
-                      hintText: 'e.g. Bug, Feature, Billing',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
+                children: formFields,
               ),
             ),
           ),
@@ -418,60 +464,83 @@ class _SmartColumnsExamplePageState extends State<SmartColumnsExamplePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = widget.isDarkMode;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return ScaffoldMessenger(
       child: Scaffold(
         body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header Banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
-              border: Border(
-                bottom: BorderSide(
-                  color:
-                      isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+          // Header Banner (Collapsible on mobile)
+          InkWell(
+            onTap: isMobile
+                ? () => setState(() => _isHeaderExpanded = !_isHeaderExpanded)
+                : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
+                border: Border(
+                  bottom: BorderSide(
+                    color:
+                        isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: Color(0xFF8B5CF6),
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: Color(0xFF8B5CF6),
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AI-Synthesized Smart / Prompt Columns',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI-Synthesized Smart / Prompt Columns',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Declare columns computed on-demand by LLMs with prompt templates ({feedback}), streaming generation, and per-cell regeneration.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                        if (!isMobile || _isHeaderExpanded) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            'Declare columns computed on-demand by LLMs with prompt templates ({feedback}), streaming generation, and per-cell regeneration.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  if (isMobile)
+                    IconButton(
+                      icon: Icon(
+                        _isHeaderExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                      ),
+                      tooltip: _isHeaderExpanded ? 'Collapse info' : 'Expand info',
+                      onPressed: () =>
+                          setState(() => _isHeaderExpanded = !_isHeaderExpanded),
+                    ),
+                ],
+              ),
             ),
           ),
 

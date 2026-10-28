@@ -27,6 +27,7 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
   bool _accordionMode = false;
   double _detailRowHeight = 380.0;
   int _lastExpandedCount = 1;
+  bool _isHeaderExpanded = false;
 
   @override
   void initState() {
@@ -284,82 +285,107 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
     final colorScheme = theme.colorScheme;
     final expandedCount = _controller.expandedDetailCount;
 
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
     return Scaffold(
       body: Column(
         children: [
-          // Header / Feature Summary Card
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: widget.isDarkMode
-                  ? const Color(0xFF1E2430)
-                  : const Color(0xFFF1F5F9),
-              border: Border(
-                bottom: BorderSide(
-                  color: widget.isDarkMode
-                      ? Colors.white12
-                      : Colors.black.withValues(alpha: 0.08),
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
-                  child: Icon(
-                    Icons.unfold_more_rounded,
-                    size: 20,
-                    color: colorScheme.primary,
+          // Header / Feature Summary Card (Collapsible on mobile)
+          InkWell(
+            onTap: isMobile
+                ? () => setState(() => _isHeaderExpanded = !_isHeaderExpanded)
+                : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: widget.isDarkMode
+                    ? const Color(0xFF1E2430)
+                    : const Color(0xFFF1F5F9),
+                border: Border(
+                  bottom: BorderSide(
+                    color: widget.isDarkMode
+                        ? Colors.white12
+                        : Colors.black.withValues(alpha: 0.08),
                   ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Feature 3: Master-Detail Child Rows & Nested DataGrids',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'READY',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
+                    child: Icon(
+                      Icons.unfold_more_rounded,
+                      size: 18,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Feature 3: Master-Detail Child Rows & Nested DataGrids',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'READY',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (!isMobile || _isHeaderExpanded) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Click the leading chevron icon on any row to inspect expandable child tabs: nested order item grids, delivery tracking timeline & customer profile.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: widget.isDarkMode
+                                  ? Colors.white70
+                                  : Colors.black87,
+                              fontSize: 12,
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Click the leading chevron icon on any row to inspect expandable child tabs: nested order item grids, delivery tracking timeline & customer profile.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: widget.isDarkMode
-                              ? Colors.white70
-                              : Colors.black87,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  if (isMobile)
+                    IconButton(
+                      icon: Icon(
+                        _isHeaderExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                      ),
+                      tooltip:
+                          _isHeaderExpanded ? 'Collapse info' : 'Expand info',
+                      onPressed: () =>
+                          setState(() => _isHeaderExpanded = !_isHeaderExpanded),
+                    ),
+                ],
+              ),
             ),
           ),
 
@@ -870,57 +896,61 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
             ),
             child: Row(
               children: [
-                TabBar(
-                  controller: _tabCtrl,
-                  isScrollable: true,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  tabAlignment: TabAlignment.start,
-                  indicatorWeight: 2.5,
-                  indicatorColor: colorScheme.primary,
-                  labelColor: colorScheme.primary,
-                  unselectedLabelColor:
-                      widget.isDarkMode ? Colors.white60 : Colors.black54,
-                  labelStyle: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.normal,
-                  ),
-                  tabs: [
-                    Tab(
-                      icon: const Icon(Icons.table_view_rounded, size: 15),
-                      text: 'Child Items Grid (${items.length})',
+                Expanded(
+                  child: TabBar(
+                    controller: _tabCtrl,
+                    isScrollable: true,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    tabAlignment: TabAlignment.start,
+                    indicatorWeight: 2.5,
+                    indicatorColor: colorScheme.primary,
+                    labelColor: colorScheme.primary,
+                    unselectedLabelColor:
+                        widget.isDarkMode ? Colors.white60 : Colors.black54,
+                    labelStyle: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const Tab(
-                      icon: Icon(Icons.timeline_rounded, size: 15),
-                      text: 'Shipping & Delivery',
+                    unselectedLabelStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.normal,
                     ),
-                    const Tab(
-                      icon: Icon(Icons.badge_outlined, size: 15),
-                      text: 'Customer & Payment',
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  'Order ${order['id']}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
+                    tabs: [
+                      Tab(
+                        icon: const Icon(Icons.table_view_rounded, size: 15),
+                        text: 'Child Items Grid (${items.length})',
+                      ),
+                      const Tab(
+                        icon: Icon(Icons.timeline_rounded, size: 15),
+                        text: 'Shipping & Delivery',
+                      ),
+                      const Tab(
+                        icon: Icon(Icons.badge_outlined, size: 15),
+                        text: 'Customer & Payment',
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '•  Total: \$${order['total']?.toStringAsFixed(2) ?? '0.00'}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: widget.isDarkMode ? Colors.white70 : Colors.black87,
+                if (MediaQuery.sizeOf(context).width >= 600) ...[
+                  const SizedBox(width: 12),
+                  Text(
+                    'Order ${order['id']}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '•  Total: \$${order['total']?.toStringAsFixed(2) ?? '0.00'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: widget.isDarkMode ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

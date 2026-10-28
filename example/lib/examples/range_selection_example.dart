@@ -22,6 +22,7 @@ class _RangeSelectionExamplePageState extends State<RangeSelectionExamplePage> {
   late final AiGridController _controller;
   late final LocalAiGridDataSource _dataSource;
   AiGridConfig? _aiConfig;
+  bool _isHeaderExpanded = false;
 
   @override
   void initState() {
@@ -215,59 +216,82 @@ class _RangeSelectionExamplePageState extends State<RangeSelectionExamplePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = widget.isDarkMode;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return ScaffoldMessenger(
       child: Scaffold(
         body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header Banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+          // Header Banner (Collapsible on mobile)
+          InkWell(
+            onTap: isMobile
+                ? () => setState(() => _isHeaderExpanded = !_isHeaderExpanded)
+                : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                  ),
                 ),
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.select_all_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.select_all_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Cell Range Selection & Spreadsheet Copy/Paste',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cell Range Selection & Spreadsheet Copy/Paste',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Click & drag across cells, use Shift+Arrows to expand range, Ctrl+C to copy TSV to Excel, Ctrl+V to paste values, and inspect instant stats.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                        if (!isMobile || _isHeaderExpanded) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            'Click & drag across cells, use Shift+Arrows to expand range, Ctrl+C to copy TSV to Excel, Ctrl+V to paste values, and inspect instant stats.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  if (isMobile)
+                    IconButton(
+                      icon: Icon(
+                        _isHeaderExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                      ),
+                      tooltip: _isHeaderExpanded ? 'Collapse info' : 'Expand info',
+                      onPressed: () =>
+                          setState(() => _isHeaderExpanded = !_isHeaderExpanded),
+                    ),
+                ],
+              ),
             ),
           ),
 

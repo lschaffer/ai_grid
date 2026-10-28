@@ -178,6 +178,125 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
         (isAdding ? 'Add Record' : 'Edit Record');
 
     final orderedColumns = _getOrderedEditableColumns();
+    final screenSize = MediaQuery.sizeOf(context);
+    final isMobile = screenSize.width < 600;
+
+    final effectiveLayout = isMobile
+        ? const AiGridFormLayout(mode: AiGridFormLayoutMode.row)
+        : options.formLayout;
+
+    if (isMobile) {
+      return Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Cancel',
+              onPressed: _isSaving ? null : _onCancel,
+            ),
+            title: Text(
+              dialogTitle,
+              style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilledButton.tonal(
+                  onPressed: _isSaving ? null : _onSave,
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save'),
+                ),
+              ),
+            ],
+          ),
+          body: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_generalError != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: colorScheme.error.withAlpha(120),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 20,
+                            color: colorScheme.error,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _generalError!,
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  _buildFormContent(
+                    context,
+                    effectiveLayout,
+                    orderedColumns,
+                    draft,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check, size: 18),
+                    label: Text(_isSaving ? 'Saving...' : 'Save Changes'),
+                    onPressed: _isSaving ? null : _onSave,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: _isSaving ? null : _onCancel,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -569,7 +688,10 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
           children: [
             if (controller.text.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.clear, size: 18),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.clear, size: 16),
                 tooltip: 'Clear',
                 onPressed: () {
                   controller.clear();
@@ -577,6 +699,9 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
                 },
               ),
             IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               icon: Icon(
                 isDateTime
                     ? Icons.access_time_outlined
@@ -586,6 +711,7 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
               tooltip: isDateTime ? 'Select Date & Time' : 'Select Date',
               onPressed: () => _pickDate(context, col, controller),
             ),
+            const SizedBox(width: 4),
           ],
         ),
       ),
@@ -710,6 +836,7 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
     final effectiveValue = options.contains(strVal) ? strVal : null;
 
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       initialValue: effectiveValue,
       decoration: InputDecoration(
         labelText: col.title,
@@ -721,7 +848,10 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
       items: options
           .map((opt) => DropdownMenuItem<String>(
                 value: opt,
-                child: Text(opt),
+                child: Text(
+                  opt,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ))
           .toList(),
       onChanged: (val) {
