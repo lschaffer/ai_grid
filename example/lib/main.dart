@@ -169,113 +169,185 @@ class ShowcaseGalleryShell extends StatelessWidget {
     required this.onToggleTheme,
   });
 
+  void _openFullScreenFeatureList(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (ctx) => _FullScreenFeatureListPage(
+          currentDemo: currentDemo,
+          onSelectDemo: (demo) {
+            Navigator.of(ctx).pop();
+            onSelectDemo(demo);
+          },
+          isDarkMode: isDarkMode,
+          onToggleTheme: onToggleTheme,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isMobile = MediaQuery.sizeOf(context).width < 700;
+
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 8,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.grid_view_rounded,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+        titleSpacing: isMobile ? 8 : 12,
+        title: isMobile
+            ? InkWell(
+                onTap: () => _openFullScreenFeatureList(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 13,
+                        backgroundColor: colorScheme.primaryContainer,
+                        child: Icon(
+                          currentDemo.icon,
+                          size: 15,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          currentDemo.title,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                        color: theme.hintColor,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'AI GRID GALLERY',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              )
+            : Row(
+                children: [
+                  InkWell(
+                    onTap: () => _openFullScreenFeatureList(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Tooltip(
+                      message: 'Open Fullscreen Feature Gallery',
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.grid_view_rounded,
+                              size: 16,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'AI GRID GALLERY',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<ShowcaseDemo>(
+                        isExpanded: true,
+                        value: currentDemo,
+                        icon: const Icon(Icons.arrow_drop_down_rounded),
+                        items: ShowcaseDemo.values.map((demo) {
+                          final isNew = demo.badge == 'NEW';
+                          final isPlanned = demo.badge == 'Planned';
+                          return DropdownMenuItem<ShowcaseDemo>(
+                            value: demo,
+                            child: Row(
+                              children: [
+                                Icon(demo.icon, size: 18),
+                                const SizedBox(width: 10),
+                                Flexible(
+                                  child: Text(
+                                    demo.title,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isPlanned ? Colors.grey : null,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isNew
+                                        ? Colors.green.withValues(alpha: 0.2)
+                                        : isPlanned
+                                            ? Colors.grey.withValues(alpha: 0.2)
+                                            : Colors.blue.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    demo.badge,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: isNew
+                                          ? Colors.green.shade800
+                                          : isPlanned
+                                              ? Colors.grey.shade600
+                                              : Colors.blue.shade800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            onSelectDemo(val);
+                          }
+                        },
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<ShowcaseDemo>(
-                  isExpanded: true,
-                  value: currentDemo,
-                  icon: const Icon(Icons.arrow_drop_down_rounded),
-                  items: ShowcaseDemo.values.map((demo) {
-                    final isNew = demo.badge == 'NEW';
-                    final isPlanned = demo.badge == 'Planned';
-                    return DropdownMenuItem<ShowcaseDemo>(
-                      value: demo,
-                      child: Row(
-                        children: [
-                          Icon(demo.icon, size: 18),
-                          const SizedBox(width: 10),
-                          Flexible(
-                            child: Text(
-                              demo.title,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isPlanned ? Colors.grey : null,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isNew
-                                  ? Colors.green.withValues(alpha: 0.2)
-                                  : isPlanned
-                                      ? Colors.grey.withValues(alpha: 0.2)
-                                      : Colors.blue.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              demo.badge,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isNew
-                                    ? Colors.green.shade800
-                                    : isPlanned
-                                        ? Colors.grey.shade600
-                                        : Colors.blue.shade800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      onSelectDemo(val);
-                    }
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.grid_view_rounded),
+            tooltip: 'All Features (Full Screen)',
+            onPressed: () => _openFullScreenFeatureList(context),
+          ),
           IconButton(
             icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
             tooltip: 'Toggle Theme',
             onPressed: onToggleTheme,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       body: _buildCurrentDemoView(context),
@@ -440,6 +512,237 @@ class ShowcaseGalleryShell extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Full-screen responsive feature showcase gallery list, ideal for mobile devices.
+class _FullScreenFeatureListPage extends StatelessWidget {
+  final ShowcaseDemo currentDemo;
+  final ValueChanged<ShowcaseDemo> onSelectDemo;
+  final bool isDarkMode;
+  final VoidCallback onToggleTheme;
+
+  const _FullScreenFeatureListPage({
+    required this.currentDemo,
+    required this.onSelectDemo,
+    required this.isDarkMode,
+    required this.onToggleTheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final readyDemos =
+        ShowcaseDemo.values.where((d) => d.badge != 'Planned').toList();
+    final plannedDemos =
+        ShowcaseDemo.values.where((d) => d.badge == 'Planned').toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          tooltip: 'Close',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
+              child: Icon(Icons.grid_view_rounded,
+                  size: 16, color: colorScheme.primary),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Feature Showcase Gallery',
+              style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            tooltip: 'Toggle Theme',
+            onPressed: onToggleTheme,
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        children: [
+          _buildSectionHeader(
+            context,
+            'INTERACTIVE READY FEATURES (${readyDemos.length})',
+            Icons.check_circle_rounded,
+            Colors.green.shade700,
+          ),
+          const SizedBox(height: 10),
+          ...readyDemos.map((demo) => _buildDemoCard(context, demo, isReady: true)),
+          const SizedBox(height: 20),
+          _buildSectionHeader(
+            context,
+            'UPCOMING ROADMAP FEATURES (${plannedDemos.length})',
+            Icons.rocket_launch_rounded,
+            Colors.amber.shade900,
+          ),
+          const SizedBox(height: 10),
+          ...plannedDemos
+              .map((demo) => _buildDemoCard(context, demo, isReady: false)),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(
+      BuildContext context, String title, IconData icon, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.8,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDemoCard(BuildContext context, ShowcaseDemo demo,
+      {required bool isReady}) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isSelected = demo == currentDemo;
+
+    Color badgeBg;
+    Color badgeFg;
+    switch (demo.badge) {
+      case 'Flagship':
+        badgeBg = Colors.purple.withValues(alpha: 0.15);
+        badgeFg = Colors.purple.shade700;
+        break;
+      case 'NEW':
+        badgeBg = Colors.green.withValues(alpha: 0.15);
+        badgeFg = Colors.green.shade800;
+        break;
+      case 'v0.4.0':
+        badgeBg = Colors.blue.withValues(alpha: 0.15);
+        badgeFg = Colors.blue.shade800;
+        break;
+      default:
+        badgeBg = Colors.grey.withValues(alpha: 0.15);
+        badgeFg = Colors.grey.shade600;
+    }
+
+    return Card(
+      elevation: isSelected ? 2 : 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      color: isSelected
+          ? colorScheme.primaryContainer.withValues(alpha: 0.45)
+          : (isDarkMode ? const Color(0xFF1B202B) : const Color(0xFFF8FAFC)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isSelected
+              ? colorScheme.primary
+              : (isDarkMode
+                  ? Colors.white12
+                  : Colors.black.withValues(alpha: 0.08)),
+          width: isSelected ? 1.5 : 1.0,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => onSelectDemo(demo),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.primary.withValues(alpha: 0.12),
+                child: Icon(
+                  demo.icon,
+                  size: 20,
+                  color: isSelected ? Colors.white : colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            demo.title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.w600,
+                              color: isReady
+                                  ? (isDarkMode ? Colors.white : Colors.black87)
+                                  : (isDarkMode
+                                      ? Colors.white60
+                                      : Colors.black54),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: badgeBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            demo.badge,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: badgeFg,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      demo.subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: colorScheme.primary,
+                  size: 22,
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
