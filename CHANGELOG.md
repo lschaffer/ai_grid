@@ -28,8 +28,22 @@ Master-Detail Child Rows & Nested DataGrids, Accordion Mode (`autoCollapseOthers
   * Enterprise Superstore Orders with 3-tab expandable child panels:
     * **Child Items Grid**: Full nested `AiGrid` with canvas virtualization, auto-sized columns, and summary footers.
     * **Shipping & Delivery**: Visual 5-step delivery tracker with carrier tracking numbers and clipboard copy.
-    * **Customer & Payment Profile**: Organization details, contact chips, and payment terms.
   * Accordion mode switcher, live expanded counter, and detail height segmented buttons.
+
+### 📱 Mobile UI & Ergonomics Enhancements
+* **Fullscreen Mobile Dialogs (`Dialog.fullscreen`)**:
+  * `AiGridFormDialog`: Automatically presents full-screen on mobile devices (`width < 600`) with top AppBar and full-height scrollable form.
+  * `AiGridDatasourceManagerDialog` & `AiGridWebDataSourceDialog`: Fullscreen dialogs with native responsive layout on mobile screens.
+  * Superstore editing event log & JSON restore settings dialogs adapt to fullscreen on mobile.
+* **Single-Field-Per-Row Form Editing**:
+  * Form editing dialog automatically enforces single-column layout (`AiGridFormLayoutMode.row`) on mobile screens to prevent multi-column squishing.
+  * Dropdown selectors expanded (`isExpanded: true`) with text ellipsis truncation.
+  * Compact constraints (32x32) on clear and date picker actions to eliminate suffix icon row overflows.
+* **Mobile Menu Dropdown (`:menu`)**:
+  * Collapses horizontal action buttons into a consolidated `PopupMenuButton` on mobile viewports to prevent AppBar overflow.
+* **Collapsible Showcase Headers**:
+  * Showcase headers for Master-Detail, Range Selection, and AI Smart Columns are collapsible via tap or chevron toggle, maximizing vertical canvas space on small screens.
+  * Detail panel sub-headers (`TabBar`) wrap safely in `Expanded` to prevent horizontal overflows.
 
 ## 0.8.0
 
