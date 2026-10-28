@@ -1,6 +1,6 @@
 # AI Grid (`ai_grid`)
 
-[![pub version](https://img.shields.io/badge/pub-v0.8.0-blue.svg)](https://pub.dev/packages/ai_grid)
+[![pub version](https://img.shields.io/badge/pub-v0.9.0-blue.svg)](https://pub.dev/packages/ai_grid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.24.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![WASM Ready](https://img.shields.io/badge/WebAssembly-WASM%20Compatible-success.svg)](https://flutter.dev/to/wasm)
@@ -9,9 +9,11 @@
 
 ![AI Grid Showcase](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_1.png)
 
-| AI Smart Synthesis Columns | Range Selection & Multi-Cell Copy |
-| :---: | :---: |
-| ![AI Smart Synthesis Columns](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_combined_ai_synth_column.png) | ![Range Selection & Multi-Cell Copy](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_combined_range_selection.png) |
+![AI Smart Synthesis Columns](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_combined_ai_synth_column.png)
+
+![Range Selection & Multi-Cell Copy](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_combined_range_selection.png)
+
+![Master-Detail Child Rows & Nested DataGrids](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_combined_master_detail.png)
 
 ![AI Grid Live Demo](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_grid_example1.gif)
 
@@ -35,9 +37,9 @@
 
 ### 2. ✍️ DevExtreme-Style DataGrid Editing (Cell, Row & Form Modes)
 
-| Modal Form Editing Dialog | Inline Row Editing |
-| :---: | :---: |
-| ![Modal Form Editing](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_form_edit.png) | ![Inline Row Editing](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_row_edit.png) |
+![Modal Form Editing](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_form_edit.png)
+
+![Inline Row Editing](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_row_edit.png)
 
 * **Three Editing Modes (`AiGridEditMode`)**:
   * `cell`: Direct in-place cell editing.
@@ -59,7 +61,21 @@
   * **Delete Confirmation Dialog**: Built-in confirmation before deleting rows (`beforeDelete`).
   * Persistence hooks via `commit`, `afterSave`, and `afterDelete`.
 
-### 3. 📊 DevExtreme-Style Dynamic Pivot Grid & Side-by-Side Chart
+### 3. 📑 Master-Detail Child Rows & Nested DataGrids
+
+Embed rich, virtualized expandable child panels beneath any row to show nested tables, order line items, fulfillment timelines, or customer details.
+
+![Master-Detail Child Rows & Nested DataGrids](https://raw.githubusercontent.com/lschaffer/ai_grid/main/example_combined_master_detail.png)
+
+* **Pinned Leading Expansion Column**: Automatically renders a leading chevron toggle column with smooth rotate animations.
+* **Full-Width Canvas Virtualization (`detailBuilder`)**: Mounts arbitrary Flutter widgets into full-width detail slots without losing horizontal scrolling or canvas performance.
+* **Nested Child `AiGrid` Tables**: Embed independent child data grids with custom schemas, summary aggregate footers, and independent sorting/filtering.
+* **Accordion Mode (`autoCollapseOthers`)**: Built-in toggle to automatically collapse previously opened detail rows when a new row is expanded.
+* **Persistent Open State Across Mutations**: Row identity key resolver (`rowKey`) keeps detail panels pinned to the correct underlying record through sorting, filtering, and grouping passes.
+* **Configurable Panel Height**: Set uniform panel heights via `detailRowHeight` (default `360.0`) or per-row dynamic heights via `detailHeight: (row, index) => ...`.
+* **Programmatic & MCP Control**: Full expansion control via `controller.expandRow()`, `controller.collapseRow()`, `controller.toggleRowDetail()`, `controller.expandAllDetails()`, and 4 dedicated MCP tools (`grid_toggle_row_detail`, `grid_expand_all_details`, `grid_collapse_all_details`, `grid_get_detail_status`).
+
+### 4. 📊 DevExtreme-Style Dynamic Pivot Grid & Side-by-Side Chart
 
 Convert any active table into an enterprise multi-dimensional Pivot Grid on the fly with real-time aggregated cross-tabulations and side-by-side synchronized charts.
 
@@ -81,7 +97,7 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
   * Run prompts like *"create pivot table, rows category and subcategory, columns segment, data fields sales (sum), profit (sum)"*.
   * Deactivate or restore standard view anytime via toolbar button or *"reset pivot table"*.
 
-### 4. 🎨 In-Grid Visual Analytics & Conditional Formatting
+### 5. 🎨 In-Grid Visual Analytics & Conditional Formatting
 * **Direct Canvas Cell Visuals**:
   * **Data Bars (`AiGridColumn.dataBar`)**: Horizontal bars painted on canvas behind cell text with customizable positive and negative colors, minimums, maximums, and zero-line alignment.
   * **Progress Tracks (`AiGridColumn.progress`)**: Proportional progress tracks filled to a fraction between 0.0 and 1.0.
@@ -94,7 +110,7 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
   * Programmatic and natural language formatting controls via `controller.addConditionalFormat()` and `controller.clearConditionalFormats()`.
   * Preserved automatically across grid layout persistence and JSON export/restore.
 
-### 5. 📋 Cell Range Selection & Bidirectional Spreadsheet Copy/Paste
+### 6. 📋 Cell Range Selection & Bidirectional Spreadsheet Copy/Paste
 * **Desktop-Grade Ergonomics**:
   * Rectangular cell selection via mouse drag and keyboard navigation.
   * `Shift + Arrow` keys dynamically expand and contract active cell boundaries.
@@ -112,13 +128,13 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
   * `grid_get_selected_range`: Inspects active selection coordinates, dimensions, and computed statistics.
   * `grid_select_range`: Programmatically selects rectangular cell ranges by row index and column fields.
 
-### 6. ✨ AI Smart / Prompt Columns (LLM Synthesis)
+### 7. ✨ AI Smart / Prompt Columns (LLM Synthesis)
 * **LLM-Synthesized Columns (`AiGridSmartColumn`)**: Define columns dynamically evaluated by any configured LLM using per-row prompt template interpolation (e.g. `"Classify sentiment of '{feedback}'"`).
 * **Interactive & Batch Execution**: Generate values cell-by-cell on click with interactive sparkle buttons or execute batch synthesis asynchronously across rows with `AiGridSmartColumnRunner`.
 * **Discrete Categories & Offline Fallback**: Restrict outputs to categorical enums (`options: ['Positive', 'Neutral', 'Negative']`) with built-in heuristic fallbacks when working offline without active API keys.
 * **Autonomous MCP Tools**: AI agents can inspect, add, and run smart columns dynamically via `grid_add_smart_column` and `grid_run_smart_columns`.
 
-### 7. 🧠 Native AI Assistant & Model Context Protocol (MCP)
+### 8. 🧠 Native AI Assistant & Model Context Protocol (MCP)
 * **Embedded AI Chat**: Conversational interface that understands your tabular schema, column types, and data distributions.
 * **Hallucination-Free Math Engine (`grid_calculate`)**: Calculations (sum, average, minimum, maximum, count, median) are executed strictly inside the Dart engine—ensuring 100% mathematical accuracy without LLM arithmetic errors.
 * **Multi-Column AND Filtering**: Seamlessly parses and applies complex queries across multiple columns simultaneously (e.g. *"filter region East and category Furniture"*).
@@ -126,7 +142,7 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
 * **Context-Aware Suggestions**: Proactive quick-action chips generated dynamically based on active columns.
 * **LLM Provider Agnostic**: Connects seamlessly with Mistral, OpenAI, Anthropic Claude, Google Gemini, Ollama, custom OpenAI-compatible endpoints, or built-in local heuristics.
 
-### 8. 💾 Save & Restore Grid Settings (Auto-Save)
+### 9. 💾 Save & Restore Grid Settings (Auto-Save)
 * **Full State Persistence**: Export or restore grid configuration including:
   * `visibleColumns` & `hiddenColumns`
   * `groupColumns` (hierarchical row grouping)
@@ -136,13 +152,14 @@ Convert any active table into an enterprise multi-dimensional Pivot Grid on the 
 * **Automatic Layout Restoration (`autoSave`)**: Pass `autoSave: true` and a `persistenceKey` to automatically persist all user layout changes and restore them on startup.
 * **JSON Import/Export**: Export settings to JSON string or save to file via `controller.exportSettingsJson()` and restore via `controller.restoreSettingsJson(str)`.
 * **In-Memory Cache**: Built-in `AiGridSettingsStorage` handles session-level caching and retrieval.
-### 9. 🌐 Dynamic AI DataGrid (Files, Web GET & Clipboard Ingestion)
+
+### 10. 🌐 Dynamic AI DataGrid (Files, Web GET & Clipboard Ingestion)
 
 Instantly generate, inspect, and interact with dynamic DataGrids from external files, public web APIs, or clipboard content without hardcoding data models:
 
-| Dynamic Grid from Clipboard | Create Table from PDF Attachment |
-| :---: | :---: |
-| ![Dynamic Grid from Clipboard](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_dynamic_grid_from_clipboard.gif) | ![Dynamic Grid from PDF](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_dynamic_grid_from_pdf.gif) |
+![Dynamic Grid from Clipboard](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_dynamic_grid_from_clipboard.gif)
+
+![Dynamic Grid from PDF](https://raw.githubusercontent.com/lschaffer/ai_grid/main/ai_dynamic_grid_from_pdf.gif)
 
 * **Multi-Source Ingestion**:
   * **Files**: Pick `.csv`, `.tsv`, `.json`, `.md` (Markdown pipe tables), `.txt`, `.pdf`, or `.docx` files. Tabular structures and field types (`number`, `text`, `boolean`, `date`, `currency`) are automatically detected and parsed.

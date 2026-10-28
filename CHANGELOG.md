@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.9.0
+
+Master-Detail Child Rows & Nested DataGrids, Accordion Mode (`autoCollapseOthers`), Expand/Collapse Programmatic API, 4 New MCP Tools, and Showcase Gallery Demo.
+
+### 📑 Feature 3: Master-Detail Child Rows & Nested Grids
+* **Master-Detail Configuration (`AiGridMasterDetailOptions`)**:
+  * Pinned leading chevron expansion column automatically managed by `FitGrid`.
+  * Fully virtualized full-width detail slot (`detailBuilder`) mounting real widgets including nested child `AiGrid` instances, delivery tracking timelines, or tabbed customer profiles.
+  * Configurable panel height (`detailRowHeight` and per-row `detailHeight`).
+  * Custom row key resolver (`rowKey`) maintaining open panels across sort, search, and filter passes.
+  * Built-in **Accordion Mode (`autoCollapseOthers`)**: Expanding a row automatically collapses previously open rows.
+  * Initial expansion support (`initiallyExpandedKeys`).
+  * Expansion state change callback (`onExpansionChanged`).
+* **Controller Operations**:
+  * `expandRow(key)` / `expandRowAt(index)`.
+  * `collapseRow(key)` / `collapseRowAt(index)`.
+  * `toggleRowDetail(key)` / `toggleRowDetailAt(index)`.
+  * `expandAllDetails()` / `collapseAllDetails()`.
+  * `isRowExpanded(key)`, `isRowExpandedAt(index)`, `expandedDetailKeys`, `hasExpandedDetails`, `expandedDetailCount`.
+* **4 New Model Context Protocol (MCP) Tools (`AiGridSkill`)**:
+  * `grid_toggle_row_detail`: Expands, collapses, or toggles child row detail by row key or view index.
+  * `grid_expand_all_details`: Expands all rows in the active view (unless accordion mode is active).
+  * `grid_collapse_all_details`: Collapses all currently expanded row details.
+  * `grid_get_detail_status`: Returns current master-detail configuration and list of expanded row keys.
+* **Showcase Gallery Demo (`MasterDetailExamplePage`)**:
+  * Enterprise Superstore Orders with 3-tab expandable child panels:
+    * **Child Items Grid**: Full nested `AiGrid` with canvas virtualization, auto-sized columns, and summary footers.
+    * **Shipping & Delivery**: Visual 5-step delivery tracker with carrier tracking numbers and clipboard copy.
+    * **Customer & Payment Profile**: Organization details, contact chips, and payment terms.
+  * Accordion mode switcher, live expanded counter, and detail height segmented buttons.
+
 ## 0.8.0
 
 Enhanced Scrollbar Interaction Isolation, Non-Displacing Selection Status Bar, Dependency Updates (`material_ui: ^1.8.0`, `dart_mcp_core: ^1.4.0`), and Showcase UI Ergonomics.

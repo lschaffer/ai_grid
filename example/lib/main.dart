@@ -5,6 +5,7 @@ import 'examples/superstore_enterprise_example.dart';
 import 'examples/conditional_formatting_example.dart';
 import 'examples/range_selection_example.dart';
 import 'examples/smart_columns_example.dart';
+import 'examples/master_detail_example.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,7 +55,7 @@ enum ShowcaseDemo {
     title: 'Feature 3: Master-Detail Child Rows',
     subtitle: 'Expandable row details, nested grids & tabbed cards',
     icon: Icons.unfold_more_rounded,
-    badge: 'Planned',
+    badge: 'NEW',
   ),
   excelImport(
     id: 'excel_import',
@@ -309,6 +310,10 @@ class ShowcaseGalleryShell extends StatelessWidget {
           onToggleTheme: onToggleTheme,
         );
       case ShowcaseDemo.masterDetail:
+        return MasterDetailExamplePage(
+          isDarkMode: isDarkMode,
+          onToggleTheme: onToggleTheme,
+        );
       case ShowcaseDemo.excelImport:
       case ShowcaseDemo.dataAuditor:
       case ShowcaseDemo.mobileCardView:

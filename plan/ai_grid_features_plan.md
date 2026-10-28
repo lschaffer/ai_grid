@@ -246,7 +246,7 @@ enum ExampleShowcase {
 | :---: | :--- | :---: | :---: |
 | **Feature 1** | **AI Smart / Prompt Columns** | ✅ **Completed** | `v0.7.0` |
 | **Feature 2** | **Conditional Formatting, Data Bars & Sparklines** | ✅ **Completed** | `v0.5.0` |
-| **Feature 3** | **Master-Detail Child Rows & Nested Grids** | ⏳ Planned | `v0.8.0` |
+| **Feature 3** | **Master-Detail Child Rows & Nested Grids** | ✅ **Completed** | `v0.8.1` |
 | **Feature 4** | **Cell Range Selection & Bidirectional Copy/Paste** | ✅ **Completed** | `v0.6.0` |
 | **Feature 5** | **Pure-Dart Excel (.xlsx) Import** | ⏳ Planned | `v0.9.0` |
 | **Feature 6** | **AI Data Auditor & Cleaner** | ⏳ Planned | `v0.10.0` |

@@ -11,6 +11,7 @@ import '../controllers/ai_grid_controller.dart';
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_conditional_format.dart';
+import '../models/ai_grid_master_detail.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../theme/ai_grid_theme.dart';
@@ -97,7 +98,16 @@ class AiGrid extends StatefulWidget {
     this.enableCopy = true,
     this.enablePaste = true,
     this.showSelectionStatusBar = false,
+    this.masterDetailOptions,
+    this.detailRowBuilder,
   });
+
+  /// Optional master-detail configuration for expandable child rows and nested tables.
+  final AiGridMasterDetailOptions? masterDetailOptions;
+
+  /// Shorthand builder for the detail panel beneath an expanded row.
+  final Widget Function(BuildContext context, Map<String, dynamic> row, int rowIndex)?
+      detailRowBuilder;
 
   /// Whether rectangular cell range selection is enabled.
   final bool cellSelection;
@@ -181,6 +191,13 @@ class _AiGridState extends State<AiGrid> {
         _controller.addConditionalFormat(fmt);
       }
     }
+    final initialMasterDetail = widget.masterDetailOptions ??
+        (widget.detailRowBuilder != null
+            ? AiGridMasterDetailOptions(detailBuilder: widget.detailRowBuilder!)
+            : null);
+    if (initialMasterDetail != null) {
+      _controller.setMasterDetailOptions(initialMasterDetail);
+    }
 
     _lastEditMode = _controller.editingOptions.mode;
     _lastEditingRowIndex = _controller.editingRowIndex;
@@ -190,9 +207,14 @@ class _AiGridState extends State<AiGrid> {
 
     final fitColumns = _buildFitColumns();
     _lastColumns = List.of(_effectiveColumns);
+    final isLocalData = widget.dataSource is LocalAiGridDataSource;
+    final initialRows = isLocalData
+        ? (widget.dataSource as LocalAiGridDataSource).data
+        : const <Map<String, dynamic>>[];
+    _isLoading = !isLocalData && initialRows.isEmpty;
     _fitController = FitGridController<Map<String, dynamic>>(
       columns: fitColumns,
-      rows: const [],
+      rows: initialRows,
       selectionMode: FitGridSelectionMode.multiple,
     );
 
@@ -298,6 +320,16 @@ class _AiGridState extends State<AiGrid> {
           _fitController.columns.columns = _buildFitColumns();
         }
       });
+    }
+    if (widget.masterDetailOptions != oldWidget.masterDetailOptions ||
+        widget.detailRowBuilder != oldWidget.detailRowBuilder) {
+      final updatedMasterDetail = widget.masterDetailOptions ??
+          (widget.detailRowBuilder != null
+              ? AiGridMasterDetailOptions(detailBuilder: widget.detailRowBuilder!)
+              : null);
+      if (updatedMasterDetail != _controller.masterDetailOptions) {
+        _controller.setMasterDetailOptions(updatedMasterDetail);
+      }
     }
   }
 
@@ -959,7 +991,8 @@ class _AiGridState extends State<AiGrid> {
   }
 
   Future<void> _loadData() async {
-    if (!_isLoading && mounted) {
+    final isLocalData = widget.dataSource is LocalAiGridDataSource;
+    if (!isLocalData && !_isLoading && mounted) {
       setState(() => _isLoading = true);
     }
     final rows = await widget.dataSource.fetchRows();
@@ -1450,6 +1483,17 @@ class _AiGridState extends State<AiGrid> {
       editTrigger: effectiveEditTrigger,
       paginated: widget.enablePagination || widget.pageSize != null,
       pageSize: widget.pageSize ?? 40,
+      detailBuilder: (!_controller.isPivotActive && _controller.isMasterDetailEnabled)
+          ? (context, row, rowIndex) {
+              final opts = _controller.masterDetailOptions;
+              return opts?.detailBuilder(context, row, rowIndex) ?? const SizedBox.shrink();
+            }
+          : null,
+      detailRowHeight: _controller.masterDetailOptions?.detailRowHeight ?? 360.0,
+      detailHeight: _controller.masterDetailOptions?.detailHeight,
+      rowKey: _controller.isMasterDetailEnabled
+          ? (row) => _controller.resolveRowKey(row)
+          : null,
       onRowDoubleTap: (row, rowIndex) {
         if (_controller.isPivotActive || isReadonly) return;
         if (widget.onRowDoubleTap != null) {

@@ -332,7 +332,47 @@ controller.clearPivot();
 
 ---
 
-## 10. Best Practices for AI Agents Writing Pivot Prompts
+## 10. Master-Detail Child Rows & Nested DataGrids
+
+`ai_grid` supports hierarchical master-detail rows with pinned chevrons and full-width virtualized detail slots:
+* **Configuration via `AiGridMasterDetailOptions`**:
+  ```dart
+  AiGrid(
+    dataSource: ordersDataSource,
+    controller: _controller,
+    masterDetailOptions: AiGridMasterDetailOptions(
+      enabled: true,
+      detailRowHeight: 280.0,
+      autoCollapseOthers: false, // true for accordion mode
+      detailBuilder: (context, row, rowIndex) {
+        // Mount any real Flutter widget, nested AiGrid, or tabbed view
+        return MyOrderItemsChildGrid(order: row);
+      },
+    ),
+  )
+  ```
+* **Accordion Mode (`autoCollapseOthers`)**:
+  When enabled, expanding any row automatically collapses previously open rows.
+* **Programmatic Controller API**:
+  ```dart
+  controller.expandRow('ORD-2026-901');
+  controller.collapseRow('ORD-2026-901');
+  controller.toggleRowDetail('ORD-2026-901');
+  controller.expandRowAt(0); // by view index
+  controller.expandAllDetails();
+  controller.collapseAllDetails();
+  final isExpanded = controller.isRowExpanded('ORD-2026-901');
+  final count = controller.expandedDetailCount;
+  ```
+* **4 Dedicated MCP AI Tools**:
+  - `grid_toggle_row_detail`: Expand/collapse row by key or index via natural language.
+  - `grid_expand_all_details`: Expand all rows in current view.
+  - `grid_collapse_all_details`: Collapse all open detail panels.
+  - `grid_get_detail_status`: Inspect master-detail configuration and list open keys.
+
+---
+
+## 11. Best Practices for AI Agents Writing Pivot Prompts
 
 ### ✅ Dense, Informative Aggregations
 Pivot tables are designed to **aggregate higher-level categorical dimensions**:

@@ -1076,7 +1076,9 @@ class _FitGridState<T> extends State<FitGrid<T>> {
       if (line == null || !line.isDetail) return null;
       final owner = line.detailOf as T;
       final ownerIndex = line.ownerIndex!;
+      final rowKey = (widget.rowKey?.call(owner) ?? owner) ?? localRow;
       return ColoredBox(
+        key: ValueKey<Object>(rowKey),
         color: theme.effectiveDetailBackground,
         child: Builder(
           builder: (context) =>

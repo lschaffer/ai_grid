@@ -52,6 +52,10 @@ class AiGridSkill {
       GridSelectRangeTool(controller),
       GridAddSmartColumnTool(controller),
       GridRunSmartColumnsTool(controller),
+      GridToggleRowDetailTool(controller),
+      GridExpandAllDetailsTool(controller),
+      GridCollapseAllDetailsTool(controller),
+      GridGetDetailStatusTool(controller),
     ];
   }
 
@@ -2423,6 +2427,204 @@ class GridRunSmartColumnsTool extends McpLocalTool {
     }));
   }
 }
+
+/// Tool for expanding, collapsing, or toggling master-detail child row panels.
+class GridToggleRowDetailTool extends McpLocalTool {
+  final AiGridController controller;
+  GridToggleRowDetailTool(this.controller);
+
+  @override
+  String get name => 'grid_toggle_row_detail';
+
+  @override
+  String get description =>
+      'Expands, collapses, or toggles the master-detail child panel for a specific row by its row index or key (e.g. order ID).';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {
+          'rowIndex': {
+            'type': 'integer',
+            'description':
+                '0-based row index in the active grid view to expand/collapse.',
+          },
+          'rowKey': {
+            'type': 'string',
+            'description':
+                'Unique row key or ID (e.g. "CA-2016-152156") of the record.',
+          },
+          'expand': {
+            'type': 'boolean',
+            'description':
+                'Optional explicit target state. If true, expands; if false, collapses; if omitted, toggles.',
+          },
+        },
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    if (!controller.isMasterDetailEnabled) {
+      return MCPToolResult.error(
+          'Master-detail child rows are not enabled on this DataGrid.');
+    }
+
+    final rowIndex = arguments['rowIndex'] as int?;
+    final rowKey = arguments['rowKey'];
+    final explicitExpand = arguments['expand'] as bool?;
+
+    Object? targetKey;
+    if (rowKey != null) {
+      targetKey = rowKey;
+    } else if (rowIndex != null) {
+      final rows = controller.fitController?.data.view ?? [];
+      if (rowIndex < 0 || rowIndex >= rows.length) {
+        return MCPToolResult.error(
+            'Row index $rowIndex is out of range (0 to ${rows.length - 1}).');
+      }
+      targetKey = controller.resolveRowKey(rows[rowIndex]);
+    } else {
+      return MCPToolResult.error('Either "rowIndex" or "rowKey" must be provided.');
+    }
+
+    if (targetKey == null) {
+      return MCPToolResult.error('Target row key could not be resolved.');
+    }
+
+    final effectiveKey = targetKey;
+    final wasExpanded = controller.isRowExpanded(effectiveKey);
+    if (explicitExpand == true) {
+      controller.expandRow(effectiveKey);
+    } else if (explicitExpand == false) {
+      controller.collapseRow(effectiveKey);
+    } else {
+      controller.toggleRowDetail(effectiveKey);
+    }
+
+    final isNowExpanded = controller.isRowExpanded(effectiveKey);
+
+    return MCPToolResult.text(jsonEncode({
+      'targetKey': targetKey.toString(),
+      'wasExpanded': wasExpanded,
+      'isNowExpanded': isNowExpanded,
+      'totalExpanded': controller.expandedDetailCount,
+      'message':
+          'Row "$targetKey" detail panel is now ${isNowExpanded ? "expanded" : "collapsed"}.',
+    }));
+  }
+}
+
+/// Tool for expanding all master-detail child panels across visible rows.
+class GridExpandAllDetailsTool extends McpLocalTool {
+  final AiGridController controller;
+  GridExpandAllDetailsTool(this.controller);
+
+  @override
+  String get name => 'grid_expand_all_details';
+
+  @override
+  String get description =>
+      'Expands all master-detail child panels across visible rows in the grid (unless accordion mode is enabled).';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    if (!controller.isMasterDetailEnabled) {
+      return MCPToolResult.error(
+          'Master-detail child rows are not enabled on this DataGrid.');
+    }
+    if (controller.masterDetailOptions?.autoCollapseOthers == true) {
+      return MCPToolResult.error(
+          'Cannot expand all rows because accordion mode (autoCollapseOthers) is active.');
+    }
+
+    controller.expandAllDetails();
+
+    return MCPToolResult.text(jsonEncode({
+      'status': 'expanded_all',
+      'totalExpanded': controller.expandedDetailCount,
+      'message':
+          'Successfully expanded ${controller.expandedDetailCount} row detail panels.',
+    }));
+  }
+}
+
+/// Tool for collapsing all open master-detail child panels.
+class GridCollapseAllDetailsTool extends McpLocalTool {
+  final AiGridController controller;
+  GridCollapseAllDetailsTool(this.controller);
+
+  @override
+  String get name => 'grid_collapse_all_details';
+
+  @override
+  String get description =>
+      'Collapses all currently open master-detail child panels in the DataGrid.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    if (!controller.isMasterDetailEnabled) {
+      return MCPToolResult.error(
+          'Master-detail child rows are not enabled on this DataGrid.');
+    }
+
+    final prevCount = controller.expandedDetailCount;
+    controller.collapseAllDetails();
+
+    return MCPToolResult.text(jsonEncode({
+      'status': 'collapsed_all',
+      'previouslyExpanded': prevCount,
+      'totalExpanded': 0,
+      'message': 'Successfully collapsed all ($prevCount) row detail panels.',
+    }));
+  }
+}
+
+/// Tool returning the master-detail configuration and list of expanded rows.
+class GridGetDetailStatusTool extends McpLocalTool {
+  final AiGridController controller;
+  GridGetDetailStatusTool(this.controller);
+
+  @override
+  String get name => 'grid_get_detail_status';
+
+  @override
+  String get description =>
+      'Returns the current master-detail configuration, whether child rows are enabled, and the list of currently expanded row keys.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+        'type': 'object',
+        'properties': {},
+      };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final isEnabled = controller.isMasterDetailEnabled;
+    final opts = controller.masterDetailOptions;
+    final expanded = controller.expandedDetailKeys.map((k) => k.toString()).toList();
+
+    return MCPToolResult.text(jsonEncode({
+      'enabled': isEnabled,
+      'autoCollapseOthers': opts?.autoCollapseOthers ?? false,
+      'detailRowHeight': opts?.detailRowHeight ?? 240.0,
+      'expandedCount': expanded.length,
+      'expandedKeys': expanded,
+    }));
+  }
+}
+
 
 
 

@@ -10,6 +10,7 @@ import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_conditional_format.dart';
 import '../models/ai_grid_range_summary.dart';
+import '../models/ai_grid_master_detail.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../models/ai_grid_pivot.dart';
@@ -845,9 +846,19 @@ class AiGridController extends ChangeNotifier {
 
   /// Whether the inline column filter row is visible.
   bool get showColumnFilterRow => _showColumnFilterRow;
+  set showColumnFilterRow(bool value) {
+    if (_showColumnFilterRow == value) return;
+    _showColumnFilterRow = value;
+    notifyListeners();
+  }
 
   /// Whether the top group panel is visible.
   bool get showGroupPanel => _showGroupPanel;
+  set showGroupPanel(bool value) {
+    if (_showGroupPanel == value) return;
+    _showGroupPanel = value;
+    notifyListeners();
+  }
 
   /// Whether the AI Assistant panel is visible.
   bool get showAiAssistant => _showAiAssistant;
@@ -909,6 +920,7 @@ class AiGridController extends ChangeNotifier {
       _fitController!.columns.removeListener(_onFitControllerChanged);
       _fitController!.filter.removeListener(_onFitFilterChanged);
       _fitController!.range.removeListener(_onFitRangeChanged);
+      _fitController!.details.removeListener(_onFitDetailsChanged);
     }
     _fitController = fitController ??
         _fitController ??
@@ -930,10 +942,19 @@ class AiGridController extends ChangeNotifier {
     _fitController!.columns.removeListener(_onFitControllerChanged);
     _fitController!.filter.removeListener(_onFitFilterChanged);
     _fitController!.range.removeListener(_onFitRangeChanged);
+    _fitController!.details.removeListener(_onFitDetailsChanged);
     _fitController!.data.addListener(_onFitControllerChanged);
     _fitController!.columns.addListener(_onFitControllerChanged);
     _fitController!.filter.addListener(_onFitFilterChanged);
     _fitController!.range.addListener(_onFitRangeChanged);
+    _fitController!.details.addListener(_onFitDetailsChanged);
+
+    if (_masterDetailOptions?.initiallyExpandedKeys != null) {
+      for (final key in _masterDetailOptions!.initiallyExpandedKeys!) {
+        _fitController!.details.setExpanded(key, true);
+      }
+      _previousExpandedKeys = Set<Object>.of(_fitController!.details.expanded);
+    }
 
     // Reapply active state if pre-configured
     if (_activeGrouping.isNotEmpty) {
@@ -1313,6 +1334,123 @@ class AiGridController extends ChangeNotifier {
     return true;
   }
 
+  // ---------------------------------------------------------------------------
+  // Master-Detail & Expandable Child Row Operations
+  // ---------------------------------------------------------------------------
+
+  AiGridMasterDetailOptions? _masterDetailOptions;
+  Set<Object> _previousExpandedKeys = const <Object>{};
+
+  /// Current master-detail options configured on this controller.
+  AiGridMasterDetailOptions? get masterDetailOptions => _masterDetailOptions;
+
+  /// Sets master-detail options and synchronizes initial expansion state.
+  void setMasterDetailOptions(AiGridMasterDetailOptions? options) {
+    if (_masterDetailOptions == options) return;
+    _masterDetailOptions = options;
+    if (options != null && options.initiallyExpandedKeys != null && _fitController != null) {
+      for (final key in options.initiallyExpandedKeys!) {
+        _fitController!.details.setExpanded(key, true);
+      }
+      _previousExpandedKeys = Set<Object>.of(_fitController!.details.expanded);
+    }
+    notifyListeners();
+  }
+
+  /// Whether the master-detail child row expansion is active and enabled.
+  bool get isMasterDetailEnabled => _masterDetailOptions?.enabled == true;
+
+  /// Returns the unmodifiable set of keys for currently expanded detail rows.
+  Set<Object> get expandedDetailKeys =>
+      _fitController?.details.expanded ?? const <Object>{};
+
+  /// Whether any row detail panel is currently expanded.
+  bool get hasExpandedDetails => expandedDetailKeys.isNotEmpty;
+
+  /// Number of currently expanded detail panels.
+  int get expandedDetailCount => expandedDetailKeys.length;
+
+  /// Resolves the stable key for a given row map.
+  Object resolveRowKey(Map<String, dynamic> row) {
+    if (_masterDetailOptions?.rowKey != null) {
+      return _masterDetailOptions!.rowKey!(row);
+    }
+    return row['id'] ?? row['order_id'] ?? row['key'] ?? row;
+  }
+
+  /// Checks if a row with [rowKey] is currently expanded.
+  bool isRowExpanded(Object rowKey) =>
+      _fitController?.details.isExpanded(rowKey) ?? false;
+
+  /// Checks if the row at [rowIndex] in the active view is currently expanded.
+  bool isRowExpandedAt(int rowIndex) {
+    if (_fitController == null) return false;
+    final view = _fitController!.data.view;
+    if (rowIndex < 0 || rowIndex >= view.length) return false;
+    return isRowExpanded(resolveRowKey(view[rowIndex]));
+  }
+
+  /// Expands the detail panel for the given [rowKey].
+  void expandRow(Object rowKey) {
+    if (_fitController == null) return;
+    if (_masterDetailOptions?.autoCollapseOthers == true) {
+      _fitController!.details.collapseAll();
+    }
+    _fitController!.details.setExpanded(rowKey, true);
+  }
+
+  /// Expands the detail panel for the row at [rowIndex] in the active view.
+  void expandRowAt(int rowIndex) {
+    if (_fitController == null) return;
+    final view = _fitController!.data.view;
+    if (rowIndex < 0 || rowIndex >= view.length) return;
+    expandRow(resolveRowKey(view[rowIndex]));
+  }
+
+  /// Collapses the detail panel for the given [rowKey].
+  void collapseRow(Object rowKey) {
+    _fitController?.details.setExpanded(rowKey, false);
+  }
+
+  /// Collapses the detail panel for the row at [rowIndex] in the active view.
+  void collapseRowAt(int rowIndex) {
+    if (_fitController == null) return;
+    final view = _fitController!.data.view;
+    if (rowIndex < 0 || rowIndex >= view.length) return;
+    collapseRow(resolveRowKey(view[rowIndex]));
+  }
+
+  /// Toggles expansion for the given [rowKey].
+  void toggleRowDetail(Object rowKey) {
+    if (_fitController == null) return;
+    final willExpand = !isRowExpanded(rowKey);
+    if (willExpand && _masterDetailOptions?.autoCollapseOthers == true) {
+      _fitController!.details.collapseAll();
+    }
+    _fitController!.details.toggle(rowKey);
+  }
+
+  /// Toggles expansion for the row at [rowIndex] in the active view.
+  void toggleRowDetailAt(int rowIndex) {
+    if (_fitController == null) return;
+    final view = _fitController!.data.view;
+    if (rowIndex < 0 || rowIndex >= view.length) return;
+    toggleRowDetail(resolveRowKey(view[rowIndex]));
+  }
+
+  /// Expands all rows in the active view (disabled in accordion mode).
+  void expandAllDetails() {
+    if (_fitController == null || _masterDetailOptions?.autoCollapseOthers == true) return;
+    for (final row in _fitController!.data.view) {
+      _fitController!.details.setExpanded(resolveRowKey(row), true);
+    }
+  }
+
+  /// Collapses all currently expanded row details.
+  void collapseAllDetails() {
+    _fitController?.details.collapseAll();
+  }
+
   bool _disposed = false;
 
   @override
@@ -1322,11 +1460,54 @@ class AiGridController extends ChangeNotifier {
     _fitController?.columns.removeListener(_onFitControllerChanged);
     _fitController?.filter.removeListener(_onFitFilterChanged);
     _fitController?.range.removeListener(_onFitRangeChanged);
+    _fitController?.details.removeListener(_onFitDetailsChanged);
     super.dispose();
   }
 
   void _onFitRangeChanged() {
     if (_disposed) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed) notifyListeners();
+      });
+    } else {
+      notifyListeners();
+    }
+  }
+
+  void _onFitDetailsChanged() {
+    if (_disposed) return;
+    final current = _fitController?.details.expanded ?? const <Object>{};
+
+    // Accordion Mode (autoCollapseOthers):
+    if (_masterDetailOptions?.autoCollapseOthers == true && current.length > 1) {
+      final newlyAdded = current.difference(_previousExpandedKeys);
+      if (newlyAdded.isNotEmpty) {
+        final keepKey = newlyAdded.last;
+        for (final k in List<Object>.from(current)) {
+          if (k != keepKey) {
+            _fitController?.details.setExpanded(k, false);
+          }
+        }
+      }
+    }
+
+    final updated = _fitController?.details.expanded ?? const <Object>{};
+    final added = updated.difference(_previousExpandedKeys);
+    final removed = _previousExpandedKeys.difference(updated);
+    _previousExpandedKeys = Set<Object>.of(updated);
+
+    if (_masterDetailOptions?.onExpansionChanged != null) {
+      for (final k in added) {
+        _masterDetailOptions!.onExpansionChanged!(k, true);
+      }
+      for (final k in removed) {
+        _masterDetailOptions!.onExpansionChanged!(k, false);
+      }
+    }
+
     final phase = SchedulerBinding.instance.schedulerPhase;
     if (phase == SchedulerPhase.persistentCallbacks ||
         phase == SchedulerPhase.midFrameMicrotasks) {
