@@ -182,7 +182,7 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
     final isMobile = screenSize.width < 600;
 
     final effectiveLayout = isMobile
-        ? const AiGridFormLayout(mode: AiGridFormLayoutMode.row)
+        ? const AiGridFormLayout.row()
         : options.formLayout;
 
     if (isMobile) {
