@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:math' as math;
+
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+
 import '../fitgrid/fitgrid_table.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_conditional_format.dart';
@@ -23,6 +25,13 @@ import '../widgets/ai_grid_pivot_chart.dart';
 import '../config/ai_grid_config.dart';
 import '../models/ai_grid_smart_column.dart';
 import '../models/ai_grid_smart_column_runner.dart';
+import '../data/excel_table_parser.dart';
+import '../widgets/ai_grid_excel_dialogs.dart';
+import '../models/ai_grid_data_auditor.dart';
+import '../data/ai_grid_data_cleaner.dart';
+import '../widgets/ai_grid_data_auditor_dialog.dart';
+
+import 'package:file_picker/file_picker.dart';
 
 /// Controller coordinating grid state, grouping, filtering, sorting,
 /// column visibility, and introspection for AI Assistant tools.
@@ -31,9 +40,14 @@ class AiGridController extends ChangeNotifier {
   AiGridDataSource? _dataSource;
   List<AiGridColumn> _columns = [];
   AiGridDynamicDescriptor? _activeDynamicDatasource;
+  AiGridExcelWorkbook? _activeExcelWorkbook;
 
   /// Active dynamic datasource descriptor if currently bound to a dynamic dataset.
-  AiGridDynamicDescriptor? get activeDynamicDatasource => _activeDynamicDatasource;
+  AiGridDynamicDescriptor? get activeDynamicDatasource =>
+      _activeDynamicDatasource;
+
+  /// Active Excel workbook if currently bound to an imported Excel dataset.
+  AiGridExcelWorkbook? get activeExcelWorkbook => _activeExcelWorkbook;
 
   List<String> _activeGrouping = [];
   final Map<String, Map<String, dynamic>> _activeFilters = {};
@@ -88,7 +102,8 @@ class AiGridController extends ChangeNotifier {
 
   /// Current editing options configured for this grid.
   AiGridEditingOptions get editingOptions => _editingOptions;
-  set editingOptions(AiGridEditingOptions options) => setEditingOptions(options);
+  set editingOptions(AiGridEditingOptions options) =>
+      setEditingOptions(options);
 
   /// Index of the row currently being edited in row/form mode, or null.
   int? get editingRowIndex => _editingRowIndex;
@@ -103,7 +118,8 @@ class AiGridController extends ChangeNotifier {
   bool get isEditingRow => _editingRowIndex != null || _isAddingRow;
 
   /// Validation error messages keyed by column field name.
-  Map<String, String> get validationErrors => Map.unmodifiable(_validationErrors);
+  Map<String, String> get validationErrors =>
+      Map.unmodifiable(_validationErrors);
 
   /// Updates the editing options and notifies listeners.
   void setEditingOptions(AiGridEditingOptions options, {bool notify = true}) {
@@ -191,8 +207,9 @@ class AiGridController extends ChangeNotifier {
   /// Builds a [FitGridColumn] from an [AiGridColumn], applying any active dynamic conditional formats.
   FitGridColumn<Map<String, dynamic>> buildFitGridColumn(AiGridColumn col) {
     var effectiveCol = col;
-    final fieldFormats =
-        _conditionalFormats.where((f) => f.field == col.field).toList();
+    final fieldFormats = _conditionalFormats
+        .where((f) => f.field == col.field)
+        .toList();
     if (fieldFormats.isNotEmpty) {
       final barFormat = fieldFormats
           .where((f) => f.type == AiGridFormatType.dataBar)
@@ -239,8 +256,11 @@ class AiGridController extends ChangeNotifier {
           if (colorScaleFormat != null && val is num) {
             final min = colorScaleFormat.min ?? 0;
             final max = colorScaleFormat.max ?? 100;
-            final interpolated =
-                colorScaleFormat.interpolateColor(val, min, max);
+            final interpolated = colorScaleFormat.interpolateColor(
+              val,
+              min,
+              max,
+            );
             if (interpolated != null) {
               base = (base ?? const TextStyle()).copyWith(color: interpolated);
             }
@@ -249,10 +269,7 @@ class AiGridController extends ChangeNotifier {
         };
       }
 
-      effectiveCol = col.copyWith(
-        visual: visual,
-        cellStyle: cellStyle,
-      );
+      effectiveCol = col.copyWith(visual: visual, cellStyle: cellStyle);
     }
 
     // Smart column visual styling & inline sparkle indicator
@@ -303,8 +320,11 @@ class AiGridController extends ChangeNotifier {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.auto_awesome_outlined,
-                        size: 12, color: sparkleColor.withValues(alpha: 0.8)),
+                    Icon(
+                      Icons.auto_awesome_outlined,
+                      size: 12,
+                      color: sparkleColor.withValues(alpha: 0.8),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Generate',
@@ -320,7 +340,8 @@ class AiGridController extends ChangeNotifier {
             );
           }
 
-          final style = smartCol.cellStyle?.call(val, row) ??
+          final style =
+              smartCol.cellStyle?.call(val, row) ??
               theme.textTheme.bodyMedium?.copyWith(fontSize: 12);
 
           return Tooltip(
@@ -374,8 +395,9 @@ class AiGridController extends ChangeNotifier {
     bool force = false,
     AiGridConfig? aiConfig,
   }) async {
-    final targets =
-        smartColumns.where((c) => field == null || c.field == field).toList();
+    final targets = smartColumns
+        .where((c) => field == null || c.field == field)
+        .toList();
     if (targets.isEmpty) return;
 
     final allRows = List<Map<String, dynamic>>.from(rows);
@@ -428,11 +450,14 @@ class AiGridController extends ChangeNotifier {
           (_dataSource as LocalAiGridDataSource).setData(allRows);
         }
 
-        logEditEvent(AiGridEditEvent(
-          action: 'smart_column_generated',
-          rowIndex: 0,
-          message: 'Synthesized ${batchResults.length} values for "${col.title}"',
-        ));
+        logEditEvent(
+          AiGridEditEvent(
+            action: 'smart_column_generated',
+            rowIndex: 0,
+            message:
+                'Synthesized ${batchResults.length} values for "${col.title}"',
+          ),
+        );
       }
     } finally {
       _isGeneratingSmartColumns = false;
@@ -467,7 +492,8 @@ class AiGridController extends ChangeNotifier {
 
       if (results.containsKey(rowIndex)) {
         allRows[rowIndex][col.field] = results[rowIndex];
-        _smartCellStatus[col.field]![rowIndex] = AiGridSmartCellStatus.generated;
+        _smartCellStatus[col.field]![rowIndex] =
+            AiGridSmartCellStatus.generated;
       } else {
         _smartCellStatus[col.field]![rowIndex] = AiGridSmartCellStatus.error;
       }
@@ -486,8 +512,9 @@ class AiGridController extends ChangeNotifier {
 
   /// Clears generated AI values in smart columns and resets cell statuses to idle.
   void clearSmartColumnValues([String? field]) {
-    final targets =
-        smartColumns.where((c) => field == null || c.field == field).toList();
+    final targets = smartColumns
+        .where((c) => field == null || c.field == field)
+        .toList();
     if (targets.isEmpty) return;
 
     final allRows = List<Map<String, dynamic>>.from(rows);
@@ -537,7 +564,9 @@ class AiGridController extends ChangeNotifier {
     // Row mode: show an empty record inline at the configured position.
     if (_editingOptions.mode == AiGridEditMode.row && _fitController != null) {
       final placeholder = Map<String, dynamic>.from(_draftRow!);
-      final allRows = List<Map<String, dynamic>>.from(_fitController!.data.rows);
+      final allRows = List<Map<String, dynamic>>.from(
+        _fitController!.data.rows,
+      );
       if (_editingOptions.insertRowPosition == AiGridInsertRowPosition.top) {
         allRows.insert(0, placeholder);
       } else {
@@ -549,11 +578,13 @@ class AiGridController extends ChangeNotifier {
       _editingRowIndex = idx >= 0 ? idx : null;
     }
 
-    logEditEvent(AiGridEditEvent(
-      action: 'startAdd',
-      message: 'Started adding a new record',
-      data: initialValues,
-    ));
+    logEditEvent(
+      AiGridEditEvent(
+        action: 'startAdd',
+        message: 'Started adding a new record',
+        data: initialValues,
+      ),
+    );
     notifyListeners();
   }
 
@@ -571,12 +602,14 @@ class AiGridController extends ChangeNotifier {
     final row = rows[rowIndex];
     _draftRow = Map<String, dynamic>.from(row);
     final idVal = row['OrderID'] ?? row['id'] ?? row['ID'] ?? '#$rowIndex';
-    logEditEvent(AiGridEditEvent(
-      action: 'startEdit',
-      rowIndex: rowIndex,
-      message: 'Started editing row #$rowIndex ($idVal)',
-      data: row,
-    ));
+    logEditEvent(
+      AiGridEditEvent(
+        action: 'startEdit',
+        rowIndex: rowIndex,
+        message: 'Started editing row #$rowIndex ($idVal)',
+        data: row,
+      ),
+    );
     notifyListeners();
   }
 
@@ -614,14 +647,17 @@ class AiGridController extends ChangeNotifier {
       }
       col.onChanged?.call(value, _draftRow!);
     }
-    logEditEvent(AiGridEditEvent(
-      action: 'change',
-      rowIndex: _editingRowIndex,
-      field: column,
-      oldValue: oldVal,
-      newValue: value,
-      message: 'Updated field "$column": ${oldVal ?? "null"} → ${value ?? "null"}',
-    ));
+    logEditEvent(
+      AiGridEditEvent(
+        action: 'change',
+        rowIndex: _editingRowIndex,
+        field: column,
+        oldValue: oldVal,
+        newValue: value,
+        message:
+            'Updated field "$column": ${oldVal ?? "null"} → ${value ?? "null"}',
+      ),
+    );
     notifyListeners();
   }
 
@@ -634,21 +670,27 @@ class AiGridController extends ChangeNotifier {
     _isAddingRow = false;
     _draftRow = null;
     _validationErrors.clear();
-    logEditEvent(AiGridEditEvent(
-      action: 'cancel',
-      rowIndex: prevIdx,
-      message: wasAdding
-          ? 'Cancelled adding new record'
-          : 'Cancelled editing row #${prevIdx ?? "unknown"}',
-    ));
+    logEditEvent(
+      AiGridEditEvent(
+        action: 'cancel',
+        rowIndex: prevIdx,
+        message: wasAdding
+            ? 'Cancelled adding new record'
+            : 'Cancelled editing row #${prevIdx ?? "unknown"}',
+      ),
+    );
     notifyListeners();
   }
 
   /// Validates and saves the active edit or added row.
   /// Returns null on success, or an error message on validation failure.
   Future<String?> saveEdit() async {
-    if (_activeDynamicDatasource?.isReadonly == true) return 'Table is read-only';
-    if (_draftRow == null || _fitController == null) return null;
+    if (_activeDynamicDatasource?.isReadonly == true) {
+      return 'Table is read-only';
+    }
+    if (_draftRow == null || _fitController == null) {
+      return null;
+    }
 
     // 1. Column-level validation
     _validationErrors.clear();
@@ -662,28 +704,34 @@ class AiGridController extends ChangeNotifier {
     }
     if (_validationErrors.isNotEmpty) {
       final err = _validationErrors.values.first;
-      logEditEvent(AiGridEditEvent(
-        action: 'error',
-        rowIndex: _editingRowIndex,
-        message: 'Validation failed: $err',
-      ));
+      logEditEvent(
+        AiGridEditEvent(
+          action: 'error',
+          rowIndex: _editingRowIndex,
+          message: 'Validation failed: $err',
+        ),
+      );
       notifyListeners();
       return err;
     }
 
     final originalRow = _isAddingRow
         ? <String, dynamic>{}
-        : Map<String, dynamic>.from(_fitController!.data.view[_editingRowIndex!]);
+        : Map<String, dynamic>.from(
+            _fitController!.data.view[_editingRowIndex!],
+          );
 
     // 2. beforeSave lifecycle hook
     if (_editingOptions.beforeSave != null) {
       final err = await _editingOptions.beforeSave!(originalRow, _draftRow!);
       if (err != null) {
-        logEditEvent(AiGridEditEvent(
-          action: 'error',
-          rowIndex: _editingRowIndex,
-          message: 'beforeSave rejected: $err',
-        ));
+        logEditEvent(
+          AiGridEditEvent(
+            action: 'error',
+            rowIndex: _editingRowIndex,
+            message: 'beforeSave rejected: $err',
+          ),
+        );
         notifyListeners();
         return err;
       }
@@ -705,8 +753,9 @@ class AiGridController extends ChangeNotifier {
     final allRows = List<Map<String, dynamic>>.from(_fitController!.data.rows);
     if (_isAddingRow) {
       final newRow = Map<String, dynamic>.from(_draftRow!);
-      final pendingIdx =
-          _pendingNewRow == null ? -1 : allRows.indexOf(_pendingNewRow!);
+      final pendingIdx = _pendingNewRow == null
+          ? -1
+          : allRows.indexOf(_pendingNewRow!);
       if (pendingIdx >= 0) {
         allRows[pendingIdx] = newRow;
       } else if (_editingOptions.insertRowPosition ==
@@ -727,8 +776,12 @@ class AiGridController extends ChangeNotifier {
     if (_dataSource is LocalAiGridDataSource) {
       (_dataSource as LocalAiGridDataSource).setData(allRows);
     }
-    if (_activeDynamicDatasource != null && !_activeDynamicDatasource!.isReadonly) {
-      AiGridDynamicStorage.updateDataRows(_activeDynamicDatasource!.name, allRows);
+    if (_activeDynamicDatasource != null &&
+        !_activeDynamicDatasource!.isReadonly) {
+      AiGridDynamicStorage.updateDataRows(
+        _activeDynamicDatasource!.name,
+        allRows,
+      );
     }
 
     final savedRow = Map<String, dynamic>.from(_draftRow!);
@@ -739,14 +792,16 @@ class AiGridController extends ChangeNotifier {
     _draftRow = null;
     _validationErrors.clear();
 
-    logEditEvent(AiGridEditEvent(
-      action: 'save',
-      rowIndex: targetIndex,
-      message: isAdding
-          ? 'Successfully added new record'
-          : 'Successfully saved row #${targetIndex ?? 0}',
-      data: savedRow,
-    ));
+    logEditEvent(
+      AiGridEditEvent(
+        action: 'save',
+        rowIndex: targetIndex,
+        message: isAdding
+            ? 'Successfully added new record'
+            : 'Successfully saved row #${targetIndex ?? 0}',
+        data: savedRow,
+      ),
+    );
 
     // 5. afterSave lifecycle hook
     _editingOptions.afterSave?.call(savedRow);
@@ -777,17 +832,27 @@ class AiGridController extends ChangeNotifier {
     if (_dataSource is LocalAiGridDataSource) {
       (_dataSource as LocalAiGridDataSource).setData(allRows);
     }
-    if (_activeDynamicDatasource != null && !_activeDynamicDatasource!.isReadonly) {
-      AiGridDynamicStorage.updateDataRows(_activeDynamicDatasource!.name, allRows);
+    if (_activeDynamicDatasource != null &&
+        !_activeDynamicDatasource!.isReadonly) {
+      AiGridDynamicStorage.updateDataRows(
+        _activeDynamicDatasource!.name,
+        allRows,
+      );
     }
 
-    final idVal = targetRow['OrderID'] ?? targetRow['id'] ?? targetRow['ID'] ?? '#$rowIndex';
-    logEditEvent(AiGridEditEvent(
-      action: 'delete',
-      rowIndex: rowIndex,
-      message: 'Deleted row #$rowIndex ($idVal)',
-      data: targetRow,
-    ));
+    final idVal =
+        targetRow['OrderID'] ??
+        targetRow['id'] ??
+        targetRow['ID'] ??
+        '#$rowIndex';
+    logEditEvent(
+      AiGridEditEvent(
+        action: 'delete',
+        rowIndex: rowIndex,
+        message: 'Deleted row #$rowIndex ($idVal)',
+        data: targetRow,
+      ),
+    );
 
     // 3. afterDelete hook
     _editingOptions.afterDelete?.call(targetRow);
@@ -915,25 +980,32 @@ class AiGridController extends ChangeNotifier {
     required AiGridDataSource dataSource,
     bool notify = false,
   }) {
-    if (_fitController != null && _fitController != fitController && fitController != null) {
+    if (_fitController != null &&
+        _fitController != fitController &&
+        fitController != null) {
       _fitController!.data.removeListener(_onFitControllerChanged);
       _fitController!.columns.removeListener(_onFitControllerChanged);
       _fitController!.filter.removeListener(_onFitFilterChanged);
       _fitController!.range.removeListener(_onFitRangeChanged);
       _fitController!.details.removeListener(_onFitDetailsChanged);
     }
-    _fitController = fitController ??
+    _fitController =
+        fitController ??
         _fitController ??
         FitGridController<Map<String, dynamic>>(
           columns: columns.map((c) => c.toFitGridColumn()).toList(),
-          rows: dataSource is LocalAiGridDataSource ? dataSource.data : const [],
+          rows: dataSource is LocalAiGridDataSource
+              ? dataSource.data
+              : const [],
         );
     _columns = columns;
     _dataSource = dataSource;
 
     // Seed initial column width overrides if declared and not yet overridden
     for (final col in _columns) {
-      if (col.width != null && col.width! > 0 && !_fitController!.columns.isResized(col.field)) {
+      if (col.width != null &&
+          col.width! > 0 &&
+          !_fitController!.columns.isResized(col.field)) {
         _fitController!.columns.setWidth(col.field, col.width!);
       }
     }
@@ -988,9 +1060,11 @@ class AiGridController extends ChangeNotifier {
     _activeDynamicDatasource = descriptor;
     final effectiveColumns = descriptor.isReadonly
         ? columns
-            .map((c) => c.copyWith(editable: false, enableEditingMode: false))
-            .toList()
-        : columns;
+              .map((c) => c.copyWith(editable: false, enableEditingMode: false))
+              .toList()
+        : columns
+              .map((c) => c.editable != null ? c : c.copyWith(editable: true))
+              .toList();
     _columns = effectiveColumns;
     _dataSource = LocalAiGridDataSource(
       columns: effectiveColumns,
@@ -998,8 +1072,9 @@ class AiGridController extends ChangeNotifier {
     );
 
     if (_fitController != null) {
-      _fitController!.columns.columns =
-          effectiveColumns.map((c) => c.toFitGridColumn()).toList();
+      _fitController!.columns.columns = effectiveColumns
+          .map((c) => c.toFitGridColumn())
+          .toList();
       _fitController!.data.rows = rows;
     } else {
       _fitController = FitGridController<Map<String, dynamic>>(
@@ -1056,9 +1131,118 @@ class AiGridController extends ChangeNotifier {
     _activeSortColumn = null;
     _searchQuery = '';
     _hiddenFields.clear();
+    _activeExcelWorkbook = null;
 
     AiGridDynamicStorage.setActiveDatasourceName(null);
     notifyListeners();
+  }
+
+  /// Parses an Excel (.xlsx) file into an [AiGridExcelWorkbook].
+  AiGridExcelWorkbook parseExcel(
+    Uint8List bytes, {
+    String fileName = 'workbook.xlsx',
+  }) {
+    return AiGridExcelParser.parseBytes(bytes, fileName: fileName);
+  }
+
+  /// Imports an Excel (.xlsx) workbook directly into the grid.
+  ///
+  /// If [bytes] is omitted, launches the platform file picker for `.xlsx` files.
+  /// If the workbook contains multiple worksheets and [context] is provided,
+  /// opens [AiGridExcelSheetPickerDialog] allowing the user to preview and pick
+  /// their desired worksheet.
+  /// Once a worksheet is selected, automatically infers schema types,
+  /// saves the dynamic dataset to [AiGridDynamicStorage], and loads it into the grid.
+  Future<AiGridExcelSheet?> importExcel({
+    Uint8List? bytes,
+    String? fileName,
+    String? sheetName,
+    BuildContext? context,
+  }) async {
+    Uint8List? fileBytes = bytes;
+    String name = fileName ?? 'workbook.xlsx';
+
+    if (fileBytes == null) {
+      final picked = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (picked == null) return null;
+      fileBytes = await picked.xFile.readAsBytes();
+      name = picked.name;
+    }
+
+    final workbook = AiGridExcelParser.parseBytes(fileBytes, fileName: name);
+    if (workbook.sheets.isEmpty) return null;
+    _activeExcelWorkbook = workbook;
+
+    AiGridExcelSheet? selectedSheet;
+    if (sheetName != null) {
+      selectedSheet = workbook.getSheet(sheetName);
+    }
+
+    if (selectedSheet == null) {
+      if (workbook.isMultiSheet && context != null && context.mounted) {
+        selectedSheet = await AiGridExcelSheetPickerDialog.show(
+          context,
+          workbook: workbook,
+        );
+        if (selectedSheet == null) return null;
+      } else {
+        selectedSheet = workbook.primarySheet;
+      }
+    }
+
+    if (selectedSheet == null) return null;
+
+    final rawName = name
+        .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+        .toLowerCase();
+    final cleanSheet = selectedSheet.name
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+        .toLowerCase();
+    final dsName = rawName.isEmpty ? 'excel_dataset' : '${rawName}_$cleanSheet';
+    final modelName = '${dsName}_mdl.yaml';
+    final datasourceName = '$dsName.json';
+    final now = DateTime.now();
+
+    final dynamicModel = AiGridDynamicModel(
+      modelName: modelName,
+      datasourceName: datasourceName,
+      title: '${selectedSheet.name} ($name)',
+      sourceType: 'file',
+      sourceOrigin: name,
+      createdAt: now,
+      columns: selectedSheet.columns,
+    );
+
+    final descriptor = AiGridDynamicDescriptor(
+      name: dsName,
+      modelName: modelName,
+      datasourceName: datasourceName,
+      title: dynamicModel.title,
+      sourceType: 'file',
+      sourceOrigin: name,
+      rowCount: selectedSheet.rows.length,
+      createdAt: now,
+      updatedAt: now,
+      isReadonly: false,
+    );
+
+    await AiGridDynamicStorage.saveDatasource(
+      descriptor: descriptor,
+      model: dynamicModel,
+      rows: selectedSheet.rows,
+    );
+
+    loadDynamicDatasource(
+      descriptor,
+      selectedSheet.columns.map((c) => c.toAiGridColumn()).toList(),
+      selectedSheet.rows,
+    );
+
+    return selectedSheet;
   }
 
   /// Opens the modal popup [AiGridColumnEditorDialog] to edit a column's schema definition.
@@ -1067,7 +1251,11 @@ class AiGridController extends ChangeNotifier {
     BuildContext context, {
     required String field,
   }) {
-    return AiGridColumnEditorDialog.show(context, controller: this, field: field);
+    return AiGridColumnEditorDialog.show(
+      context,
+      controller: this,
+      field: field,
+    );
   }
 
   /// Opens the modal popup [AiGridColumnsEditorDialog] to edit and reorder all grid columns
@@ -1075,6 +1263,107 @@ class AiGridController extends ChangeNotifier {
   /// Only available when the dynamic grid is not read-only.
   Future<bool?> showColumnsEditorDialog(BuildContext context) {
     return AiGridColumnsEditorDialog.show(context, controller: this);
+  }
+
+  /// Updates rows in FitGrid, AiGridDataSource, and persistent dynamic storage.
+  void _updateGridRows(List<Map<String, dynamic>> newRows) {
+    if (_fitController != null) {
+      _fitController!.data.rows = List<Map<String, dynamic>>.from(newRows);
+    }
+    if (_dataSource is LocalAiGridDataSource) {
+      (_dataSource as LocalAiGridDataSource).setData(newRows);
+    }
+    if (_activeDynamicDatasource != null &&
+        !_activeDynamicDatasource!.isReadonly) {
+      AiGridDynamicStorage.updateDataRows(
+        _activeDynamicDatasource!.name,
+        newRows,
+      );
+    }
+    notifyListeners();
+  }
+
+  /// Audits active grid data for anomalies, inconsistencies, and dirty patterns.
+  AiGridAuditReport auditData() {
+    return AiGridDataCleaner.audit(rows: rows, columns: _columns);
+  }
+
+  /// Applies a targeted data cleaning [remediation] to the active grid data.
+  AiGridCleanResult cleanData(AiGridAuditRemediation remediation) {
+    if (_activeDynamicDatasource?.isReadonly == true) {
+      return AiGridCleanResult(
+        modifiedCount: 0,
+        remainingRows: rows.length,
+        message: 'Cannot clean read-only datasource',
+        success: false,
+      );
+    }
+
+    final initialRows = rows;
+    final cleaned = AiGridDataCleaner.applyRemediation(
+      rows: initialRows,
+      remediation: remediation,
+      columns: _columns,
+    );
+
+    _updateGridRows(cleaned);
+
+    final modified = initialRows.length != cleaned.length
+        ? (initialRows.length - cleaned.length).abs()
+        : initialRows.length;
+
+    final result = AiGridCleanResult(
+      modifiedCount: modified,
+      remainingRows: cleaned.length,
+      message: 'Applied: ${remediation.description}',
+    );
+
+    logEditEvent(
+      AiGridEditEvent(
+        action: 'cleanData',
+        message: result.message,
+        data: remediation.toJson(),
+      ),
+    );
+
+    return result;
+  }
+
+  /// Automatically executes all remediation strategies across all fields in 1 click.
+  AiGridCleanResult cleanAllData() {
+    if (_activeDynamicDatasource?.isReadonly == true) {
+      return AiGridCleanResult(
+        modifiedCount: 0,
+        remainingRows: rows.length,
+        message: 'Cannot clean read-only datasource',
+        success: false,
+      );
+    }
+
+    final initialRows = rows;
+    final cleaned = AiGridDataCleaner.cleanAll(initialRows, columns: _columns);
+
+    _updateGridRows(cleaned);
+
+    final removed = initialRows.length - cleaned.length;
+    final msg = removed > 0
+        ? 'Cleaned all anomalies (removed $removed duplicate rows, normalized formats & numbers)'
+        : 'Cleaned all anomalies across all columns';
+
+    final result = AiGridCleanResult(
+      modifiedCount: cleaned.length,
+      remainingRows: cleaned.length,
+      message: msg,
+    );
+
+    logEditEvent(AiGridEditEvent(action: 'cleanAllData', message: msg));
+
+    return result;
+  }
+
+  /// Opens the modal popup [AiGridDataAuditorDialog] to inspect data quality and apply 1-click cleanups.
+  Future<AiGridCleanResult?> showDataAuditorDialog(BuildContext context) {
+    return AiGridDataAuditorDialog.show(context, controller: this);
   }
 
   /// Updates grid column definitions and syncs with the underlying FitGrid.
@@ -1121,16 +1410,20 @@ class AiGridController extends ChangeNotifier {
 
     if (_activeDynamicDatasource != null &&
         !_activeDynamicDatasource!.isReadonly) {
-      final existingModel =
-          await AiGridDynamicStorage.getModel(_activeDynamicDatasource!.name);
+      final existingModel = await AiGridDynamicStorage.getModel(
+        _activeDynamicDatasource!.name,
+      );
       if (existingModel != null) {
         final updatedDynamicCols = _columns
             .map((c) => AiGridDynamicColumnModel.fromAiGridColumn(c))
             .toList();
-        final updatedModel =
-            existingModel.copyWith(columns: updatedDynamicCols);
+        final updatedModel = existingModel.copyWith(
+          columns: updatedDynamicCols,
+        );
         await AiGridDynamicStorage.updateModel(
-            _activeDynamicDatasource!.name, updatedModel);
+          _activeDynamicDatasource!.name,
+          updatedModel,
+        );
       }
     }
 
@@ -1195,8 +1488,9 @@ class AiGridController extends ChangeNotifier {
     }
 
     if (_fitController != null) {
-      _fitController!.columns.columns =
-          updatedColumns.map((c) => c.toFitGridColumn()).toList();
+      _fitController!.columns.columns = updatedColumns
+          .map((c) => c.toFitGridColumn())
+          .toList();
       if (width != null && width > 0) {
         _fitController!.columns.setWidth(field, width);
       }
@@ -1204,16 +1498,20 @@ class AiGridController extends ChangeNotifier {
 
     if (_activeDynamicDatasource != null &&
         !_activeDynamicDatasource!.isReadonly) {
-      final existingModel =
-          await AiGridDynamicStorage.getModel(_activeDynamicDatasource!.name);
+      final existingModel = await AiGridDynamicStorage.getModel(
+        _activeDynamicDatasource!.name,
+      );
       if (existingModel != null) {
         final updatedDynamicCols = updatedColumns
             .map((c) => AiGridDynamicColumnModel.fromAiGridColumn(c))
             .toList();
-        final updatedModel =
-            existingModel.copyWith(columns: updatedDynamicCols);
+        final updatedModel = existingModel.copyWith(
+          columns: updatedDynamicCols,
+        );
         await AiGridDynamicStorage.updateModel(
-            _activeDynamicDatasource!.name, updatedModel);
+          _activeDynamicDatasource!.name,
+          updatedModel,
+        );
       }
     }
 
@@ -1231,7 +1529,8 @@ class AiGridController extends ChangeNotifier {
   bool get hasCellRangeSelection => _fitController?.range.isActive ?? false;
 
   /// Whether more than one cell is currently selected in the active range.
-  bool get isMultiCellRangeSelected => _fitController?.range.isMultiCell ?? false;
+  bool get isMultiCellRangeSelected =>
+      _fitController?.range.isMultiCell ?? false;
 
   /// Selects a rectangular range of cells spanning from ([anchorRow], [anchorColumn])
   /// to ([extentRow], [extentColumn]).
@@ -1299,7 +1598,9 @@ class AiGridController extends ChangeNotifier {
 
   /// Copies the currently selected rectangular cell range to the system clipboard
   /// as tab-separated values (TSV), compatible with Microsoft Excel, Google Sheets, etc.
-  Future<bool> copySelectedRangeToClipboard({bool includeHeaders = false}) async {
+  Future<bool> copySelectedRangeToClipboard({
+    bool includeHeaders = false,
+  }) async {
     final range = _fitController?.range.range;
     if (range == null || _fitController == null) return false;
 
@@ -1311,13 +1612,15 @@ class AiGridController extends ChangeNotifier {
 
     final buffer = StringBuffer();
     if (includeHeaders) {
-      final headerTitles = colIds.map((id) {
-        final col = displayed.firstWhere(
-          (c) => c.id == id,
-          orElse: () => displayed.first,
-        );
-        return col.label;
-      }).join('\t');
+      final headerTitles = colIds
+          .map((id) {
+            final col = displayed.firstWhere(
+              (c) => c.id == id,
+              orElse: () => displayed.first,
+            );
+            return col.label;
+          })
+          .join('\t');
       buffer.writeln(headerTitles);
     }
 
@@ -1348,7 +1651,9 @@ class AiGridController extends ChangeNotifier {
   void setMasterDetailOptions(AiGridMasterDetailOptions? options) {
     if (_masterDetailOptions == options) return;
     _masterDetailOptions = options;
-    if (options != null && options.initiallyExpandedKeys != null && _fitController != null) {
+    if (options != null &&
+        options.initiallyExpandedKeys != null &&
+        _fitController != null) {
       for (final key in options.initiallyExpandedKeys!) {
         _fitController!.details.setExpanded(key, true);
       }
@@ -1434,13 +1739,18 @@ class AiGridController extends ChangeNotifier {
   void toggleRowDetailAt(int rowIndex) {
     if (_fitController == null) return;
     final view = _fitController!.data.view;
-    if (rowIndex < 0 || rowIndex >= view.length) return;
+    if (rowIndex < 0 || rowIndex >= view.length) {
+      return;
+    }
     toggleRowDetail(resolveRowKey(view[rowIndex]));
   }
 
   /// Expands all rows in the active view (disabled in accordion mode).
   void expandAllDetails() {
-    if (_fitController == null || _masterDetailOptions?.autoCollapseOthers == true) return;
+    if (_fitController == null ||
+        _masterDetailOptions?.autoCollapseOthers == true) {
+      return;
+    }
     for (final row in _fitController!.data.view) {
       _fitController!.details.setExpanded(resolveRowKey(row), true);
     }
@@ -1482,7 +1792,8 @@ class AiGridController extends ChangeNotifier {
     final current = _fitController?.details.expanded ?? const <Object>{};
 
     // Accordion Mode (autoCollapseOthers):
-    if (_masterDetailOptions?.autoCollapseOthers == true && current.length > 1) {
+    if (_masterDetailOptions?.autoCollapseOthers == true &&
+        current.length > 1) {
       final newlyAdded = current.difference(_previousExpandedKeys);
       if (newlyAdded.isNotEmpty) {
         final keepKey = newlyAdded.last;
@@ -1526,10 +1837,14 @@ class AiGridController extends ChangeNotifier {
     for (final entry in currentFilters.entries) {
       _activeFilters[entry.key] = {
         'operator': entry.value.operator.name,
-        'value': entry.value.value ??
-            (entry.value.values.isNotEmpty ? entry.value.values.join(', ') : null),
+        'value':
+            entry.value.value ??
+            (entry.value.values.isNotEmpty
+                ? entry.value.values.join(', ')
+                : null),
         if (entry.value.value2 != null) 'value2': entry.value.value2,
-        if (entry.value.values.isNotEmpty) 'values': entry.value.values.toList(),
+        if (entry.value.values.isNotEmpty)
+          'values': entry.value.values.toList(),
       };
     }
     final phase = SchedulerBinding.instance.schedulerPhase;
@@ -1605,26 +1920,44 @@ class AiGridController extends ChangeNotifier {
   }
 
   FitGridFilterOperator _resolveFilterOperator(String operator) {
-    final clean = operator.toLowerCase().replaceAll(' ', '').replaceAll('_', '');
+    final clean = operator
+        .toLowerCase()
+        .replaceAll(' ', '')
+        .replaceAll('_', '');
     return switch (clean) {
-      'notequals' || 'neq' || 'ne' || '!=' || '<>' || 'not' =>
-        FitGridFilterOperator.notEquals,
-      'notcontains' || 'doesnotcontain' || '!contains' || 'exclude' || 'excludes' =>
-        FitGridFilterOperator.notContains,
+      'notequals' ||
+      'neq' ||
+      'ne' ||
+      '!=' ||
+      '<>' ||
+      'not' => FitGridFilterOperator.notEquals,
+      'notcontains' ||
+      'doesnotcontain' ||
+      '!contains' ||
+      'exclude' ||
+      'excludes' => FitGridFilterOperator.notContains,
       'equals' || 'eq' || '=' || '==' => FitGridFilterOperator.equals,
       'startswith' => FitGridFilterOperator.startsWith,
       'endswith' => FitGridFilterOperator.endsWith,
       'greaterthan' || 'gt' || '>' => FitGridFilterOperator.greaterThan,
-      'greaterthanorequalto' || 'greaterorequal' || 'gte' || '>=' =>
-        FitGridFilterOperator.greaterOrEqual,
+      'greaterthanorequalto' ||
+      'greaterorequal' ||
+      'gte' ||
+      '>=' => FitGridFilterOperator.greaterOrEqual,
       'lessthan' || 'lt' || '<' => FitGridFilterOperator.lessThan,
-      'lessthanorequalto' || 'lessorequal' || 'lte' || '<=' =>
-        FitGridFilterOperator.lessOrEqual,
+      'lessthanorequalto' ||
+      'lessorequal' ||
+      'lte' ||
+      '<=' => FitGridFilterOperator.lessOrEqual,
       'between' => FitGridFilterOperator.between,
       'isempty' => FitGridFilterOperator.isEmpty,
       'isnotempty' => FitGridFilterOperator.isNotEmpty,
-      'inlist' || 'oneof' || 'in' || 'or' || 'anyof' || 'either' =>
-        FitGridFilterOperator.inList,
+      'inlist' ||
+      'oneof' ||
+      'in' ||
+      'or' ||
+      'anyof' ||
+      'either' => FitGridFilterOperator.inList,
       _ => FitGridFilterOperator.contains,
     };
   }
@@ -1635,7 +1968,8 @@ class AiGridController extends ChangeNotifier {
     try {
       final activeFields = _activeFilters.keys.toSet();
       // 1. Remove filters in FitGrid that are no longer active in _activeFilters
-      for (final existingField in _fitController!.filter.filters.keys.toList()) {
+      for (final existingField
+          in _fitController!.filter.filters.keys.toList()) {
         if (!activeFields.contains(existingField)) {
           _fitController!.filter.setFilter(existingField, null);
         }
@@ -1652,7 +1986,8 @@ class AiGridController extends ChangeNotifier {
         if (val is Iterable) {
           op = FitGridFilterOperator.inList;
         } else if (val is String &&
-            (op == FitGridFilterOperator.contains || op == FitGridFilterOperator.equals)) {
+            (op == FitGridFilterOperator.contains ||
+                op == FitGridFilterOperator.equals)) {
           final trimmed = val.trim();
           if (trimmed.toLowerCase().startsWith('in:') ||
               trimmed.toLowerCase().contains(RegExp(r'\s+or\s+'))) {
@@ -1674,7 +2009,8 @@ class AiGridController extends ChangeNotifier {
             var raw = val.trim();
             if (raw.toLowerCase().startsWith('in:')) {
               raw = raw.substring(3).trim();
-            } else if (raw.toLowerCase().startsWith('in(') && raw.endsWith(')')) {
+            } else if (raw.toLowerCase().startsWith('in(') &&
+                raw.endsWith(')')) {
               raw = raw.substring(3, raw.length - 1).trim();
             }
             setValues = raw
@@ -1687,9 +2023,12 @@ class AiGridController extends ChangeNotifier {
           }
           operand = setValues.join(', ');
         } else if (col != null) {
-          if (col.type == AiGridColumnType.number || col.type == AiGridColumnType.currency) {
+          if (col.type == AiGridColumnType.number ||
+              col.type == AiGridColumnType.currency) {
             if (val is! num && val != null) {
-              operand = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+              operand = num.tryParse(
+                val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''),
+              );
             }
           } else if (col.type == AiGridColumnType.date) {
             if (val is! DateTime && val != null) {
@@ -1700,11 +2039,7 @@ class AiGridController extends ChangeNotifier {
 
         _fitController!.filter.setFilter(
           field,
-          FitGridColumnFilter(
-            operator: op,
-            value: operand,
-            values: setValues,
-          ),
+          FitGridColumnFilter(operator: op, value: operand, values: setValues),
         );
       }
     } finally {
@@ -1719,20 +2054,14 @@ class AiGridController extends ChangeNotifier {
     required dynamic value,
   }) {
     final actualField = _resolveField(field) ?? field;
-    _activeFilters[actualField] = {
-      'operator': operator,
-      'value': value,
-    };
+    _activeFilters[actualField] = {'operator': operator, 'value': value};
     _applyActiveFilters();
     notifyListeners();
   }
 
   /// Applies multiple column filters at once joined by AND.
   /// If [replace] is true, existing filters are cleared first.
-  void setFilters(
-    List<Map<String, dynamic>> filters, {
-    bool replace = false,
-  }) {
+  void setFilters(List<Map<String, dynamic>> filters, {bool replace = false}) {
     if (replace) {
       _activeFilters.clear();
     }
@@ -1742,10 +2071,7 @@ class AiGridController extends ChangeNotifier {
       final actualField = _resolveField(field) ?? field;
       final op = (f['operator'] as String?) ?? 'contains';
       final val = f['value'];
-      _activeFilters[actualField] = {
-        'operator': op,
-        'value': val,
-      };
+      _activeFilters[actualField] = {'operator': op, 'value': val};
     }
     _applyActiveFilters();
     notifyListeners();
@@ -1778,26 +2104,31 @@ class AiGridController extends ChangeNotifier {
     }
 
     final actualField = _resolveField(field) ?? field;
-    final String columnTitle = _columns
-        .where((c) => c.field == actualField)
-        .firstOrNull
-        ?.title ?? actualField;
+    final String columnTitle =
+        _columns.where((c) => c.field == actualField).firstOrNull?.title ??
+        actualField;
 
-    final targetColumn = _columns.where((c) => c.field == actualField).firstOrNull;
+    final targetColumn = _columns
+        .where((c) => c.field == actualField)
+        .firstOrNull;
 
     List<Map<String, dynamic>> rows = [];
     if (_fitController != null) {
-      rows = filteredOnly ? _fitController!.data.view : _fitController!.data.rows;
+      rows = filteredOnly
+          ? _fitController!.data.view
+          : _fitController!.data.rows;
     } else if (_dataSource is LocalAiGridDataSource) {
       rows = (_dataSource as LocalAiGridDataSource).data;
     }
 
     if (groupBy != null && groupBy.isNotEmpty) {
       final actualGroupField = _resolveField(groupBy) ?? groupBy;
-      final String groupTitle = _columns
-          .where((c) => c.field == actualGroupField)
-          .firstOrNull
-          ?.title ?? actualGroupField;
+      final String groupTitle =
+          _columns
+              .where((c) => c.field == actualGroupField)
+              .firstOrNull
+              ?.title ??
+          actualGroupField;
 
       final groups = <dynamic, List<num>>{};
       for (final row in rows) {
@@ -1806,7 +2137,9 @@ class AiGridController extends ChangeNotifier {
         if (val is num) {
           groups.putIfAbsent(gVal, () => []).add(val);
         } else if (val != null) {
-          final parsed = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+          final parsed = num.tryParse(
+            val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''),
+          );
           if (parsed != null) {
             groups.putIfAbsent(gVal, () => []).add(parsed);
           }
@@ -1815,7 +2148,11 @@ class AiGridController extends ChangeNotifier {
 
       final results = <String, dynamic>{};
       for (final entry in groups.entries) {
-        results[entry.key.toString()] = _computeStats(entry.value, operation, targetColumn);
+        results[entry.key.toString()] = _computeStats(
+          entry.value,
+          operation,
+          targetColumn,
+        );
       }
 
       return {
@@ -1835,7 +2172,9 @@ class AiGridController extends ChangeNotifier {
       if (val is num) {
         numbers.add(val);
       } else if (val != null) {
-        final parsed = num.tryParse(val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+        final parsed = num.tryParse(
+          val.toString().replaceAll(RegExp(r'[^0-9.-]'), ''),
+        );
         if (parsed != null) numbers.add(parsed);
       }
     }
@@ -1926,10 +2265,13 @@ class AiGridController extends ChangeNotifier {
   /// Transforms the grid on-the-fly into an aggregated Pivot Table.
   void setPivot(AiGridPivotConfig config) {
     if (config.rowFieldIds.isEmpty || config.values.isEmpty) {
-      throw ArgumentError('Pivot requires at least one row field and one value field.');
+      throw ArgumentError(
+        'Pivot requires at least one row field and one value field.',
+      );
     }
 
-    final sourceRows = _prePivotRows ??
+    final sourceRows =
+        _prePivotRows ??
         List<Map<String, dynamic>>.from(
           _fitController?.data.rows ??
               (_dataSource is LocalAiGridDataSource
@@ -1966,13 +2308,17 @@ class AiGridController extends ChangeNotifier {
       final colId = resolvedColIds.first;
       colDimension = FitGridPivotDimension<Map<String, dynamic>>(
         id: colId,
-        label: _columns.where((c) => c.field == colId).firstOrNull?.title ?? colId,
+        label:
+            _columns.where((c) => c.field == colId).firstOrNull?.title ?? colId,
         keyOf: (row) => row[colId]?.toString() ?? '(blank)',
       );
     } else if (resolvedColIds.length > 1) {
       final compId = resolvedColIds.join('__');
       final compLabel = resolvedColIds
-          .map((id) => _columns.where((c) => c.field == id).firstOrNull?.title ?? id)
+          .map(
+            (id) =>
+                _columns.where((c) => c.field == id).firstOrNull?.title ?? id,
+          )
           .join(' / ');
       colDimension = FitGridPivotDimension<Map<String, dynamic>>(
         id: compId,
@@ -2000,7 +2346,9 @@ class AiGridController extends ChangeNotifier {
               final raw = row[actualField];
               if (raw is num) return raw;
               if (raw == null) return null;
-              return num.tryParse(raw.toString().replaceAll(RegExp(r'[^0-9.-]'), ''));
+              return num.tryParse(
+                raw.toString().replaceAll(RegExp(r'[^0-9.-]'), ''),
+              );
             },
             format: v.format,
           );
@@ -2039,7 +2387,9 @@ class AiGridController extends ChangeNotifier {
       for (final col in pivotResult.columns.skip(rowDimensions.length)) {
         if (col.id.startsWith('total/')) {
           final valId = col.id.substring('total/'.length);
-          final valDim = valueDimensions.where((v) => v.id == valId).firstOrNull;
+          final valDim = valueDimensions
+              .where((v) => v.id == valId)
+              .firstOrNull;
           final subTitle = valDim?.label ?? valId;
           groupsMap.putIfAbsent('Grand Total', () => []).add(col.id);
           subTitleByColId[col.id] = subTitle;
@@ -2052,7 +2402,9 @@ class AiGridController extends ChangeNotifier {
             if (slashIdx != -1) {
               final headingLabel = rest.substring(0, slashIdx);
               final valId = rest.substring(slashIdx + 1);
-              final valDim = valueDimensions.where((v) => v.id == valId).firstOrNull;
+              final valDim = valueDimensions
+                  .where((v) => v.id == valId)
+                  .firstOrNull;
               final subTitle = valDim?.label ?? valId;
               groupsMap.putIfAbsent(headingLabel, () => []).add(col.id);
               subTitleByColId[col.id] = subTitle;
@@ -2107,8 +2459,8 @@ class AiGridController extends ChangeNotifier {
                 isEmpty
                     ? '—'
                     : (val is num
-                        ? NumberFormat('#,##0.##').format(val)
-                        : val.toString()),
+                          ? NumberFormat('#,##0.##').format(val)
+                          : val.toString()),
                 style: TextStyle(
                   fontSize: 12,
                   color: isEmpty ? Colors.grey[400] : null,
@@ -2127,14 +2479,13 @@ class AiGridController extends ChangeNotifier {
         pr.keys.map((k) => k?.toString() ?? '').join(' - '),
     ];
 
-    final measureColumns = pivotResult.columns.skip(rowDimensions.length).toList();
+    final measureColumns = pivotResult.columns
+        .skip(rowDimensions.length)
+        .toList();
     final seriesNames = <String>[for (final c in measureColumns) c.label];
     final matrix = <List<num>>[
       for (final c in measureColumns)
-        <num>[
-          for (final pr in pivotResult.rows)
-            pr.cells[c.id] ?? 0,
-        ],
+        <num>[for (final pr in pivotResult.rows) pr.cells[c.id] ?? 0],
     ];
 
     _pivotChartData = PivotChartData(
@@ -2148,8 +2499,9 @@ class AiGridController extends ChangeNotifier {
     _columns = pivotedColumns;
 
     if (_fitController != null) {
-      _fitController!.columns.columns =
-          pivotedColumns.map((c) => c.toFitGridColumn()).toList();
+      _fitController!.columns.columns = pivotedColumns
+          .map((c) => c.toFitGridColumn())
+          .toList();
       _fitController!.data.rows = pivotedRows;
 
       // DevExtreme-style hierarchical grouping when multiple row fields exist
@@ -2188,8 +2540,9 @@ class AiGridController extends ChangeNotifier {
 
     if (_fitController != null) {
       if (origCols != null) {
-        _fitController!.columns.columns =
-            origCols.map((c) => c.toFitGridColumn()).toList();
+        _fitController!.columns.columns = origCols
+            .map((c) => c.toFitGridColumn())
+            .toList();
       }
       if (origRows != null) {
         _fitController!.data.rows = origRows;
@@ -2236,13 +2589,17 @@ class AiGridController extends ChangeNotifier {
   /// If [append] is true, appends this column as an additional sort level (multi-column sorting).
   void sort(String field, {bool descending = false, bool append = false}) {
     final actual = _resolveField(field) ?? field;
-    final dir = descending ? FitGridSortDirection.descending : FitGridSortDirection.ascending;
+    final dir = descending
+        ? FitGridSortDirection.descending
+        : FitGridSortDirection.ascending;
 
     if (_fitController != null) {
       if (!append) {
         _fitController!.setSort([FitGridSortKey(actual, dir)]);
       } else {
-        final existing = _fitController!.data.sortKeys.where((k) => k.columnId != actual).toList();
+        final existing = _fitController!.data.sortKeys
+            .where((k) => k.columnId != actual)
+            .toList();
         existing.add(FitGridSortKey(actual, dir));
         _fitController!.setSort(existing);
       }
@@ -2254,8 +2611,11 @@ class AiGridController extends ChangeNotifier {
   }
 
   /// Sets column sorting (alias for [sort]).
-  void setSorting(String field, {bool descending = false, bool append = false}) =>
-      sort(field, descending: descending, append: append);
+  void setSorting(
+    String field, {
+    bool descending = false,
+    bool append = false,
+  }) => sort(field, descending: descending, append: append);
 
   /// Applies multi-column sorting with a sequence of sort definitions.
   void multiSort(List<Map<String, dynamic>> sortConfigs) {
@@ -2267,13 +2627,22 @@ class AiGridController extends ChangeNotifier {
       if (field == null) continue;
       final actual = _resolveField(field) ?? field;
       final descending = (config['descending'] as bool?) ?? false;
-      keys.add(FitGridSortKey(actual, descending ? FitGridSortDirection.descending : FitGridSortDirection.ascending));
+      keys.add(
+        FitGridSortKey(
+          actual,
+          descending
+              ? FitGridSortDirection.descending
+              : FitGridSortDirection.ascending,
+        ),
+      );
     }
 
     _fitController?.setSort(keys);
 
     if (sortConfigs.isNotEmpty) {
-      _activeSortColumn = (sortConfigs.first['field'] ?? sortConfigs.first['column']) as String?;
+      _activeSortColumn =
+          (sortConfigs.first['field'] ?? sortConfigs.first['column'])
+              as String?;
       _isSortDescending = (sortConfigs.first['descending'] as bool?) ?? false;
     }
     notifyListeners();
@@ -2306,11 +2675,16 @@ class AiGridController extends ChangeNotifier {
   void showOnlyColumns(List<String> fields) {
     final targetFields = fields.map((f) => _resolveField(f) ?? f).toSet();
     _hiddenFields.clear();
-    _hiddenFields.addAll(_columns.map((c) => c.field).where((f) => !targetFields.contains(f)));
+    _hiddenFields.addAll(
+      _columns.map((c) => c.field).where((f) => !targetFields.contains(f)),
+    );
 
     if (_fitController != null) {
       for (final col in _columns) {
-        _fitController!.columns.setVisible(col.field, targetFields.contains(col.field));
+        _fitController!.columns.setVisible(
+          col.field,
+          targetFields.contains(col.field),
+        );
       }
     }
     notifyListeners();
@@ -2342,13 +2716,19 @@ class AiGridController extends ChangeNotifier {
     if (_fitController != null) {
       return _fitController!.columns.visible.map((c) => c.id).toList();
     }
-    return _columns.map((c) => c.field).where((f) => !_hiddenFields.contains(f)).toList();
+    return _columns
+        .map((c) => c.field)
+        .where((f) => !_hiddenFields.contains(f))
+        .toList();
   }
 
   /// Returns the list of currently hidden column fields.
   List<String> get hiddenColumns {
     if (_fitController != null) {
-      return _fitController!.columns.columns.where((c) => !c.visible).map((c) => c.id).toList();
+      return _fitController!.columns.columns
+          .where((c) => !c.visible)
+          .map((c) => c.id)
+          .toList();
     }
     return _hiddenFields.toList();
   }
@@ -2426,8 +2806,12 @@ class AiGridController extends ChangeNotifier {
   void restoreLayoutState(FitGridSavedState state) {
     if (_fitController != null) {
       _fitController!.restoreState(state);
-      _activeSortColumn = state.sort.isNotEmpty ? state.sort.first.columnId : null;
-      _isSortDescending = state.sort.isNotEmpty && state.sort.first.direction == FitGridSortDirection.descending;
+      _activeSortColumn = state.sort.isNotEmpty
+          ? state.sort.first.columnId
+          : null;
+      _isSortDescending =
+          state.sort.isNotEmpty &&
+          state.sort.first.direction == FitGridSortDirection.descending;
       _searchQuery = state.query;
       _hiddenFields.clear();
       _hiddenFields.addAll(state.hiddenColumns);
@@ -2439,7 +2823,8 @@ class AiGridController extends ChangeNotifier {
   /// Uses FitGrid's native [FitGridSavedState] (column widths, order, frozen columns, sorts, filters, search)
   /// combined with AI Grid's grouping and UI toggles.
   Map<String, dynamic> exportSettings() {
-    final fitState = _fitController?.saveState().toJson() ?? <String, dynamic>{};
+    final fitState =
+        _fitController?.saveState().toJson() ?? <String, dynamic>{};
 
     return {
       ...fitState,
@@ -2449,31 +2834,36 @@ class AiGridController extends ChangeNotifier {
       // Backwards-compatibility fields for legacy callers and tools
       'visibleColumns': visibleColumns,
       'hiddenColumns': hiddenColumns,
-      'sorts': _fitController != null && _fitController!.data.sortKeys.isNotEmpty
+      'sorts':
+          _fitController != null && _fitController!.data.sortKeys.isNotEmpty
           ? _fitController!.data.sortKeys
-              .map((k) => {
+                .map(
+                  (k) => {
                     'field': k.columnId,
-                    'descending': k.direction == FitGridSortDirection.descending,
-                  })
-              .toList()
+                    'descending':
+                        k.direction == FitGridSortDirection.descending,
+                  },
+                )
+                .toList()
           : (_activeSortColumn != null
-              ? [
-                  {
-                    'field': _activeSortColumn,
-                    'descending': _isSortDescending,
-                  }
-                ]
-              : <Map<String, dynamic>>[]),
+                ? [
+                    {
+                      'field': _activeSortColumn,
+                      'descending': _isSortDescending,
+                    },
+                  ]
+                : <Map<String, dynamic>>[]),
       'filters': Map<String, dynamic>.from(activeFilters),
-      'conditionalFormats':
-          _conditionalFormats.map((f) => f.toJson()).toList(),
+      'conditionalFormats': _conditionalFormats.map((f) => f.toJson()).toList(),
       'timestamp': DateTime.now().toIso8601String(),
     };
   }
 
   /// Exports all current settings serialized as a JSON string.
   String exportSettingsJson({bool pretty = true}) {
-    final encoder = pretty ? const JsonEncoder.withIndent('  ') : const JsonEncoder();
+    final encoder = pretty
+        ? const JsonEncoder.withIndent('  ')
+        : const JsonEncoder();
     return encoder.convert(exportSettings());
   }
 
@@ -2489,7 +2879,8 @@ class AiGridController extends ChangeNotifier {
 
         if (fitState.sort.isNotEmpty) {
           _activeSortColumn = fitState.sort.first.columnId;
-          _isSortDescending = fitState.sort.first.direction == FitGridSortDirection.descending;
+          _isSortDescending =
+              fitState.sort.first.direction == FitGridSortDirection.descending;
         } else if (!settings.containsKey('sorts')) {
           _activeSortColumn = null;
           _isSortDescending = false;
@@ -2518,7 +2909,8 @@ class AiGridController extends ChangeNotifier {
           showOnlyColumns(list);
         }
       } else if (settings.containsKey('hiddenColumns')) {
-        final hidden = (settings['hiddenColumns'] as List?)
+        final hidden =
+            (settings['hiddenColumns'] as List?)
                 ?.map((e) => e.toString())
                 .toSet() ??
             {};
@@ -2537,7 +2929,8 @@ class AiGridController extends ChangeNotifier {
       for (final entry in filters.entries) {
         final valMap = entry.value as Map<String, dynamic>?;
         if (valMap != null) {
-          final op = (valMap['operator'] ?? valMap['op'])?.toString() ?? 'contains';
+          final op =
+              (valMap['operator'] ?? valMap['op'])?.toString() ?? 'contains';
           final val = valMap['value'];
           setFilter(entry.key, operator: op, value: val);
         }
@@ -2546,25 +2939,34 @@ class AiGridController extends ChangeNotifier {
 
     // 4. Sorts restoration
     if (settings.containsKey('sorts')) {
-      final sorts = (settings['sorts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final sorts =
+          (settings['sorts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       if (sorts.isNotEmpty) {
         multiSort(sorts);
       } else {
         clearSorting();
       }
     } else if (settings.containsKey('sort')) {
-      final sorts = (settings['sort'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final sorts =
+          (settings['sort'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       if (sorts.isNotEmpty) {
-        multiSort(sorts.map((s) => {
-          'field': s['column'],
-          'descending': s['dir'] == 'descending',
-        }).toList());
+        multiSort(
+          sorts
+              .map(
+                (s) => {
+                  'field': s['column'],
+                  'descending': s['dir'] == 'descending',
+                },
+              )
+              .toList(),
+        );
       }
     }
 
     // 3. Group columns (AI Grid feature)
     if (settings.containsKey('groupColumns')) {
-      final groups = (settings['groupColumns'] as List?)
+      final groups =
+          (settings['groupColumns'] as List?)
               ?.map((e) => e.toString())
               .toList() ??
           [];
@@ -2623,14 +3025,17 @@ class AiGridController extends ChangeNotifier {
       'activeSortColumn': _activeSortColumn,
       'isSortDescending': _isSortDescending,
       'searchQuery': _searchQuery,
-      'filteredRowCount': _fitController?.data.length ?? (_dataSource?.totalRowCount ?? 0),
+      'filteredRowCount':
+          _fitController?.data.length ?? (_dataSource?.totalRowCount ?? 0),
       'visibleColumns': visibleColumns,
       'hiddenColumns': hiddenColumns,
       'sortedColumns': sortedColumns
-          .map((k) => {
-                'field': k.columnId,
-                'descending': k.direction == FitGridSortDirection.descending,
-              })
+          .map(
+            (k) => {
+              'field': k.columnId,
+              'descending': k.direction == FitGridSortDirection.descending,
+            },
+          )
           .toList(),
     };
   }
@@ -2649,12 +3054,11 @@ class AiGridController extends ChangeNotifier {
     String? fileName,
     bool includeHeaders = true,
     bool selectedOnly = false,
-  }) =>
-      exportTableWithSaveDialog(
-        fileName: fileName,
-        includeHeaders: includeHeaders,
-        selectedOnly: selectedOnly,
-      );
+  }) => exportTableWithSaveDialog(
+    fileName: fileName,
+    includeHeaders: includeHeaders,
+    selectedOnly: selectedOnly,
+  );
 
   /// Exports current grid data to Excel (.xlsx) using FitGrid's native XLSX encoder,
   /// opening the platform "Save As..." dialog so the user can select destination directory
@@ -2677,7 +3081,10 @@ class AiGridController extends ChangeNotifier {
     final rawName = (fileName != null && fileName.trim().isNotEmpty)
         ? fileName.trim()
         : 'grid_export_${DateTime.now().millisecondsSinceEpoch}';
-    final cleanName = rawName.replaceAll(RegExp(r'\.xlsx$', caseSensitive: false), '');
+    final cleanName = rawName.replaceAll(
+      RegExp(r'\.xlsx$', caseSensitive: false),
+      '',
+    );
 
     try {
       final savedPath = await FileSaver.instance.saveAs(
@@ -2689,7 +3096,9 @@ class AiGridController extends ChangeNotifier {
       );
       return savedPath;
     } on UnsupportedError catch (e) {
-      debugPrint('saveAs unsupported on platform ($e), falling back to saveFile');
+      debugPrint(
+        'saveAs unsupported on platform ($e), falling back to saveFile',
+      );
       return await FileSaver.instance.saveFile(
         name: cleanName,
         bytes: bytes,
@@ -2761,7 +3170,10 @@ class AiGridController extends ChangeNotifier {
       throw Exception('Unsupported export format: $format');
     }
 
-    final cleanName = rawName.replaceAll(RegExp('\\.$extension\$', caseSensitive: false), '');
+    final cleanName = rawName.replaceAll(
+      RegExp('\\.$extension\$', caseSensitive: false),
+      '',
+    );
 
     if (useSaveAs) {
       try {

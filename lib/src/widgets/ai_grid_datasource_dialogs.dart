@@ -127,9 +127,8 @@ class _AiGridDatasourceManagerDialogState
           final msg = (savedPath != null && savedPath.isNotEmpty)
               ? 'Saved to: $savedPath'
               : 'Exported "${desc.name}" bundle as YAML.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg)),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(msg)));
         }
       } catch (_) {
         await Clipboard.setData(ClipboardData(text: yamlString));
@@ -172,6 +171,27 @@ class _AiGridDatasourceManagerDialogState
     }
   }
 
+  Future<void> _handleImportExcel() async {
+    try {
+      final sheet = await widget.controller.importExcel(context: context);
+      if (sheet != null) {
+        await _loadList();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Imported Excel worksheet "${sheet.name}"!'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Import failed: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -191,187 +211,180 @@ class _AiGridDatasourceManagerDialogState
     final bodyContent = Column(
       children: [
         // Search Filter
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search datasources...',
-                  prefixIcon: const Icon(Icons.search, size: 18),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Search datasources...',
+              prefixIcon: const Icon(Icons.search, size: 18),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              isDense: true,
+            ),
+            onChanged: (val) => setState(() => _searchQuery = val.trim()),
+          ),
+        ),
+
+        // Body List
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : filtered.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.inbox_outlined,
+                        size: 48,
+                        color: theme.disabledColor,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _searchQuery.isEmpty
+                            ? 'No saved dynamic datasources found.'
+                            : 'No datasources match "$_searchQuery".',
+                        style: TextStyle(color: theme.disabledColor),
+                      ),
+                    ],
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
                     vertical: 8,
                   ),
-                  isDense: true,
-                ),
-                onChanged: (val) => setState(() => _searchQuery = val.trim()),
-              ),
-            ),
+                  itemCount: filtered.length,
+                  separatorBuilder: (ctx, i) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final d = filtered[index];
+                    final isActive = d.name == activeName;
 
-            // Body List
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : filtered.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.inbox_outlined,
-                            size: 48,
-                            color: theme.disabledColor,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _searchQuery.isEmpty
-                                ? 'No saved dynamic datasources found.'
-                                : 'No datasources match "$_searchQuery".',
-                            style: TextStyle(color: theme.disabledColor),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      itemCount: filtered.length,
-                      separatorBuilder: (ctx, i) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final d = filtered[index];
-                        final isActive = d.name == activeName;
-
-                        return Card(
-                          elevation: isActive ? 2 : 0,
+                    return Card(
+                      elevation: isActive ? 2 : 0,
+                      color: isActive
+                          ? theme.colorScheme.primaryContainer.withValues(
+                              alpha: 0.3,
+                            )
+                          : (isDark
+                                ? theme.colorScheme.surfaceContainerHighest
+                                : Colors.grey.shade50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(
                           color: isActive
-                              ? theme.colorScheme.primaryContainer.withValues(
-                                  alpha: 0.3,
-                                )
+                              ? theme.colorScheme.primary
                               : (isDark
-                                    ? theme.colorScheme.surfaceContainerHighest
-                                    : Colors.grey.shade50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: BorderSide(
-                              color: isActive
-                                  ? theme.colorScheme.primary
-                                  : (isDark
-                                        ? Colors.white10
-                                        : Colors.grey.shade300),
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    ? Colors.white10
+                                    : Colors.grey.shade300),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Flexible(
-                                            child: Text(
-                                              d.title,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
+                                      Flexible(
+                                        child: Text(
+                                          d.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
                                           ),
-                                          if (isActive) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    theme.colorScheme.primary,
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: const Text(
-                                                'ACTIVE',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Wrap(
-                                        spacing: 6,
-                                        children: [
-                                          _chip(d.name, Colors.blueGrey),
-                                          _chip(
-                                            '${d.rowCount} rows',
-                                            Colors.teal,
+                                      if (isActive) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
                                           ),
-                                          _chip(
-                                            d.sourceType.toUpperCase(),
-                                            Colors.indigo,
-                                          ),
-                                          if (d.isReadonly)
-                                            _chip(
-                                              'READ-ONLY',
-                                              Colors.amber.shade900,
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
                                             ),
-                                        ],
-                                      ),
+                                          ),
+                                          child: const Text(
+                                            'ACTIVE',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   ),
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 6,
+                                    children: [
+                                      _chip(d.name, Colors.blueGrey),
+                                      _chip('${d.rowCount} rows', Colors.teal),
+                                      _chip(
+                                        d.sourceType.toUpperCase(),
+                                        Colors.indigo,
+                                      ),
+                                      if (d.isReadonly)
+                                        _chip(
+                                          'READ-ONLY',
+                                          Colors.amber.shade900,
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.file_download_outlined,
+                                    size: 18,
+                                  ),
+                                  tooltip: 'Export YAML Bundle',
+                                  onPressed: () => _handleExportYaml(d),
                                 ),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.file_download_outlined,
-                                        size: 18,
-                                      ),
-                                      tooltip: 'Export YAML Bundle',
-                                      onPressed: () => _handleExportYaml(d),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        size: 18,
-                                        color: Colors.redAccent,
-                                      ),
-                                      tooltip: 'Delete Datasource',
-                                      onPressed: () => _handleDelete(d),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    FilledButton(
-                                      onPressed: isActive
-                                          ? null
-                                          : () => _handleLoad(d),
-                                      child: Text(
-                                        isActive ? 'Current' : 'Load',
-                                      ),
-                                    ),
-                                  ],
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                    color: Colors.redAccent,
+                                  ),
+                                  tooltip: 'Delete Datasource',
+                                  onPressed: () => _handleDelete(d),
+                                ),
+                                const SizedBox(width: 4),
+                                FilledButton(
+                                  onPressed: isActive
+                                      ? null
+                                      : () => _handleLoad(d),
+                                  child: Text(isActive ? 'Current' : 'Load'),
                                 ),
                               ],
                             ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
       ],
     );
 
@@ -421,6 +434,16 @@ class _AiGridDatasourceManagerDialogState
                     ),
                   ),
                   const Spacer(),
+                  OutlinedButton.icon(
+                    icon: const Icon(
+                      Icons.table_chart_rounded,
+                      size: 16,
+                      color: Color(0xFF107C41),
+                    ),
+                    label: const Text('Import Excel'),
+                    onPressed: _handleImportExcel,
+                  ),
+                  const SizedBox(width: 8),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.file_upload_outlined, size: 16),
                     label: const Text('Import YAML'),
@@ -551,7 +574,9 @@ class _AiGridWebDataSourceDialogState extends State<AiGridWebDataSourceDialog> {
       sourceType: 'web',
       sourceOrigin: url,
       createdAt: now,
-      columns: _preview!.columns.map((c) => c.copyWith(editable: false)).toList(),
+      columns: _preview!.columns
+          .map((c) => c.copyWith(editable: false))
+          .toList(),
     );
 
     final descriptor = AiGridDynamicDescriptor(
@@ -645,9 +670,7 @@ class _AiGridWebDataSourceDialogState extends State<AiGridWebDataSourceDialog> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer.withValues(
-              alpha: 0.25,
-            ),
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.25),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: theme.colorScheme.primary.withValues(alpha: 0.4),
@@ -689,7 +712,9 @@ class _AiGridWebDataSourceDialogState extends State<AiGridWebDataSourceDialog> {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: FilledButton.tonal(
-                  onPressed: _preview != null && !_isLoading ? _createAndLoad : null,
+                  onPressed: _preview != null && !_isLoading
+                      ? _createAndLoad
+                      : null,
                   child: const Text('Create'),
                 ),
               ),
@@ -708,7 +733,9 @@ class _AiGridWebDataSourceDialogState extends State<AiGridWebDataSourceDialog> {
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  onPressed: _preview != null && !_isLoading ? _createAndLoad : null,
+                  onPressed: _preview != null && !_isLoading
+                      ? _createAndLoad
+                      : null,
                 ),
               ],
             ),

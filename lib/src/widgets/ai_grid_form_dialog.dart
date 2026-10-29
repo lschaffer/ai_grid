@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
+
 import '../controllers/ai_grid_controller.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_editing_options.dart';
@@ -18,11 +19,7 @@ class AiGridFormDialog extends StatefulWidget {
   final AiGridController controller;
   final String? title;
 
-  const AiGridFormDialog({
-    super.key,
-    required this.controller,
-    this.title,
-  });
+  const AiGridFormDialog({super.key, required this.controller, this.title});
 
   /// Opens the [AiGridFormDialog] modally.
   ///
@@ -39,13 +36,13 @@ class AiGridFormDialog extends StatefulWidget {
       barrierColor: const Color(0x80000000),
       transitionDuration: const Duration(milliseconds: 150),
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        Widget content = AiGridFormDialog(
-          controller: controller,
-          title: title,
-        );
+        Widget content = AiGridFormDialog(controller: controller, title: title);
 
-        final hasLoc = Localizations.of<MaterialLocalizations>(
-                dialogContext, MaterialLocalizations) !=
+        final hasLoc =
+            Localizations.of<MaterialLocalizations>(
+              dialogContext,
+              MaterialLocalizations,
+            ) !=
             null;
         if (!hasLoc) {
           content = Localizations(
@@ -58,9 +55,7 @@ class AiGridFormDialog extends StatefulWidget {
           );
         }
 
-        return SafeArea(
-          child: content,
-        );
+        return SafeArea(child: content);
       },
       transitionBuilder: (context, anim1, anim2, child) {
         return FadeTransition(
@@ -173,7 +168,8 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
     final draft = widget.controller.draftRow ?? {};
     final isAdding = widget.controller.isAddingRow;
 
-    final dialogTitle = widget.title ??
+    final dialogTitle =
+        widget.title ??
         options.popupTitle ??
         (isAdding ? 'Add Record' : 'Edit Record');
 
@@ -196,7 +192,10 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
             ),
             title: Text(
               dialogTitle,
-              style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             actions: [
               Padding(
@@ -305,8 +304,8 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: options.popupWidth,
-          maxHeight: options.popupHeight ??
-              (MediaQuery.sizeOf(context).height * 0.85),
+          maxHeight:
+              options.popupHeight ?? (MediaQuery.sizeOf(context).height * 0.85),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -457,7 +456,8 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
     List<AiGridColumn> columns,
     Map<String, dynamic> draft,
   ) {
-    if (layout.mode == AiGridFormLayoutMode.custom && layout.formBuilder != null) {
+    if (layout.mode == AiGridFormLayoutMode.custom &&
+        layout.formBuilder != null) {
       return layout.formBuilder!(
         context,
         draft,
@@ -475,10 +475,7 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
           spacing: layout.fieldSpacing,
           runSpacing: layout.rowSpacing,
           children: fieldWidgets
-              .map((w) => SizedBox(
-                    width: layout.fieldWidth ?? 240.0,
-                    child: w,
-                  ))
+              .map((w) => SizedBox(width: layout.fieldWidth ?? 240.0, child: w))
               .toList(),
         );
 
@@ -499,10 +496,12 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
           if (rows.isNotEmpty) {
             rows.add(SizedBox(height: layout.rowSpacing));
           }
-          rows.add(Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: rowChildren,
-          ));
+          rows.add(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: rowChildren,
+            ),
+          );
         }
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -842,17 +841,19 @@ class _AiGridFormDialogState extends State<AiGridFormDialog> {
         labelText: col.title,
         border: const OutlineInputBorder(),
         errorText: errorText,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 14,
+        ),
       ),
       icon: const Icon(Icons.arrow_drop_down),
       items: options
-          .map((opt) => DropdownMenuItem<String>(
-                value: opt,
-                child: Text(
-                  opt,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ))
+          .map(
+            (opt) => DropdownMenuItem<String>(
+              value: opt,
+              child: Text(opt, overflow: TextOverflow.ellipsis),
+            ),
+          )
           .toList(),
       onChanged: (val) {
         widget.controller.updateDraftValue(col.field, val);

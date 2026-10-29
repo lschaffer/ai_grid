@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 /// Editing mode of the [AiGrid].
@@ -49,44 +50,42 @@ class AiGridFormLayout {
     BuildContext context,
     Map<String, dynamic> draftValues,
     void Function(String column, dynamic value) onChanged,
-  )? formBuilder;
+  )?
+  formBuilder;
 
   const AiGridFormLayout.row({this.rowSpacing = 12.0})
-      : mode = AiGridFormLayoutMode.row,
-        columns = 1,
-        fieldSpacing = 0,
-        fieldWidth = null,
-        formBuilder = null;
+    : mode = AiGridFormLayoutMode.row,
+      columns = 1,
+      fieldSpacing = 0,
+      fieldWidth = null,
+      formBuilder = null;
 
   const AiGridFormLayout.wrap({
     this.fieldWidth = 240.0,
     this.fieldSpacing = 12.0,
     this.rowSpacing = 12.0,
-  })  : mode = AiGridFormLayoutMode.wrap,
-        columns = null,
-        formBuilder = null;
+  }) : mode = AiGridFormLayoutMode.wrap,
+       columns = null,
+       formBuilder = null;
 
   const AiGridFormLayout.grid({
     this.columns = 2,
     this.fieldSpacing = 16.0,
     this.rowSpacing = 16.0,
-  })  : mode = AiGridFormLayoutMode.grid,
-        fieldWidth = null,
-        formBuilder = null;
+  }) : mode = AiGridFormLayoutMode.grid,
+       fieldWidth = null,
+       formBuilder = null;
 
   const AiGridFormLayout.custom(this.formBuilder)
-      : mode = AiGridFormLayoutMode.custom,
-        columns = null,
-        fieldSpacing = 0,
-        rowSpacing = 0,
-        fieldWidth = null;
+    : mode = AiGridFormLayoutMode.custom,
+      columns = null,
+      fieldSpacing = 0,
+      rowSpacing = 0,
+      fieldWidth = null;
 }
 
 /// Position of the pinned action column in [AiGridEditMode.row].
-enum AiGridActionColumnPosition {
-  left,
-  right,
-}
+enum AiGridActionColumnPosition { left, right }
 
 /// Where a newly added record is inserted (DevExtreme `newRowPosition`).
 enum AiGridInsertRowPosition {
@@ -145,7 +144,11 @@ class AiGridEditingOptions {
 
   /// Called before saving changes. Return an error message to block save and display the error,
   /// or return null to proceed.
-  final FutureOr<String?> Function(Map<String, dynamic> row, Map<String, dynamic> changes)? beforeSave;
+  final FutureOr<String?> Function(
+    Map<String, dynamic> row,
+    Map<String, dynamic> changes,
+  )?
+  beforeSave;
 
   /// Called for each modified field to persist the value back to the model or database.
   final void Function(String column, dynamic value)? commit;
@@ -191,7 +194,11 @@ class AiGridEditingOptions {
     String? popupTitle,
     double? popupWidth,
     double? popupHeight,
-    FutureOr<String?> Function(Map<String, dynamic> row, Map<String, dynamic> changes)? beforeSave,
+    FutureOr<String?> Function(
+      Map<String, dynamic> row,
+      Map<String, dynamic> changes,
+    )?
+    beforeSave,
     void Function(String column, dynamic value)? commit,
     void Function(Map<String, dynamic> row)? afterSave,
     FutureOr<bool> Function(Map<String, dynamic> row)? beforeDelete,
@@ -262,15 +269,15 @@ class AiGridEditEvent {
   }) : timestamp = timestamp ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
-        'timestamp': timestamp.toIso8601String(),
-        'action': action,
-        if (rowIndex != null) 'rowIndex': rowIndex,
-        if (field != null) 'field': field,
-        if (oldValue != null) 'oldValue': oldValue,
-        if (newValue != null) 'newValue': newValue,
-        'message': message,
-        if (data != null) 'data': data,
-      };
+    'timestamp': timestamp.toIso8601String(),
+    'action': action,
+    if (rowIndex != null) 'rowIndex': rowIndex,
+    if (field != null) 'field': field,
+    if (oldValue != null) 'oldValue': oldValue,
+    if (newValue != null) 'newValue': newValue,
+    'message': message,
+    if (data != null) 'data': data,
+  };
 
   @override
   String toString() {

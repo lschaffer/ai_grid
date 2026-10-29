@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
+
 import '../models/ai_grid_pivot.dart';
 
 /// Data bundle for rendering a pivot chart.
@@ -95,12 +97,16 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
     final topCatIndices = sortedCatIndices.take(10).toList()..sort();
 
     final newCategories = [for (final c in topCatIndices) raw.categories[c]];
-    final newSeriesNames = [for (final s in topSeriesIndices) raw.seriesNames[s]];
+    final newSeriesNames = [
+      for (final s in topSeriesIndices) raw.seriesNames[s],
+    ];
     final newValues = <List<num>>[
       for (final s in topSeriesIndices)
         <num>[
           for (final c in topCatIndices)
-            (s < raw.values.length && c < raw.values[s].length) ? raw.values[s][c] : 0,
+            (s < raw.values.length && c < raw.values[s].length)
+                ? raw.values[s][c]
+                : 0,
         ],
     ];
 
@@ -138,7 +144,9 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
               color: isDark ? const Color(0xFF252526) : const Color(0xFFF8FAFC),
               border: Border(
                 bottom: BorderSide(
-                  color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                  color: isDark
+                      ? const Color(0xFF333333)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
             ),
@@ -148,7 +156,11 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.bar_chart, size: 18, color: theme.colorScheme.primary),
+                    Icon(
+                      Icons.bar_chart,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Pivot Chart',
@@ -157,10 +169,14 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                         fontSize: 13,
                       ),
                     ),
-                    if (widget.data.seriesNames.length > effective.seriesNames.length) ...[
+                    if (widget.data.seriesNames.length >
+                        effective.seriesNames.length) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.primary.withAlpha(30),
                           borderRadius: BorderRadius.circular(10),
@@ -186,7 +202,8 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                           tooltip: 'Change Chart Type',
                           icon: Icon(
                             switch (widget.chartType) {
-                              AiGridPivotChartType.groupedBar => Icons.bar_chart,
+                              AiGridPivotChartType.groupedBar =>
+                                Icons.bar_chart,
                               AiGridPivotChartType.column => Icons.equalizer,
                               AiGridPivotChartType.line => Icons.show_chart,
                               AiGridPivotChartType.pie => Icons.pie_chart,
@@ -196,55 +213,76 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                           ),
                           splashRadius: 16,
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
                           onPressed: () async {
-                            final box = btnContext.findRenderObject() as RenderBox?;
+                            final box =
+                                btnContext.findRenderObject() as RenderBox?;
                             if (box == null) return;
-                            final overlay = Overlay.of(btnContext).context.findRenderObject() as RenderBox?;
+                            final overlay =
+                                Overlay.of(btnContext).context
+                                        .findRenderObject()
+                                    as RenderBox?;
                             if (overlay == null) return;
                             final position = RelativeRect.fromRect(
                               Rect.fromPoints(
-                                box.localToGlobal(Offset.zero, ancestor: overlay),
-                                box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
+                                box.localToGlobal(
+                                  Offset.zero,
+                                  ancestor: overlay,
+                                ),
+                                box.localToGlobal(
+                                  box.size.bottomRight(Offset.zero),
+                                  ancestor: overlay,
+                                ),
                               ),
                               Offset.zero & overlay.size,
                             );
-                            final selected = await showMenu<AiGridPivotChartType>(
-                              context: btnContext,
-                              position: position,
-                              items: [
-                                for (final type in AiGridPivotChartType.values)
-                                  PopupMenuItem(
-                                    value: type,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          switch (type) {
-                                            AiGridPivotChartType.groupedBar => Icons.bar_chart,
-                                            AiGridPivotChartType.column => Icons.equalizer,
-                                            AiGridPivotChartType.line => Icons.show_chart,
-                                            AiGridPivotChartType.pie => Icons.pie_chart,
-                                          },
-                                          size: 16,
-                                          color: type == widget.chartType
-                                              ? theme.colorScheme.primary
-                                              : null,
+                            final selected =
+                                await showMenu<AiGridPivotChartType>(
+                                  context: btnContext,
+                                  position: position,
+                                  items: [
+                                    for (final type
+                                        in AiGridPivotChartType.values)
+                                      PopupMenuItem(
+                                        value: type,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              switch (type) {
+                                                AiGridPivotChartType
+                                                    .groupedBar =>
+                                                  Icons.bar_chart,
+                                                AiGridPivotChartType.column =>
+                                                  Icons.equalizer,
+                                                AiGridPivotChartType.line =>
+                                                  Icons.show_chart,
+                                                AiGridPivotChartType.pie =>
+                                                  Icons.pie_chart,
+                                              },
+                                              size: 16,
+                                              color: type == widget.chartType
+                                                  ? theme.colorScheme.primary
+                                                  : null,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              type.displayName,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight:
+                                                    type == widget.chartType
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          type.displayName,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: type == widget.chartType
-                                                ? FontWeight.bold
-                                                : FontWeight.normal,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            );
+                                      ),
+                                  ],
+                                );
                             if (selected != null) {
                               widget.onChartTypeChanged(selected);
                             }
@@ -257,7 +295,10 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                       icon: const Icon(Icons.close, size: 16),
                       splashRadius: 16,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
                       tooltip: 'Hide Chart',
                       onPressed: widget.onClose,
                     ),
@@ -274,14 +315,19 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                 color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 border: Border(
                   bottom: BorderSide(
-                    color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+                    color: isDark
+                        ? const Color(0xFF333333)
+                        : const Color(0xFFE2E8F0),
                   ),
                 ),
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 62),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   child: Wrap(
                     spacing: 12,
                     runSpacing: 4,
@@ -303,14 +349,20 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                               effective.seriesNames[i],
                               style: TextStyle(
                                 fontSize: 11,
-                                color: isDark ? Colors.grey[300] : Colors.grey[700],
+                                color: isDark
+                                    ? Colors.grey[300]
+                                    : Colors.grey[700],
                               ),
                             ),
                           ],
                         ),
-                      if (widget.data.seriesNames.length > effective.seriesNames.length)
+                      if (widget.data.seriesNames.length >
+                          effective.seriesNames.length)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: theme.colorScheme.primary.withAlpha(20),
                             borderRadius: BorderRadius.circular(10),
@@ -340,7 +392,8 @@ class _AiGridPivotChartState extends State<AiGridPivotChart> {
                     ),
                   )
                 : MouseRegion(
-                    onHover: (e) => setState(() => _hoverPosition = e.localPosition),
+                    onHover: (e) =>
+                        setState(() => _hoverPosition = e.localPosition),
                     onExit: (_) => setState(() => _hoverPosition = null),
                     child: CustomPaint(
                       size: Size.infinite,
@@ -450,8 +503,9 @@ class _PivotChartPainter extends CustomPainter {
 
       // Draw X label
       final catName = data.categories[c];
-      final shortLabel =
-          catName.length > 10 ? '${catName.substring(0, 9)}…' : catName;
+      final shortLabel = catName.length > 10
+          ? '${catName.substring(0, 9)}…'
+          : catName;
       final catTp = TextPainter(
         text: TextSpan(text: shortLabel, style: textStyle),
         textDirection: TextDirection.ltr,
@@ -497,8 +551,10 @@ class _PivotChartPainter extends CustomPainter {
         for (var s = 0; s < seriesCount; s++) {
           if (c < data.values[s].length) sumVal += data.values[s][c];
         }
-        final barH = (sumVal / (maxVal * seriesCount) * chartHeight)
-            .clamp(0.0, chartHeight);
+        final barH = (sumVal / (maxVal * seriesCount) * chartHeight).clamp(
+          0.0,
+          chartHeight,
+        );
         final barWidth = (slotWidth * 0.5).clamp(6.0, 48.0);
         final barRect = Rect.fromLTWH(
           xCenter - barWidth / 2,
@@ -657,7 +713,10 @@ class _PivotChartPainter extends CustomPainter {
     const pad = 6.0;
     final rect = Rect.fromLTWH(
       (anchor.dx - tp.width / 2 - pad).clamp(8.0, size.width - tp.width - 16),
-      (anchor.dy - tp.height - pad * 2 - 8).clamp(8.0, size.height - tp.height - 16),
+      (anchor.dy - tp.height - pad * 2 - 8).clamp(
+        8.0,
+        size.height - tp.height - 16,
+      ),
       tp.width + pad * 2,
       tp.height + pad * 2,
     );

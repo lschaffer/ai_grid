@@ -41,9 +41,7 @@ class _RangeSelectionExamplePageState extends State<RangeSelectionExamplePage> {
       ],
     );
 
-    _controller.editingOptions = const AiGridEditingOptions(
-      enabled: false,
-    );
+    _controller.editingOptions = const AiGridEditingOptions(enabled: false);
 
     final columns = [
       const AiGridColumn(
@@ -221,194 +219,209 @@ class _RangeSelectionExamplePageState extends State<RangeSelectionExamplePage> {
     return ScaffoldMessenger(
       child: Scaffold(
         body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header Banner (Collapsible on mobile)
-          InkWell(
-            onTap: isMobile
-                ? () => setState(() => _isHeaderExpanded = !_isHeaderExpanded)
-                : null,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF252526) : const Color(0xFFF1F5F9),
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark ? const Color(0xFF333333) : const Color(0xFFE2E8F0),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header Banner (Collapsible on mobile)
+            InkWell(
+              onTap: isMobile
+                  ? () => setState(() => _isHeaderExpanded = !_isHeaderExpanded)
+                  : null,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF252526)
+                      : const Color(0xFFF1F5F9),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF333333)
+                          : const Color(0xFFE2E8F0),
+                    ),
                   ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.select_all_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Cell Range Selection & Spreadsheet Copy/Paste',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.12,
                         ),
-                        if (!isMobile || _isHeaderExpanded) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                            'Click & drag across cells, use Shift+Arrows to expand range, Ctrl+C to copy TSV to Excel, Ctrl+V to paste values, and inspect instant stats.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (isMobile)
-                    IconButton(
-                      icon: Icon(
-                        _isHeaderExpanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.select_all_rounded,
+                        color: theme.colorScheme.primary,
                         size: 20,
                       ),
-                      tooltip: _isHeaderExpanded ? 'Collapse info' : 'Expand info',
-                      onPressed: () =>
-                          setState(() => _isHeaderExpanded = !_isHeaderExpanded),
                     ),
-                ],
-              ),
-            ),
-          ),
-
-          // Shortcut Actions Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? const Color(0xFF2D2D2D) : const Color(0xFFE2E8F0),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Cell Range Selection & Spreadsheet Copy/Paste',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (!isMobile || _isHeaderExpanded) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              'Click & drag across cells, use Shift+Arrows to expand range, Ctrl+C to copy TSV to Excel, Ctrl+V to paste values, and inspect instant stats.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: isDark
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (isMobile)
+                      IconButton(
+                        icon: Icon(
+                          _isHeaderExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          size: 20,
+                        ),
+                        tooltip: _isHeaderExpanded
+                            ? 'Collapse info'
+                            : 'Expand info',
+                        onPressed: () => setState(
+                          () => _isHeaderExpanded = !_isHeaderExpanded,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.crop_free_rounded, size: 16),
-                    label: const Text('Select Q1–Q2 Revenue (Rows 0–3)'),
-                    onPressed: () {
-                      _controller.selectCellRange(
-                        anchorRow: 0,
-                        anchorColumn: 'q1_sales',
-                        extentRow: 3,
-                        extentColumn: 'q2_sales',
-                      );
-                    },
+
+            // Shortcut Actions Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF2D2D2D)
+                        : const Color(0xFFE2E8F0),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.border_all_rounded, size: 16),
-                    label: const Text('Select All Quarterly Data'),
-                    onPressed: () {
-                      _controller.selectCellRange(
-                        anchorRow: 0,
-                        anchorColumn: 'q1_sales',
-                        extentRow: 7,
-                        extentColumn: 'q4_sales',
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonalIcon(
-                    icon: const Icon(Icons.copy_rounded, size: 16),
-                    label: const Text('Copy Selection (Ctrl+C)'),
-                    onPressed: () async {
-                      final ok = await _controller.copySelectedRangeToClipboard(
-                        includeHeaders: true,
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              ok
-                                  ? 'Copied selection with headers to clipboard! Paste into Excel or Google Sheets.'
-                                  : 'Select a range of cells first.',
+                ),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.crop_free_rounded, size: 16),
+                      label: const Text('Select Q1–Q2 Revenue (Rows 0–3)'),
+                      onPressed: () {
+                        _controller.selectCellRange(
+                          anchorRow: 0,
+                          anchorColumn: 'q1_sales',
+                          extentRow: 3,
+                          extentColumn: 'q2_sales',
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.border_all_rounded, size: 16),
+                      label: const Text('Select All Quarterly Data'),
+                      onPressed: () {
+                        _controller.selectCellRange(
+                          anchorRow: 0,
+                          anchorColumn: 'q1_sales',
+                          extentRow: 7,
+                          extentColumn: 'q4_sales',
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      label: const Text('Copy Selection (Ctrl+C)'),
+                      onPressed: () async {
+                        final ok = await _controller
+                            .copySelectedRangeToClipboard(includeHeaders: true);
+                        if (context.mounted) {
+                          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                ok
+                                    ? 'Copied selection with headers to clipboard! Paste into Excel or Google Sheets.'
+                                    : 'Select a range of cells first.',
+                              ),
+                              duration: const Duration(seconds: 2),
                             ),
-                            duration: const Duration(seconds: 2),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 18),
+                      tooltip: 'Clear Selection (Esc)',
+                      onPressed: () {
+                        _controller.clearCellRangeSelection();
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: const Text('AI: Select High Margin Cells'),
+                      onPressed: () {
+                        _controller.selectCellRange(
+                          anchorRow: 0,
+                          anchorColumn: 'margin',
+                          extentRow: 1,
+                          extentColumn: 'margin',
+                        );
+                        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                          const SnackBar(
+                            content: Text('AI selected top margin performers'),
+                            duration: Duration(seconds: 2),
                           ),
                         );
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.clear_rounded, size: 18),
-                    tooltip: 'Clear Selection (Esc)',
-                    onPressed: () {
-                      _controller.clearCellRangeSelection();
-                    },
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.auto_awesome, size: 16),
-                    label: const Text('AI: Select High Margin Cells'),
-                    onPressed: () {
-                      _controller.selectCellRange(
-                        anchorRow: 0,
-                        anchorColumn: 'margin',
-                        extentRow: 1,
-                        extentColumn: 'margin',
-                      );
-                      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                        const SnackBar(
-                          content: Text('AI selected top margin performers'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // Main Interactive DataGrid
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: AiGrid(
-                dataSource: _dataSource,
-                controller: _controller,
-                aiConfig: _aiConfig,
-                cellSelection: true,
-                enableCopy: true,
-                enablePaste: true,
-                showSelectionStatusBar: true,
-                enableAiAssistant: true,
-                autoSave: false,
+            // Main Interactive DataGrid
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: AiGrid(
+                  dataSource: _dataSource,
+                  controller: _controller,
+                  aiConfig: _aiConfig,
+                  cellSelection: true,
+                  enableCopy: true,
+                  enablePaste: true,
+                  showSelectionStatusBar: true,
+                  enableAiAssistant: true,
+                  autoSave: false,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }

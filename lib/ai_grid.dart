@@ -29,6 +29,12 @@ export 'src/data/delimited_table_parser.dart';
 export 'src/data/markdown_table_extractor.dart';
 export 'src/data/web_table_fetcher.dart';
 export 'src/data/pdf_table_extractor.dart';
+export 'src/data/excel_table_parser.dart';
+export 'src/widgets/ai_grid_excel_dialogs.dart';
+export 'src/models/ai_grid_data_auditor.dart';
+export 'src/data/ai_grid_data_cleaner.dart';
+export 'src/widgets/ai_grid_data_auditor_dialog.dart';
 export 'src/mcp/ai_grid_tools.dart';
 export 'src/config/ai_grid_settings_storage.dart';
+
 export 'package:file_saver/file_saver.dart';

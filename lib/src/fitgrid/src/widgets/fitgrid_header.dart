@@ -698,9 +698,8 @@ class _HeaderCell<T> extends StatelessWidget {
                   // label folds into the header's and the button vanishes.
                   container: true,
                   button: true,
-                  label: FitGridLocalizations.of(
-                    context,
-                  ).columnMenuLabel(column.label),
+                  label: FitGridLocalizations.of(context)
+                      .columnMenuLabel(column.label),
                   child: InkResponse(
                     radius: theme.sortIconSize,
                     onTap: () => onMenu!(anchor),

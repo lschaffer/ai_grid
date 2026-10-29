@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+
 import '../controllers/ai_grid_controller.dart';
 import '../models/ai_grid_column.dart';
 import '../theme/ai_grid_theme.dart';
@@ -10,10 +11,7 @@ import '../theme/ai_grid_theme.dart';
 class AiGridGroupPanel extends StatelessWidget {
   final AiGridController controller;
 
-  const AiGridGroupPanel({
-    super.key,
-    required this.controller,
-  });
+  const AiGridGroupPanel({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {

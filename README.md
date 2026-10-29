@@ -1,6 +1,6 @@
 # AI Grid (`ai_grid`)
 
-[![pub version](https://img.shields.io/badge/pub-v0.9.0-blue.svg)](https://pub.dev/packages/ai_grid)
+[![pub version](https://img.shields.io/badge/pub-v0.10.0-blue.svg)](https://pub.dev/packages/ai_grid)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.24.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![WASM Ready](https://img.shields.io/badge/WebAssembly-WASM%20Compatible-success.svg)](https://flutter.dev/to/wasm)
@@ -221,7 +221,45 @@ Instantly generate, inspect, and interact with dynamic DataGrids from external f
   * **Pure-Dart Excel Engine**: Generates `.xlsx` workbooks directly in Dart with zero C/C++ native dependencies or platform channels.
   * **Direct Programmatic API**: Trigger export programmatically anytime via `controller.export()`.
 
-### 11. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
+
+### 11. 📥 Pure-Dart Excel (.xlsx) Import & Multi-Sheet Ingestion
+Complete the tabular ingestion roundtrip by opening or dropping Excel workbooks directly into `ai_grid` without converting to CSV:
+* **Pure-Dart OpenXML Parser (`AiGridExcelParser`)**:
+  * 100% pure Dart implementation with zero native FFI dependencies or platform channels, fully compatible with Flutter WebAssembly (`dart2wasm`).
+  * Parses workbook structures, shared string pools (including rich-text runs and XML entity decoding), styles, and individual sheet XMLs.
+  * Coordinate-based cell reference mapping (`A1`, `BC15`) properly preserving sparse cell matrices.
+  * Decodes text, numbers, booleans, formulas, errors, and converts Excel serial date numbers to standard ISO date strings.
+* **Interactive Multi-Sheet Selection Dialog (`AiGridExcelSheetPickerDialog`)**:
+  * Visual worksheet list with row/column counts and inferred column header chips.
+  * Live interactive preview table showing the first 5 rows of the currently selected worksheet before importing.
+  * Responsive mobile support with automatic fullscreen presentation.
+* **Schema Inference & Dynamic Datasets**:
+  * Inferred column data types (`currency`, `number`, `date`, `datetime`, `boolean`, `text`).
+  * Automatically creates an `AiGridDynamicModel` and saves dynamic datasets to `AiGridDynamicStorage` (`SharedPreferences`).
+* **Programmatic & MCP Control**:
+  * Import anytime via `controller.importExcel({bytes, fileName, sheetName, context})`.
+  * Dedicated MCP tool `grid_import_excel` allowing AI agents to inspect workbook sheets or import targeted worksheets.
+  * Attach `.xlsx` files directly in the AI Assistant chat for instant schema and tabular analysis.
+
+### 12. 🩺 AI Data Auditor & Automated Tabular Cleaner
+Diagnose data hygiene issues, profile anomalies, and execute automated 1-click cleanups directly in the grid or through autonomous AI agents:
+* **Continuous Tabular Health Scoring (0–100%)**:
+  * Evaluates overall data cleanliness across completeness, format consistency, type uniformity, and distribution boundaries.
+* **6 Automated Anomaly Detectors**:
+  * **Duplicates**: Exact and primary-key duplicate row detection.
+  * **Missing Values**: Nulls, blank strings, and placeholder strings (`N/A`, `none`).
+  * **Dirty Numbers**: Numbers polluted by currency signs (`$`, `€`, `£`, `¥`), thousands separators (`,`), and non-numeric characters.
+  * **Mixed Date Formats**: Conflicting date patterns (`MM/dd/yyyy`, `dd-MM-yyyy`, ISO) unified into standard ISO `YYYY-MM-DD`.
+  * **Inconsistent Whitespace**: Trailing and leading spaces across string fields.
+  * **Statistical Outliers**: $1.5 \times \text{IQR}$ interquartile range detection highlighting distribution anomalies.
+* **Interactive Quality Inspector Dialog (`AiGridDataAuditorDialog`)**:
+  * Circular visual score gauge, severity badges (`CRITICAL`, `WARNING`, `INFO`), and sample dirty value pills.
+  * Per-issue "Quick Fix" buttons and 1-Click **"Clean All Anomalies"** master action.
+* **Controller & MCP Control**:
+  * Programmatic methods: `controller.auditData()`, `controller.cleanData(remediation)`, `controller.cleanAllData()`, and `controller.showDataAuditorDialog(context)`.
+  * Dedicated MCP Tools: `grid_audit_data` and `grid_apply_data_cleanse`.
+
+### 12. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
 * **Client-Side Pagination**: Simple opt-in via `enablePagination: true` and `pageSize: 25`, rendering an interactive page-navigation footer with total row counts and page controls.
 * **Server-Side Partial Data Load (`LazyAiGridDataSource`)**:
   * Only requests and loads the slice of records for the active page from your backend or REST/GraphQL API.
@@ -269,6 +307,9 @@ Instantly generate, inspect, and interact with dynamic DataGrids from external f
 | `grid_export_datasource_yaml` | Exports a dynamic dataset package (model and data rows) as a YAML formatted string. |
 | `grid_set_conditional_format` | Applies conditional formatting (data bars, color scales, or highlight rules) to a column or row. |
 | `grid_clear_conditional_formats` | Clears active conditional formatting rules for a column or the entire grid. |
+| `grid_import_excel` | Inspects workbook sheet structures or imports a targeted Excel (.xlsx) worksheet. |
+| `grid_audit_data` | Performs automated data quality audit (duplicates, missing values, dirty numbers, mixed dates, whitespace, IQR outliers) returning overall health score (0-100). |
+| `grid_apply_data_cleanse` | Executes automated data cleaning transformations (clean_all, remove_duplicates, clean_numbers, standardize_dates, trim_whitespace, impute_missing, cap_outliers). |
 | `grid_reset` | Resets grouping, filters, sorting, search, and restores all column visibility. |
 
 ---

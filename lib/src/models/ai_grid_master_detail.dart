@@ -63,7 +63,8 @@ class AiGridMasterDetailOptions {
       detailHeight: detailHeight ?? this.detailHeight,
       rowKey: rowKey ?? this.rowKey,
       autoCollapseOthers: autoCollapseOthers ?? this.autoCollapseOthers,
-      initiallyExpandedKeys: initiallyExpandedKeys ?? this.initiallyExpandedKeys,
+      initiallyExpandedKeys:
+          initiallyExpandedKeys ?? this.initiallyExpandedKeys,
       onExpansionChanged: onExpansionChanged ?? this.onExpansionChanged,
     );
   }

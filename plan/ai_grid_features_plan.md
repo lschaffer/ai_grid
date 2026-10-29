@@ -161,26 +161,34 @@ Complete the tabular ingestion roundtrip: drop or pick `.xlsx` workbooks directl
 
 ---
 
-## 6. 🧹 AI Data Auditor & Auto-Cleaning (`grid_audit_data`)
+## 6. 🧹 AI Data Auditor & Auto-Cleaning (`grid_audit_data`) [COMPLETED - v0.11.0]
 
 ### 6.1 Goal & User Experience
 Provide an instant "Data Quality Inspector" that analyzes tabular data for anomalies, inconsistencies, and nulls, offering one-click AI remediations.
 
 ### 6.2 Audit Capabilities
 1. **Schema & Format Consistency**:
-   - Detect mixed date formats (`2026-01-01` vs `01/02/2026`).
+   - Detect mixed date formats (`2026-01-01` vs `01/02/2026` vs `15-03-2026`).
    - Detect dirty numbers (e.g. `$1,200.00` mixed with `1200` and `N/A`).
+   - Detect inconsistent whitespace across text and categorical columns.
 2. **Statistical Outliers**:
-   - IQR (Interquartile Range) or standard deviation checks for extreme values in numeric columns.
+   - IQR ($1.5 \times \text{IQR}$) interquartile range checks for extreme anomalies in numeric columns.
 3. **Duplicate & Null Detection**:
-   - Flag complete duplicate rows or high-cardinality missing values.
-4. **Interactive Fix Dialog**:
-   - Visual summary card with issues list.
-   - Quick action buttons: *"Standardize Dates"*, *"Impute Missing with Mean/Median"*, *"Strip Currency Symbols"*, *"Remove Duplicates"*.
+   - Flag complete duplicate rows or primary-key collisions.
+   - Missing values detection (`null`, empty string, `'N/A'`, `'none'`).
+4. **Interactive Fix Dialog (`AiGridDataAuditorDialog`)**:
+   - Visual health score meter (0-100%) with rating grades.
+   - Summary pills (clean rows count, critical issues, warnings).
+   - Issues list with severity badges, sample dirty values, and per-issue quick fix actions.
+   - 1-Click "Clean All Anomalies" action.
 
-### 6.3 MCP Tool
+### 6.3 MCP Tools
 - `grid_audit_data`: Returns a structured diagnostics report of issues and proposed cleanups.
 - `grid_apply_data_cleanse`: Applies chosen transformations directly to the datasource.
+
+### 6.4 Status
+- **Implemented**: `lib/src/models/ai_grid_data_auditor.dart`, `lib/src/data/ai_grid_data_cleaner.dart`, `lib/src/widgets/ai_grid_data_auditor_dialog.dart`, `example/lib/examples/data_auditor_example.dart`.
+- **Tested**: 10 tests passing in `test/ai_grid_data_auditor_test.dart`.
 
 ---
 
@@ -248,7 +256,7 @@ enum ExampleShowcase {
 | **Feature 2** | **Conditional Formatting, Data Bars & Sparklines** | ✅ **Completed** | `v0.5.0` |
 | **Feature 3** | **Master-Detail Child Rows & Nested Grids** | ✅ **Completed** | `v0.8.1` |
 | **Feature 4** | **Cell Range Selection & Bidirectional Copy/Paste** | ✅ **Completed** | `v0.6.0` |
-| **Feature 5** | **Pure-Dart Excel (.xlsx) Import** | ⏳ Planned | `v0.9.0` |
+| **Feature 5** | **Pure-Dart Excel (.xlsx) Import** | ✅ **Completed** | `v0.10.0` |
 | **Feature 6** | **AI Data Auditor & Cleaner** | ⏳ Planned | `v0.10.0` |
 | **Feature 7** | **Mobile Card / Feed Responsive Mode** | ⏳ Planned | `v0.11.0` |
 | **Feature 8** | **Contextual Row/Cell AI Actions** | ⏳ Planned | `v0.12.0` |

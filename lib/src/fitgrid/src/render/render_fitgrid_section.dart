@@ -16,8 +16,10 @@ import 'cell_spec.dart';
 /// A callback rather than a precomputed list, because precomputing specs for
 /// every row is exactly the O(rows) work that virtualization exists to avoid.
 /// It is only ever called for cells inside the current window.
-typedef FitGridCellSpecResolver =
-    FitGridCellSpec Function(int rowIndex, int columnIndex);
+typedef FitGridCellSpecResolver = FitGridCellSpec Function(
+  int rowIndex,
+  int columnIndex,
+);
 
 /// Resolves a row's background, or null to use the theme's striping.
 typedef FitGridRowColorResolver = Color? Function(int rowIndex);

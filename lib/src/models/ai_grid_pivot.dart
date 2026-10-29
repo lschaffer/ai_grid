@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../fitgrid/fitgrid_table.dart';
 
 /// Aggregation functions supported in Pivot mode.
@@ -131,10 +132,10 @@ class AiGridPivotValueConfig {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'columnId': columnId,
-        'aggregation': aggregation.name,
-        if (label != null) 'label': label,
-      };
+    'columnId': columnId,
+    'aggregation': aggregation.name,
+    if (label != null) 'label': label,
+  };
 
   factory AiGridPivotValueConfig.fromJson(Map<String, dynamic> json) {
     return AiGridPivotValueConfig(
@@ -195,27 +196,27 @@ class AiGridPivotConfig {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'rowFieldIds': rowFieldIds,
-        'columnFieldIds': columnFieldIds,
-        'values': values.map((v) => v.toJson()).toList(),
-        'showColumnTotals': showColumnTotals,
-        'showRowTotals': showRowTotals,
-        'showChart': showChart,
-        'chartType': chartType.name,
-        'groupByRows': groupByRows,
-      };
+    'rowFieldIds': rowFieldIds,
+    'columnFieldIds': columnFieldIds,
+    'values': values.map((v) => v.toJson()).toList(),
+    'showColumnTotals': showColumnTotals,
+    'showRowTotals': showRowTotals,
+    'showChart': showChart,
+    'chartType': chartType.name,
+    'groupByRows': groupByRows,
+  };
 
   factory AiGridPivotConfig.fromJson(Map<String, dynamic> json) {
     final rawValues = json['values'] as List<dynamic>? ?? const [];
     return AiGridPivotConfig(
-      rowFieldIds: (json['rowFieldIds'] as List<dynamic>?)
+      rowFieldIds:
+          (json['rowFieldIds'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
-          (json['rows'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
+          (json['rows'] as List<dynamic>?)?.map((e) => e.toString()).toList() ??
           const <String>[],
-      columnFieldIds: (json['columnFieldIds'] as List<dynamic>?)
+      columnFieldIds:
+          (json['columnFieldIds'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           (json['columns'] as List<dynamic>?)

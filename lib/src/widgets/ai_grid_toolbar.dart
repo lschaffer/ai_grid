@@ -111,12 +111,32 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
     try {
       final file = await FilePicker.pickFile(
         type: FileType.custom,
-        allowedExtensions: ['csv', 'tsv', 'json', 'md', 'txt'],
+        allowedExtensions: ['csv', 'tsv', 'json', 'md', 'txt', 'xlsx'],
       );
       if (file != null) {
+        final ext = file.extension?.toLowerCase() ?? '';
+        if (ext == 'xlsx') {
+          final bytes = await file.xFile.readAsBytes();
+          if (context.mounted) {
+            final sheet = await widget.controller.importExcel(
+              bytes: bytes,
+              fileName: file.name,
+              context: context,
+            );
+            if (sheet != null && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Successfully imported Excel worksheet "${sheet.name}"!',
+                  ),
+                ),
+              );
+            }
+          }
+          return;
+        }
         final content = await file.xFile.readAsString();
 
-        final ext = file.extension?.toLowerCase() ?? '';
         List<AiGridDynamicColumnModel> columns = [];
         List<Map<String, dynamic>> rows = [];
 
@@ -633,6 +653,15 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
         ),
         IconButton(
           icon: Icon(
+            Icons.auto_fix_high_rounded,
+            size: 20,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          tooltip: 'AI Data Quality Auditor & Cleaner',
+          onPressed: () => widget.controller.showDataAuditorDialog(context),
+        ),
+        IconButton(
+          icon: Icon(
             widget.controller.isPivotActive
                 ? Icons.pivot_table_chart
                 : Icons.pivot_table_chart_outlined,
@@ -874,7 +903,9 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
       ),
       tooltip: 'New Datasource...',
       onSelected: (val) {
-        if (val == 'file') {
+        if (val == 'excel') {
+          widget.controller.importExcel(context: context);
+        } else if (val == 'file') {
           _handleNewFromFile(context);
         } else if (val == 'web') {
           AiGridWebDataSourceDialog.show(context, widget.controller);
@@ -890,6 +921,20 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
         }
       },
       itemBuilder: (ctx) => const [
+        PopupMenuItem(
+          value: 'excel',
+          child: Row(
+            children: [
+              Icon(
+                Icons.table_chart_rounded,
+                size: 18,
+                color: Color(0xFF107C41),
+              ),
+              SizedBox(width: 8),
+              Text('Import Excel Workbook (.xlsx)...'),
+            ],
+          ),
+        ),
         PopupMenuItem(
           value: 'file',
           child: Row(

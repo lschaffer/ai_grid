@@ -1,14 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// The recognized category of content extracted from the system clipboard.
-enum ClipboardContentType {
-  image,
-  document,
-  text,
-}
+enum ClipboardContentType { image, document, text }
 
 /// A structured representation of data extracted from the clipboard.
 class ClipboardPayload {
@@ -30,7 +27,8 @@ class ClipboardPayload {
 
   /// True if this payload represents media (image or document) rather than plain text.
   bool get isMedia =>
-      type == ClipboardContentType.image || type == ClipboardContentType.document;
+      type == ClipboardContentType.image ||
+      type == ClipboardContentType.document;
 }
 
 /// Unified service for extracting images, documents, and rich content from
@@ -115,10 +113,12 @@ if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
     }
     final encodedCmd = base64.encode(utf16leBytes);
 
-    final result = await Process.run(
-      'powershell',
-      ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedCmd],
-    );
+    final result = await Process.run('powershell', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-EncodedCommand',
+      encodedCmd,
+    ]);
 
     if (result.exitCode != 0) return const [];
 
@@ -218,10 +218,23 @@ if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
     }
   }
 
-  static Future<List<ClipboardPayload>> _parsePotentialFilePaths(String input) async {
+  static Future<List<ClipboardPayload>> _parsePotentialFilePaths(
+    String input,
+  ) async {
     final lines = input
         .split('\n')
-        .map((l) => l.trim().replaceAll(RegExp(r'^["' "'" r']|["' "'" r']$'), ''))
+        .map(
+          (l) => l.trim().replaceAll(
+            RegExp(
+              r'^["'
+              "'"
+              r']|["'
+              "'"
+              r']$',
+            ),
+            '',
+          ),
+        )
         .where((l) => l.isNotEmpty);
 
     final payloads = <ClipboardPayload>[];
@@ -297,7 +310,8 @@ if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
     return map[ext] ?? 'application/octet-stream';
   }
 
-  static bool _isImageMime(String mime) => mime.toLowerCase().startsWith('image/');
+  static bool _isImageMime(String mime) =>
+      mime.toLowerCase().startsWith('image/');
 
   static bool _isTextFile(String mimeType, String filename) {
     final mime = mimeType.toLowerCase();

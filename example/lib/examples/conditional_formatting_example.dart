@@ -44,9 +44,7 @@ class _ConditionalFormattingExamplePageState
       ],
     );
 
-    _controller.editingOptions = const AiGridEditingOptions(
-      enabled: false,
-    );
+    _controller.editingOptions = const AiGridEditingOptions(enabled: false);
 
     _setupDataSource();
     _applyActiveFormatting();
@@ -262,135 +260,140 @@ class _ConditionalFormattingExamplePageState
     return ScaffoldMessenger(
       child: Scaffold(
         backgroundColor: isDark
-          ? const Color(0xFF121418)
-          : const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+            ? const Color(0xFF121418)
+            : const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Feature 2: Conditional Formatting & Visuals',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Data Bars, Bidirectional Profit Bars, Progress Tracks & In-Cell Sparklines',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
+            ],
+          ),
+        ),
+        body: Column(
           children: [
-            Text(
-              'Feature 2: Conditional Formatting & Visuals',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            // Formatting Toggles Ribbon
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+                    : Colors.white,
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark ? Colors.white12 : Colors.grey.shade200,
+                  ),
+                ),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    FilterChip(
+                      avatar: const Icon(Icons.bar_chart_rounded, size: 16),
+                      label: const Text('Data Bars'),
+                      selected: _showDataBars,
+                      onSelected: (val) {
+                        setState(() {
+                          _showDataBars = val;
+                          _setupDataSource();
+                          _applyActiveFormatting();
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: const Icon(Icons.show_chart_rounded, size: 16),
+                      label: const Text('Sparklines'),
+                      selected: _showSparklines,
+                      onSelected: (val) {
+                        setState(() {
+                          _showSparklines = val;
+                          _setupDataSource();
+                          _applyActiveFormatting();
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: const Icon(Icons.warning_amber_rounded, size: 16),
+                      label: const Text('Row Alert Highlights'),
+                      selected: _showRowHighlights,
+                      onSelected: (val) {
+                        setState(() {
+                          _showRowHighlights = val;
+                          _applyActiveFormatting();
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      avatar: const Icon(
+                        Icons.format_color_text_rounded,
+                        size: 16,
+                      ),
+                      label: const Text('Conditional Text Colors'),
+                      selected: _showTextFormatting,
+                      onSelected: (val) {
+                        setState(() {
+                          _showTextFormatting = val;
+                          _setupDataSource();
+                          _applyActiveFormatting();
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: const Text('AI: Highlight Margins'),
+                      onPressed: () {
+                        _controller.addConditionalFormat(
+                          AiGridConditionalFormat.highlight(
+                            field: 'margin',
+                            operator: '>=',
+                            targetValue: 0.30,
+                            textColor: const Color(0xFF2E7D32),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'AI applied: Highlight margins >= 30% in bold green',
+                            ),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
-            Text(
-              'Data Bars, Bidirectional Profit Bars, Progress Tracks & In-Cell Sparklines',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+
+            // Main Interactive DataGrid
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: AiGrid(
+                  dataSource: _dataSource,
+                  controller: _controller,
+                  aiConfig: _aiConfig,
+                  enableAiAssistant: true,
+                  autoSave: false,
+                ),
+              ),
             ),
           ],
         ),
       ),
-      body: Column(
-        children: [
-          // Formatting Toggles Ribbon
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
-                  : Colors.white,
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? Colors.white12 : Colors.grey.shade200,
-                ),
-              ),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  FilterChip(
-                    avatar: const Icon(Icons.bar_chart_rounded, size: 16),
-                    label: const Text('Data Bars'),
-                    selected: _showDataBars,
-                    onSelected: (val) {
-                      setState(() {
-                        _showDataBars = val;
-                        _setupDataSource();
-                        _applyActiveFormatting();
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  FilterChip(
-                    avatar: const Icon(Icons.show_chart_rounded, size: 16),
-                    label: const Text('Sparklines'),
-                    selected: _showSparklines,
-                    onSelected: (val) {
-                      setState(() {
-                        _showSparklines = val;
-                        _setupDataSource();
-                        _applyActiveFormatting();
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  FilterChip(
-                    avatar: const Icon(Icons.warning_amber_rounded, size: 16),
-                    label: const Text('Row Alert Highlights'),
-                    selected: _showRowHighlights,
-                    onSelected: (val) {
-                      setState(() {
-                        _showRowHighlights = val;
-                        _applyActiveFormatting();
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  FilterChip(
-                    avatar: const Icon(Icons.format_color_text_rounded, size: 16),
-                    label: const Text('Conditional Text Colors'),
-                    selected: _showTextFormatting,
-                    onSelected: (val) {
-                      setState(() {
-                        _showTextFormatting = val;
-                        _setupDataSource();
-                        _applyActiveFormatting();
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.auto_awesome, size: 16),
-                    label: const Text('AI: Highlight Margins'),
-                    onPressed: () {
-                      _controller.addConditionalFormat(
-                        AiGridConditionalFormat.highlight(
-                          field: 'margin',
-                          operator: '>=',
-                          targetValue: 0.30,
-                          textColor: const Color(0xFF2E7D32),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('AI applied: Highlight margins >= 30% in bold green'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Main Interactive DataGrid
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: AiGrid(
-                dataSource: _dataSource,
-                controller: _controller,
-                aiConfig: _aiConfig,
-                enableAiAssistant: true,
-                autoSave: false,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
     );
   }
 }

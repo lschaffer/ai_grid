@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_dynamic_datasource.dart';
 import 'delimited_table_parser.dart';
@@ -18,21 +20,33 @@ class WebTableFetcher {
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('HTTP GET failed with status ${response.statusCode}: ${response.reasonPhrase}');
+      throw Exception(
+        'HTTP GET failed with status ${response.statusCode}: ${response.reasonPhrase}',
+      );
     }
 
     final body = response.body.trim();
     final contentType = response.headers['content-type']?.toLowerCase() ?? '';
 
     // 1. JSON Array or Object with nested array
-    if (contentType.contains('application/json') || body.startsWith('[') || body.startsWith('{')) {
+    if (contentType.contains('application/json') ||
+        body.startsWith('[') ||
+        body.startsWith('{')) {
       try {
         final decoded = jsonDecode(body);
         if (decoded is List) {
           return _parseJsonArray(decoded);
         } else if (decoded is Map) {
           // Look for common array wrappers
-          for (final key in ['data', 'items', 'results', 'rows', 'records', 'users', 'posts']) {
+          for (final key in [
+            'data',
+            'items',
+            'results',
+            'rows',
+            'records',
+            'users',
+            'posts',
+          ]) {
             if (decoded[key] is List) {
               return _parseJsonArray(decoded[key] as List);
             }
@@ -46,7 +60,8 @@ class WebTableFetcher {
     }
 
     // 2. CSV / Delimited
-    if (contentType.contains('text/csv') || contentType.contains('text/tab-separated-values')) {
+    if (contentType.contains('text/csv') ||
+        contentType.contains('text/tab-separated-values')) {
       final res = DelimitedTableParser.parse(body);
       return WebTableResult(
         columns: res.columns,
@@ -74,11 +89,7 @@ class WebTableFetcher {
     }
 
     // Fallback: return raw content so LLM can extract
-    return WebTableResult(
-      columns: const [],
-      rows: const [],
-      rawContent: body,
-    );
+    return WebTableResult(columns: const [], rows: const [], rawContent: body);
   }
 
   static WebTableResult _parseJsonArray(List list) {
@@ -115,13 +126,13 @@ class WebTableFetcher {
       );
     }
 
-    return WebTableResult(
-      columns: columns,
-      rows: rows,
-    );
+    return WebTableResult(columns: columns, rows: rows);
   }
 
-  static Map<String, dynamic> _flattenMap(Map<String, dynamic> map, [String prefix = '']) {
+  static Map<String, dynamic> _flattenMap(
+    Map<String, dynamic> map, [
+    String prefix = '',
+  ]) {
     final result = <String, dynamic>{};
     map.forEach((key, value) {
       final newKey = prefix.isEmpty ? key : '${prefix}_$key';
@@ -135,14 +146,30 @@ class WebTableFetcher {
   }
 
   static WebTableResult? _tryParseHtmlTable(String html) {
-    final tableRegex = RegExp(r'<table[^>]*>(.*?)<\/table>', dotAll: true, caseSensitive: false);
+    final tableRegex = RegExp(
+      r'<table[^>]*>(.*?)<\/table>',
+      dotAll: true,
+      caseSensitive: false,
+    );
     final match = tableRegex.firstMatch(html);
     if (match == null) return null;
 
     final tableHtml = match.group(1)!;
-    final rowRegex = RegExp(r'<tr[^>]*>(.*?)<\/tr>', dotAll: true, caseSensitive: false);
-    final thRegex = RegExp(r'<th[^>]*>(.*?)<\/th>', dotAll: true, caseSensitive: false);
-    final tdRegex = RegExp(r'<td[^>]*>(.*?)<\/td>', dotAll: true, caseSensitive: false);
+    final rowRegex = RegExp(
+      r'<tr[^>]*>(.*?)<\/tr>',
+      dotAll: true,
+      caseSensitive: false,
+    );
+    final thRegex = RegExp(
+      r'<th[^>]*>(.*?)<\/th>',
+      dotAll: true,
+      caseSensitive: false,
+    );
+    final tdRegex = RegExp(
+      r'<td[^>]*>(.*?)<\/td>',
+      dotAll: true,
+      caseSensitive: false,
+    );
 
     final rowMatches = rowRegex.allMatches(tableHtml).toList();
     if (rowMatches.isEmpty) return null;
@@ -152,14 +179,20 @@ class WebTableFetcher {
 
     // Check if first row has <th>
     final firstRow = rowMatches.first.group(1)!;
-    final firstThs = thRegex.allMatches(firstRow).map((m) => _stripTags(m.group(1)!)).toList();
+    final firstThs = thRegex
+        .allMatches(firstRow)
+        .map((m) => _stripTags(m.group(1)!))
+        .toList();
 
     if (firstThs.isNotEmpty) {
       headers = firstThs;
       dataStart = 1;
     } else {
       // Use first row td as headers
-      final firstTds = tdRegex.allMatches(firstRow).map((m) => _stripTags(m.group(1)!)).toList();
+      final firstTds = tdRegex
+          .allMatches(firstRow)
+          .map((m) => _stripTags(m.group(1)!))
+          .toList();
       headers = firstTds;
       dataStart = 1;
     }
@@ -169,7 +202,10 @@ class WebTableFetcher {
     final rows = <Map<String, dynamic>>[];
     for (int i = dataStart; i < rowMatches.length; i++) {
       final rowHtml = rowMatches[i].group(1)!;
-      final cells = tdRegex.allMatches(rowHtml).map((m) => _stripTags(m.group(1)!)).toList();
+      final cells = tdRegex
+          .allMatches(rowHtml)
+          .map((m) => _stripTags(m.group(1)!))
+          .toList();
       if (cells.isEmpty) continue;
 
       final rowMap = <String, dynamic>{};
@@ -198,11 +234,7 @@ class WebTableFetcher {
       );
     }
 
-    return WebTableResult(
-      columns: columns,
-      rows: rows,
-      rawContent: html,
-    );
+    return WebTableResult(columns: columns, rows: rows, rawContent: html);
   }
 
   static String _stripTags(String html) {
@@ -213,7 +245,9 @@ class WebTableFetcher {
     return key
         .replaceAll('_', ' ')
         .split(' ')
-        .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
+        .map(
+          (w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '',
+        )
         .join(' ');
   }
 
@@ -254,7 +288,8 @@ class WebTableFetcher {
         numCount++;
       } else if (v is bool) {
         boolCount++;
-      } else if (DateTime.tryParse(v.toString()) != null && v.toString().length >= 8) {
+      } else if (DateTime.tryParse(v.toString()) != null &&
+          v.toString().length >= 8) {
         dateCount++;
       }
     }

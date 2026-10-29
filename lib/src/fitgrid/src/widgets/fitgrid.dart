@@ -738,11 +738,11 @@ class _FitGridState<T> extends State<FitGrid<T>> {
     if (reached < total - widget.loadMoreThreshold) return;
 
     setState(() => _loadingMore = true);
-    Future<void>.sync(
-      load,
-    ).catchError((Object _) => _loadMoreFailed = true).whenComplete(() {
-      if (mounted) setState(() => _loadingMore = false);
-    });
+    Future<void>.sync(load)
+        .catchError((Object _) => _loadMoreFailed = true)
+        .whenComplete(() {
+          if (mounted) setState(() => _loadingMore = false);
+        });
   }
 
   /// Hands the structured column filters to a data source, which filters for
@@ -2062,8 +2062,10 @@ class _FitGridState<T> extends State<FitGrid<T>> {
     if (row == null) return;
     final globalRow = rows.globalIndex(localRow);
     final column = columns[columnIndex];
-    final isEditingThis =
-        _controller.editing.isEditingCell(globalRow, column.id);
+    final isEditingThis = _controller.editing.isEditingCell(
+      globalRow,
+      column.id,
+    );
 
     // The disclosure triangle of a tree parent is in the leading inset of the
     // first cell. Hitting it expands rather than selects.
@@ -2735,7 +2737,7 @@ class _FitGridState<T> extends State<FitGrid<T>> {
       final inVertical = rtl
           ? (local.dx >= 0 && local.dx <= scrollbarHitMargin)
           : (local.dx >= size.width - scrollbarHitMargin &&
-              local.dx <= size.width);
+                local.dx <= size.width);
       if (inVertical && local.dy >= 0 && local.dy <= size.height) {
         return true;
       }

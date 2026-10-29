@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:ai_grid/ai_grid.dart';
 
@@ -12,7 +13,8 @@ class DynamicAiGridExampleApp extends StatefulWidget {
   const DynamicAiGridExampleApp({super.key});
 
   @override
-  State<DynamicAiGridExampleApp> createState() => _DynamicAiGridExampleAppState();
+  State<DynamicAiGridExampleApp> createState() =>
+      _DynamicAiGridExampleAppState();
 }
 
 class _DynamicAiGridExampleAppState extends State<DynamicAiGridExampleApp> {
@@ -20,8 +22,9 @@ class _DynamicAiGridExampleAppState extends State<DynamicAiGridExampleApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode =
-          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _themeMode = _themeMode == ThemeMode.light
+          ? ThemeMode.dark
+          : ThemeMode.light;
     });
   }
 
@@ -100,9 +103,13 @@ class _DynamicGridHomePageState extends State<DynamicGridHomePage> {
     });
 
     try {
-      final jsonStr = await DefaultAssetBundle.of(context).loadString('assets/sales_1000.json');
+      final jsonStr = await DefaultAssetBundle.of(context)
+          .loadString('assets/sales_1000.json');
       final list = jsonDecode(jsonStr) as List;
-      final rows = list.take(200).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final rows = list
+          .take(200)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
 
       final columns = [
         const AiGridDynamicColumnModel(
@@ -192,7 +199,11 @@ class _DynamicGridHomePageState extends State<DynamicGridHomePage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Loaded 200-row "Monthly Sales" dataset matching monthly_sales_200.pdf!')),
+          const SnackBar(
+            content: Text(
+              'Loaded 200-row "Monthly Sales" dataset matching monthly_sales_200.pdf!',
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -238,7 +249,10 @@ class _DynamicGridHomePageState extends State<DynamicGridHomePage> {
                   final active = _controller.activeDynamicDatasource;
                   return Text(
                     active != null ? active.title : 'Dynamic DataGrid (Empty)',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   );
                 },
@@ -253,7 +267,9 @@ class _DynamicGridHomePageState extends State<DynamicGridHomePage> {
             onPressed: () {
               _controller.clearDynamicDatasource();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cleared grid to an empty table.')),
+                const SnackBar(
+                  content: Text('Cleared grid to an empty table.'),
+                ),
               );
             },
           ),
@@ -265,12 +281,14 @@ class _DynamicGridHomePageState extends State<DynamicGridHomePage> {
           IconButton(
             tooltip: 'Datasource Manager',
             icon: const Icon(Icons.dataset_outlined),
-            onPressed: () => AiGridDatasourceManagerDialog.show(context, _controller),
+            onPressed: () =>
+                AiGridDatasourceManagerDialog.show(context, _controller),
           ),
           IconButton(
             tooltip: 'Web Data Source (GET)',
             icon: const Icon(Icons.language_outlined),
-            onPressed: () => AiGridWebDataSourceDialog.show(context, _controller),
+            onPressed: () =>
+                AiGridWebDataSourceDialog.show(context, _controller),
           ),
           const SizedBox(width: 8),
         ],

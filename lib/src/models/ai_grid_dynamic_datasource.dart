@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:yaml/yaml.dart';
+
 import 'ai_grid_column.dart';
 import 'ai_grid_editing_options.dart';
 
@@ -80,16 +82,16 @@ class AiGridDynamicColumnModel {
   }
 
   Map<String, dynamic> toJson() => {
-        'field': field,
-        'title': title,
-        'type': type.name,
-        'editable': editable,
-        'required': required,
-        if (width != null) 'width': width,
-        if (maxWidth != null) 'max_width': maxWidth,
-        if (numberFormat != null) 'number_format': numberFormat,
-        if (editorType != null) 'editor_type': editorType!.name,
-      };
+    'field': field,
+    'title': title,
+    'type': type.name,
+    'editable': editable,
+    'required': required,
+    if (width != null) 'width': width,
+    if (maxWidth != null) 'max_width': maxWidth,
+    if (numberFormat != null) 'number_format': numberFormat,
+    if (editorType != null) 'editor_type': editorType!.name,
+  };
 
   factory AiGridDynamicColumnModel.fromJson(Map<String, dynamic> json) {
     AiGridColumnType parseType(String? t) {
@@ -134,10 +136,14 @@ class AiGridDynamicColumnModel {
       editable: json['editable'] as bool? ?? true,
       required: json['required'] as bool? ?? false,
       width: (json['width'] as num?)?.toDouble(),
-      maxWidth: (json['max_width'] as num?)?.toDouble() ??
+      maxWidth:
+          (json['max_width'] as num?)?.toDouble() ??
           (json['maxWidth'] as num?)?.toDouble(),
-      numberFormat: json['number_format'] as String? ?? json['numberFormat'] as String?,
-      editorType: parseEditorType(json['editor_type']?.toString() ?? json['editorType']?.toString()),
+      numberFormat:
+          json['number_format'] as String? ?? json['numberFormat'] as String?,
+      editorType: parseEditorType(
+        json['editor_type']?.toString() ?? json['editorType']?.toString(),
+      ),
     );
   }
 }
@@ -186,19 +192,20 @@ class AiGridDynamicModel {
     );
   }
 
-  List<AiGridColumn> toColumns() => columns.map((c) => c.toAiGridColumn()).toList();
+  List<AiGridColumn> toColumns() =>
+      columns.map((c) => c.toAiGridColumn()).toList();
 
   Map<String, dynamic> toJson() => {
-        'version': '1.0',
-        'model_name': modelName,
-        'datasource_name': datasourceName,
-        'title': title,
-        'is_readonly': isReadonly,
-        'source_type': sourceType,
-        if (sourceOrigin != null) 'source_origin': sourceOrigin,
-        'created_at': createdAt.toIso8601String(),
-        'columns': columns.map((c) => c.toJson()).toList(),
-      };
+    'version': '1.0',
+    'model_name': modelName,
+    'datasource_name': datasourceName,
+    'title': title,
+    'is_readonly': isReadonly,
+    'source_type': sourceType,
+    if (sourceOrigin != null) 'source_origin': sourceOrigin,
+    'created_at': createdAt.toIso8601String(),
+    'columns': columns.map((c) => c.toJson()).toList(),
+  };
 
   String toYamlString() {
     final sb = StringBuffer();
@@ -234,7 +241,11 @@ class AiGridDynamicModel {
   factory AiGridDynamicModel.fromJson(Map<String, dynamic> json) {
     final colsRaw = json['columns'] as List? ?? const [];
     final cols = colsRaw
-        .map((c) => AiGridDynamicColumnModel.fromJson(Map<String, dynamic>.from(c as Map)))
+        .map(
+          (c) => AiGridDynamicColumnModel.fromJson(
+            Map<String, dynamic>.from(c as Map),
+          ),
+        )
         .toList();
 
     return AiGridDynamicModel(
@@ -267,7 +278,9 @@ class AiGridDynamicModel {
       if (value is Map) {
         result[strKey] = _deepConvertYamlMap(value);
       } else if (value is List) {
-        result[strKey] = value.map((e) => e is Map ? _deepConvertYamlMap(e) : e).toList();
+        result[strKey] = value
+            .map((e) => e is Map ? _deepConvertYamlMap(e) : e)
+            .toList();
       } else {
         result[strKey] = value;
       }
@@ -303,24 +316,25 @@ class AiGridDynamicDescriptor {
   });
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'model_name': modelName,
-        'datasource_name': datasourceName,
-        'title': title,
-        'source_type': sourceType,
-        if (sourceOrigin != null) 'source_origin': sourceOrigin,
-        'is_readonly': isReadonly,
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
-        'row_count': rowCount,
-      };
+    'name': name,
+    'model_name': modelName,
+    'datasource_name': datasourceName,
+    'title': title,
+    'source_type': sourceType,
+    if (sourceOrigin != null) 'source_origin': sourceOrigin,
+    'is_readonly': isReadonly,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+    'row_count': rowCount,
+  };
 
   factory AiGridDynamicDescriptor.fromJson(Map<String, dynamic> json) {
     return AiGridDynamicDescriptor(
       name: json['name'] as String? ?? '',
       modelName: json['model_name'] as String? ?? '',
       datasourceName: json['datasource_name'] as String? ?? '',
-      title: json['title'] as String? ?? json['name'] as String? ?? 'Datasource',
+      title:
+          json['title'] as String? ?? json['name'] as String? ?? 'Datasource',
       sourceType: json['source_type'] as String? ?? 'file',
       sourceOrigin: json['source_origin'] as String?,
       isReadonly: json['is_readonly'] as bool? ?? false,
@@ -421,7 +435,9 @@ class AiGridDynamicBundle {
     }
 
     final desc = AiGridDynamicDescriptor(
-      name: meta['name'] as String? ?? model.datasourceName.replaceAll('.json', ''),
+      name:
+          meta['name'] as String? ??
+          model.datasourceName.replaceAll('.json', ''),
       modelName: model.modelName,
       datasourceName: model.datasourceName,
       title: meta['title'] as String? ?? model.title,
@@ -437,10 +453,6 @@ class AiGridDynamicBundle {
       rowCount: rows.length,
     );
 
-    return AiGridDynamicBundle(
-      descriptor: desc,
-      model: model,
-      rows: rows,
-    );
+    return AiGridDynamicBundle(descriptor: desc, model: model, rows: rows);
   }
 }

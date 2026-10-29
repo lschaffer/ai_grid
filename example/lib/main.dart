@@ -1,11 +1,14 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:ai_grid/ai_grid.dart';
+
 import 'dynamic_ai_grid_example.dart';
 import 'examples/superstore_enterprise_example.dart';
 import 'examples/conditional_formatting_example.dart';
 import 'examples/range_selection_example.dart';
 import 'examples/smart_columns_example.dart';
 import 'examples/master_detail_example.dart';
+import 'examples/excel_import_example.dart';
+import 'examples/data_auditor_example.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,16 +63,17 @@ enum ShowcaseDemo {
   excelImport(
     id: 'excel_import',
     title: 'Feature 5: Pure-Dart Excel (.xlsx) Import',
-    subtitle: 'Native workbook reading, multi-sheet selection & schema inference',
+    subtitle:
+        'Native workbook reading, multi-sheet selection & schema inference',
     icon: Icons.file_present_rounded,
-    badge: 'Planned',
+    badge: 'NEW',
   ),
   dataAuditor(
     id: 'data_auditor',
     title: 'Feature 6: AI Data Auditor & Cleaner',
     subtitle: 'Anomaly detection, missing value imputation & format cleanup',
     icon: Icons.health_and_safety_rounded,
-    badge: 'Planned',
+    badge: 'NEW',
   ),
   mobileCardView(
     id: 'mobile_card_view',
@@ -114,8 +118,9 @@ class _AiGridShowcaseAppState extends State<AiGridShowcaseApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode =
-          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _themeMode = _themeMode == ThemeMode.light
+          ? ThemeMode.dark
+          : ThemeMode.light;
     });
   }
 
@@ -200,7 +205,10 @@ class ShowcaseGalleryShell extends StatelessWidget {
                 onTap: () => _openFullScreenFeatureList(context),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 6,
+                  ),
                   child: Row(
                     children: [
                       CircleAvatar(
@@ -242,7 +250,9 @@ class ShowcaseGalleryShell extends StatelessWidget {
                       message: 'Open Fullscreen Feature Gallery',
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(6),
@@ -300,13 +310,15 @@ class ShowcaseGalleryShell extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: isNew
                                         ? Colors.green.withValues(alpha: 0.2)
                                         : isPlanned
-                                            ? Colors.grey.withValues(alpha: 0.2)
-                                            : Colors.blue.withValues(alpha: 0.2),
+                                        ? Colors.grey.withValues(alpha: 0.2)
+                                        : Colors.blue.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
@@ -317,8 +329,8 @@ class ShowcaseGalleryShell extends StatelessWidget {
                                       color: isNew
                                           ? Colors.green.shade800
                                           : isPlanned
-                                              ? Colors.grey.shade600
-                                              : Colors.blue.shade800,
+                                          ? Colors.grey.shade600
+                                          : Colors.blue.shade800,
                                     ),
                                   ),
                                 ),
@@ -387,7 +399,15 @@ class ShowcaseGalleryShell extends StatelessWidget {
           onToggleTheme: onToggleTheme,
         );
       case ShowcaseDemo.excelImport:
+        return ExcelImportExamplePage(
+          isDarkMode: isDarkMode,
+          onToggleTheme: onToggleTheme,
+        );
       case ShowcaseDemo.dataAuditor:
+        return DataAuditorExamplePage(
+          isDarkMode: isDarkMode,
+          onToggleTheme: onToggleTheme,
+        );
       case ShowcaseDemo.mobileCardView:
       case ShowcaseDemo.contextualAi:
         return _buildFeatureRoadmapCard(context, currentDemo);
@@ -404,7 +424,9 @@ class ShowcaseGalleryShell extends StatelessWidget {
         child: Card(
           margin: const EdgeInsets.all(24),
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(
@@ -415,9 +437,14 @@ class ShowcaseGalleryShell extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 24,
-                      backgroundColor:
-                          colorScheme.primary.withValues(alpha: 0.15),
-                      child: Icon(demo.icon, size: 28, color: colorScheme.primary),
+                      backgroundColor: colorScheme.primary.withValues(
+                        alpha: 0.15,
+                      ),
+                      child: Icon(
+                        demo.icon,
+                        size: 28,
+                        color: colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -472,9 +499,18 @@ class ShowcaseGalleryShell extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _buildBullet(context, 'Full specification defined in ai_grid_features_plan.md'),
-                _buildBullet(context, 'Dedicated MCP tools for AI natural language orchestration'),
-                _buildBullet(context, 'Direct 60 FPS canvas painting with zero widget overhead'),
+                _buildBullet(
+                  context,
+                  'Full specification defined in ai_grid_features_plan.md',
+                ),
+                _buildBullet(
+                  context,
+                  'Dedicated MCP tools for AI natural language orchestration',
+                ),
+                _buildBullet(
+                  context,
+                  'Direct 60 FPS canvas painting with zero widget overhead',
+                ),
                 _buildBullet(context, 'WASM and Material 3 adaptive design'),
                 const SizedBox(height: 24),
                 Row(
@@ -502,15 +538,13 @@ class ShowcaseGalleryShell extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check_circle_outline_rounded,
-              size: 16, color: Colors.green),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 13),
-            ),
+          const Icon(
+            Icons.check_circle_outline_rounded,
+            size: 16,
+            color: Colors.green,
           ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
         ],
       ),
     );
@@ -536,10 +570,12 @@ class _FullScreenFeatureListPage extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final readyDemos =
-        ShowcaseDemo.values.where((d) => d.badge != 'Planned').toList();
-    final plannedDemos =
-        ShowcaseDemo.values.where((d) => d.badge == 'Planned').toList();
+    final readyDemos = ShowcaseDemo.values
+        .where((d) => d.badge != 'Planned')
+        .toList();
+    final plannedDemos = ShowcaseDemo.values
+        .where((d) => d.badge == 'Planned')
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -553,8 +589,11 @@ class _FullScreenFeatureListPage extends StatelessWidget {
             CircleAvatar(
               radius: 14,
               backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
-              child: Icon(Icons.grid_view_rounded,
-                  size: 16, color: colorScheme.primary),
+              child: Icon(
+                Icons.grid_view_rounded,
+                size: 16,
+                color: colorScheme.primary,
+              ),
             ),
             const SizedBox(width: 10),
             const Text(
@@ -582,7 +621,9 @@ class _FullScreenFeatureListPage extends StatelessWidget {
             Colors.green.shade700,
           ),
           const SizedBox(height: 10),
-          ...readyDemos.map((demo) => _buildDemoCard(context, demo, isReady: true)),
+          ...readyDemos.map(
+            (demo) => _buildDemoCard(context, demo, isReady: true),
+          ),
           const SizedBox(height: 20),
           _buildSectionHeader(
             context,
@@ -591,8 +632,9 @@ class _FullScreenFeatureListPage extends StatelessWidget {
             Colors.amber.shade900,
           ),
           const SizedBox(height: 10),
-          ...plannedDemos
-              .map((demo) => _buildDemoCard(context, demo, isReady: false)),
+          ...plannedDemos.map(
+            (demo) => _buildDemoCard(context, demo, isReady: false),
+          ),
           const SizedBox(height: 24),
         ],
       ),
@@ -600,7 +642,11 @@ class _FullScreenFeatureListPage extends StatelessWidget {
   }
 
   Widget _buildSectionHeader(
-      BuildContext context, String title, IconData icon, Color color) {
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+  ) {
     return Row(
       children: [
         Icon(icon, size: 15, color: color),
@@ -618,8 +664,11 @@ class _FullScreenFeatureListPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDemoCard(BuildContext context, ShowcaseDemo demo,
-      {required bool isReady}) {
+  Widget _buildDemoCard(
+    BuildContext context,
+    ShowcaseDemo demo, {
+    required bool isReady,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isSelected = demo == currentDemo;
@@ -656,8 +705,8 @@ class _FullScreenFeatureListPage extends StatelessWidget {
           color: isSelected
               ? colorScheme.primary
               : (isDarkMode
-                  ? Colors.white12
-                  : Colors.black.withValues(alpha: 0.08)),
+                    ? Colors.white12
+                    : Colors.black.withValues(alpha: 0.08)),
           width: isSelected ? 1.5 : 1.0,
         ),
       ),
@@ -692,20 +741,23 @@ class _FullScreenFeatureListPage extends StatelessWidget {
                             demo.title,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight:
-                                  isSelected ? FontWeight.bold : FontWeight.w600,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
                               color: isReady
                                   ? (isDarkMode ? Colors.white : Colors.black87)
                                   : (isDarkMode
-                                      ? Colors.white60
-                                      : Colors.black54),
+                                        ? Colors.white60
+                                        : Colors.black54),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: badgeBg,
                             borderRadius: BorderRadius.circular(6),

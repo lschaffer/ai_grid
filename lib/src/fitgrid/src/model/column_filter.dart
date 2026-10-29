@@ -194,7 +194,8 @@ class FitGridColumnFilter {
     ];
 
     final lower = trimmed.toLowerCase();
-    if (lower.startsWith('in:') || (lower.startsWith('in(') && lower.endsWith(')'))) {
+    if (lower.startsWith('in:') ||
+        (lower.startsWith('in(') && lower.endsWith(')'))) {
       final content = lower.startsWith('in:')
           ? trimmed.substring(3).trim()
           : trimmed.substring(3, trimmed.length - 1).trim();

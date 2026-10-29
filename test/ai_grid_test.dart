@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart' as fm;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,19 +24,23 @@ void main() {
       );
       final cols = [
         const AiGridColumn(
-            field: 'orderId', title: 'Order ID', type: AiGridColumnType.number),
+          field: 'orderId',
+          title: 'Order ID',
+          type: AiGridColumnType.number,
+        ),
         const AiGridColumn(
-            field: 'region', title: 'Region', type: AiGridColumnType.text),
+          field: 'region',
+          title: 'Region',
+          type: AiGridColumnType.text,
+        ),
         const AiGridColumn(
-            field: 'saleAmount',
-            title: 'Sale Amount',
-            type: AiGridColumnType.currency),
+          field: 'saleAmount',
+          title: 'Sale Amount',
+          type: AiGridColumnType.currency,
+        ),
       ];
 
-      final ds = LocalAiGridDataSource(
-        initialData: sample,
-        columns: cols,
-      );
+      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
 
       final rows = await ds.fetchRows();
       expect(rows.length, 5);
@@ -77,11 +82,20 @@ void main() {
       ];
       final cols = [
         const AiGridColumn(
-            field: 'orderId', title: 'Order ID', type: AiGridColumnType.number),
+          field: 'orderId',
+          title: 'Order ID',
+          type: AiGridColumnType.number,
+        ),
         const AiGridColumn(
-            field: 'sales', title: 'Sales', type: AiGridColumnType.currency),
+          field: 'sales',
+          title: 'Sales',
+          type: AiGridColumnType.currency,
+        ),
         const AiGridColumn(
-            field: 'category', title: 'Category', type: AiGridColumnType.text),
+          field: 'category',
+          title: 'Category',
+          type: AiGridColumnType.text,
+        ),
       ];
 
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
@@ -97,13 +111,20 @@ void main() {
 
       // Min & Max
       expect(
-          controller.calculate(field: 'sales', operation: 'min')['result'], 100.0);
+        controller.calculate(field: 'sales', operation: 'min')['result'],
+        100.0,
+      );
       expect(
-          controller.calculate(field: 'sales', operation: 'max')['result'], 300.0);
+        controller.calculate(field: 'sales', operation: 'max')['result'],
+        300.0,
+      );
 
       // Grouped calculation
       final groupCalc = controller.calculate(
-          field: 'sales', operation: 'sum', groupBy: 'category');
+        field: 'sales',
+        operation: 'sum',
+        groupBy: 'category',
+      );
       expect(groupCalc['groups'], isNotNull);
       final groups = groupCalc['groups'] as Map<String, dynamic>;
       expect(groups['Tech']['result'], 300.0);
@@ -119,11 +140,20 @@ void main() {
       ];
       final cols = [
         const AiGridColumn(
-            field: 'orderId', title: 'Order ID', type: AiGridColumnType.number),
+          field: 'orderId',
+          title: 'Order ID',
+          type: AiGridColumnType.number,
+        ),
         const AiGridColumn(
-            field: 'region', title: 'Region', type: AiGridColumnType.text),
+          field: 'region',
+          title: 'Region',
+          type: AiGridColumnType.text,
+        ),
         const AiGridColumn(
-            field: 'category', title: 'Category', type: AiGridColumnType.text),
+          field: 'category',
+          title: 'Category',
+          type: AiGridColumnType.text,
+        ),
       ];
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
       controller.attach(columns: cols, dataSource: ds);
@@ -146,9 +176,21 @@ void main() {
         {'orderId': 3, 'Quantity': 7, 'Discount': 0.0},
       ];
       final cols = [
-        const AiGridColumn(field: 'orderId', title: 'Order ID', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'Quantity', title: 'Quantity', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'Discount', title: 'Discount', type: AiGridColumnType.number),
+        const AiGridColumn(
+          field: 'orderId',
+          title: 'Order ID',
+          type: AiGridColumnType.number,
+        ),
+        const AiGridColumn(
+          field: 'Quantity',
+          title: 'Quantity',
+          type: AiGridColumnType.number,
+        ),
+        const AiGridColumn(
+          field: 'Discount',
+          title: 'Discount',
+          type: AiGridColumnType.number,
+        ),
       ];
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
       controller.attach(columns: cols, dataSource: ds);
@@ -156,44 +198,82 @@ void main() {
       // 1. First filter on Discount
       controller.setFilter('Discount', operator: 'not equals', value: '0');
       expect(controller.activeFilters.containsKey('Discount'), isTrue);
-      expect(controller.fitController!.filter.filters.containsKey('Discount'), isTrue);
-      expect(controller.fitController!.filter.filters['Discount']?.operator, FitGridFilterOperator.notEquals);
+      expect(
+        controller.fitController!.filter.filters.containsKey('Discount'),
+        isTrue,
+      );
+      expect(
+        controller.fitController!.filter.filters['Discount']?.operator,
+        FitGridFilterOperator.notEquals,
+      );
 
       // 2. Second filter on Quantity
       controller.setFilter('Quantity', operator: 'greaterThan', value: '4');
       // Verify Discount was NOT cleared
       expect(controller.activeFilters.containsKey('Discount'), isTrue);
       expect(controller.activeFilters.containsKey('Quantity'), isTrue);
-      expect(controller.fitController!.filter.filters.containsKey('Discount'), isTrue);
-      expect(controller.fitController!.filter.filters.containsKey('Quantity'), isTrue);
-      expect(controller.fitController!.filter.filters['Discount']?.operator, FitGridFilterOperator.notEquals);
-      expect(controller.fitController!.filter.filters['Quantity']?.operator, FitGridFilterOperator.greaterThan);
+      expect(
+        controller.fitController!.filter.filters.containsKey('Discount'),
+        isTrue,
+      );
+      expect(
+        controller.fitController!.filter.filters.containsKey('Quantity'),
+        isTrue,
+      );
+      expect(
+        controller.fitController!.filter.filters['Discount']?.operator,
+        FitGridFilterOperator.notEquals,
+      );
+      expect(
+        controller.fitController!.filter.filters['Quantity']?.operator,
+        FitGridFilterOperator.greaterThan,
+      );
     });
 
-    test('supports negative filter operators (not equals, does not contain)', () {
-      final controller = AiGridController();
-      final sample = [
-        {'orderId': 1, 'category': 'Furniture'},
-        {'orderId': 2, 'category': 'Office Supplies'},
-        {'orderId': 3, 'category': 'Technology'},
-      ];
-      final cols = [
-        const AiGridColumn(
-            field: 'orderId', title: 'Order ID', type: AiGridColumnType.number),
-        const AiGridColumn(
-            field: 'category', title: 'Category', type: AiGridColumnType.text),
-      ];
-      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
-      controller.attach(columns: cols, dataSource: ds);
+    test(
+      'supports negative filter operators (not equals, does not contain)',
+      () {
+        final controller = AiGridController();
+        final sample = [
+          {'orderId': 1, 'category': 'Furniture'},
+          {'orderId': 2, 'category': 'Office Supplies'},
+          {'orderId': 3, 'category': 'Technology'},
+        ];
+        final cols = [
+          const AiGridColumn(
+            field: 'orderId',
+            title: 'Order ID',
+            type: AiGridColumnType.number,
+          ),
+          const AiGridColumn(
+            field: 'category',
+            title: 'Category',
+            type: AiGridColumnType.text,
+          ),
+        ];
+        final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+        controller.attach(columns: cols, dataSource: ds);
 
-      controller.setFilter('category', operator: 'not equals', value: 'Furniture');
-      expect(controller.activeFilters['category']?['operator'], 'not equals');
-      expect(controller.activeFilters['category']?['value'], 'Furniture');
+        controller.setFilter(
+          'category',
+          operator: 'not equals',
+          value: 'Furniture',
+        );
+        expect(controller.activeFilters['category']?['operator'], 'not equals');
+        expect(controller.activeFilters['category']?['value'], 'Furniture');
 
-      controller.setFilter('category', operator: 'does not contain', value: 'Supplies');
-      expect(controller.activeFilters['category']?['operator'], 'does not contain');
-      expect(controller.activeFilters['category']?['value'], 'Supplies');
-    });
+        controller.setFilter(
+          'category',
+          operator: 'does not contain',
+          value: 'Supplies',
+        );
+        expect(
+          controller.activeFilters['category']?['operator'],
+          'does not contain',
+        );
+        expect(controller.activeFilters['category']?['value'], 'Supplies');
+      },
+    );
   });
 
   group('AiGrid MCP Skill & Tools Tests', () {
@@ -210,13 +290,25 @@ void main() {
       );
       final cols = [
         const AiGridColumn(
-            field: 'orderId', title: 'Order ID', type: AiGridColumnType.number),
+          field: 'orderId',
+          title: 'Order ID',
+          type: AiGridColumnType.number,
+        ),
         const AiGridColumn(
-            field: 'region', title: 'Region', type: AiGridColumnType.text),
+          field: 'region',
+          title: 'Region',
+          type: AiGridColumnType.text,
+        ),
         const AiGridColumn(
-            field: 'sector', title: 'Sector', type: AiGridColumnType.text),
+          field: 'sector',
+          title: 'Sector',
+          type: AiGridColumnType.text,
+        ),
         const AiGridColumn(
-            field: 'sales', title: 'Sales', type: AiGridColumnType.currency),
+          field: 'sales',
+          title: 'Sales',
+          type: AiGridColumnType.currency,
+        ),
       ];
 
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
@@ -236,29 +328,40 @@ void main() {
       expect(schemaRes.content.first.text?.contains('orderId'), isTrue);
 
       // Test calculate tool (in-built function without LLM math)
-      final calcRes = await calcTool
-          .execute({'field': 'sales', 'operation': 'average'});
-      expect(calcRes.content.first.text?.toLowerCase().contains('average of sales'), isTrue);
+      final calcRes = await calcTool.execute({
+        'field': 'sales',
+        'operation': 'average',
+      });
+      expect(
+        calcRes.content.first.text?.toLowerCase().contains('average of sales'),
+        isTrue,
+      );
 
       // Test multi-filter joined with AND
       final filterRes = await filterTool.execute({
         'filters': [
           {'field': 'region', 'operator': 'equals', 'value': 'East'},
           {'field': 'sector', 'operator': 'equals', 'value': 'Tech'},
-        ]
+        ],
       });
-      expect(filterRes.content.first.text?.contains('Filters applied:'), isTrue);
+      expect(
+        filterRes.content.first.text?.contains('Filters applied:'),
+        isTrue,
+      );
       expect(filterRes.content.first.text?.contains('joined by AND'), isFalse);
 
       // Test grouping
-      final groupRes =
-          await groupTool.execute({'columns': ['region', 'sector']});
+      final groupRes = await groupTool.execute({
+        'columns': ['region', 'sector'],
+      });
       expect(controller.activeGrouping, ['region', 'sector']);
       expect(groupRes.content.first.text?.contains('region, sector'), isTrue);
 
       // Test sorting
-      final sortRes =
-          await sortTool.execute({'column': 'orderId', 'descending': true});
+      final sortRes = await sortTool.execute({
+        'column': 'orderId',
+        'descending': true,
+      });
       expect(controller.activeSortColumn, 'orderId');
       expect(controller.isSortDescending, isTrue);
       expect(sortRes.content.first.text?.contains('orderId'), isTrue);
@@ -291,104 +394,139 @@ void main() {
       expect(stateJson['activeGrouping'], isEmpty);
     });
 
-    test('AiGridController settings export and restore persists configuration', () async {
-      final cols = [
-        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'category', title: 'Category', type: AiGridColumnType.text),
-        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
-      ];
+    test(
+      'AiGridController settings export and restore persists configuration',
+      () async {
+        final cols = [
+          const AiGridColumn(
+            field: 'id',
+            title: 'ID',
+            type: AiGridColumnType.number,
+          ),
+          const AiGridColumn(
+            field: 'category',
+            title: 'Category',
+            type: AiGridColumnType.text,
+          ),
+          const AiGridColumn(
+            field: 'sales',
+            title: 'Sales',
+            type: AiGridColumnType.number,
+          ),
+        ];
 
-      final sample = [
-        {'id': 1, 'category': 'Office Supplies', 'sales': 100},
-        {'id': 2, 'category': 'Technology', 'sales': 500},
-      ];
+        final sample = [
+          {'id': 1, 'category': 'Office Supplies', 'sales': 100},
+          {'id': 2, 'category': 'Technology', 'sales': 500},
+        ];
 
-      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
-      final controller = AiGridController();
-      controller.attach(columns: cols, dataSource: ds);
+        final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+        final controller = AiGridController();
+        controller.attach(columns: cols, dataSource: ds);
 
-      // Modify grid settings: grouping, sorting, filters, visibility
-      controller.setGrouping(['category']);
-      controller.setSorting('sales', descending: true);
-      controller.setFilter('sales', operator: 'greater than', value: 50);
-      controller.showOnlyColumns(['id', 'sales']);
+        // Modify grid settings: grouping, sorting, filters, visibility
+        controller.setGrouping(['category']);
+        controller.setSorting('sales', descending: true);
+        controller.setFilter('sales', operator: 'greater than', value: 50);
+        controller.showOnlyColumns(['id', 'sales']);
 
-      // 1. Export settings
-      final exported = controller.exportSettings();
-      expect(exported['groupColumns'], ['category']);
-      expect(exported['sorts'], isNotEmpty);
-      expect((exported['sorts'] as List).first['field'], 'sales');
-      expect((exported['sorts'] as List).first['descending'], isTrue);
-      expect(exported['filters'], isNotEmpty);
-      expect(exported['filters']['sales']['operator'], 'greater than');
-      expect(exported['visibleColumns'], containsAll(['id', 'sales']));
-      expect(exported['hiddenColumns'], contains('category'));
+        // 1. Export settings
+        final exported = controller.exportSettings();
+        expect(exported['groupColumns'], ['category']);
+        expect(exported['sorts'], isNotEmpty);
+        expect((exported['sorts'] as List).first['field'], 'sales');
+        expect((exported['sorts'] as List).first['descending'], isTrue);
+        expect(exported['filters'], isNotEmpty);
+        expect(exported['filters']['sales']['operator'], 'greater than');
+        expect(exported['visibleColumns'], containsAll(['id', 'sales']));
+        expect(exported['hiddenColumns'], contains('category'));
 
-      // 2. Export to JSON string
-      final jsonStr = controller.exportSettingsJson();
-      expect(jsonStr, contains('groupColumns'));
-      expect(jsonStr, contains('category'));
+        // 2. Export to JSON string
+        final jsonStr = controller.exportSettingsJson();
+        expect(jsonStr, contains('groupColumns'));
+        expect(jsonStr, contains('category'));
 
-      // 3. Reset grid
-      controller.reset();
-      expect(controller.activeGrouping, isEmpty);
-      expect(controller.activeSortColumn, isNull);
-      expect(controller.activeFilters, isEmpty);
-      expect(controller.hiddenColumns, isEmpty);
+        // 3. Reset grid
+        controller.reset();
+        expect(controller.activeGrouping, isEmpty);
+        expect(controller.activeSortColumn, isNull);
+        expect(controller.activeFilters, isEmpty);
+        expect(controller.hiddenColumns, isEmpty);
 
-      // 4. Restore settings from Map
-      controller.restoreSettings(exported);
-      expect(controller.activeGrouping, ['category']);
-      expect(controller.activeSortColumn, 'sales');
-      expect(controller.isSortDescending, isTrue);
-      expect(controller.activeFilters.containsKey('sales'), isTrue);
-      expect(controller.hiddenColumns, contains('category'));
+        // 4. Restore settings from Map
+        controller.restoreSettings(exported);
+        expect(controller.activeGrouping, ['category']);
+        expect(controller.activeSortColumn, 'sales');
+        expect(controller.isSortDescending, isTrue);
+        expect(controller.activeFilters.containsKey('sales'), isTrue);
+        expect(controller.hiddenColumns, contains('category'));
 
-      // 5. Test AiGridSettingsStorage cache
-      AiGridSettingsStorage.save('test_persistence_key', exported);
-      final loaded = AiGridSettingsStorage.load('test_persistence_key');
-      expect(loaded, isNotNull);
-      expect(loaded!['groupColumns'], ['category']);
-      AiGridSettingsStorage.clear('test_persistence_key');
-      expect(AiGridSettingsStorage.load('test_persistence_key'), isNull);
+        // 5. Test AiGridSettingsStorage cache
+        AiGridSettingsStorage.save('test_persistence_key', exported);
+        final loaded = AiGridSettingsStorage.load('test_persistence_key');
+        expect(loaded, isNotNull);
+        expect(loaded!['groupColumns'], ['category']);
+        AiGridSettingsStorage.clear('test_persistence_key');
+        expect(AiGridSettingsStorage.load('test_persistence_key'), isNull);
 
-      // 6. Test MCP Tools: GridExportSettingsTool & GridRestoreSettingsTool
-      final tools = AiGridSkill.createTools(controller);
-      final exportSettingsTool = tools.firstWhere((t) => t.name == 'grid_export_settings');
-      final restoreSettingsTool = tools.firstWhere((t) => t.name == 'grid_restore_settings');
+        // 6. Test MCP Tools: GridExportSettingsTool & GridRestoreSettingsTool
+        final tools = AiGridSkill.createTools(controller);
+        final exportSettingsTool = tools.firstWhere(
+          (t) => t.name == 'grid_export_settings',
+        );
+        final restoreSettingsTool = tools.firstWhere(
+          (t) => t.name == 'grid_restore_settings',
+        );
 
-      final exportResult = await exportSettingsTool.execute({});
-      expect(exportResult.content.first.text, contains('"groupColumns"'));
+        final exportResult = await exportSettingsTool.execute({});
+        expect(exportResult.content.first.text, contains('"groupColumns"'));
 
-      controller.reset();
-      expect(controller.activeGrouping, isEmpty);
+        controller.reset();
+        expect(controller.activeGrouping, isEmpty);
 
-      final restoreResult = await restoreSettingsTool.execute({
-        'settingsJson': exportResult.content.first.text,
-      });
-      expect(restoreResult.content.first.text, contains('restored successfully'));
-      expect(controller.activeGrouping, ['category']);
-    });
+        final restoreResult = await restoreSettingsTool.execute({
+          'settingsJson': exportResult.content.first.text,
+        });
+        expect(
+          restoreResult.content.first.text,
+          contains('restored successfully'),
+        );
+        expect(controller.activeGrouping, ['category']);
+      },
+    );
 
     test('LazyAiGridDataSource & pagination tools work as expected', () async {
       final cols = [
         const AiGridColumn(
-            field: 'id', title: 'ID', type: AiGridColumnType.number),
+          field: 'id',
+          title: 'ID',
+          type: AiGridColumnType.number,
+        ),
         const AiGridColumn(
-            field: 'name', title: 'Name', type: AiGridColumnType.text),
+          field: 'name',
+          title: 'Name',
+          type: AiGridColumnType.text,
+        ),
       ];
 
       final lazyDs = LazyAiGridDataSource(
         columns: cols,
-        fetch: ({required page, required pageSize, sortColumn, descending = false, searchQuery}) async {
-          return List.generate(
-            pageSize,
-            (i) => {
-              'id': (page - 1) * pageSize + i + 1,
-              'name': 'Item ${(page - 1) * pageSize + i + 1}',
+        fetch:
+            ({
+              required page,
+              required pageSize,
+              sortColumn,
+              descending = false,
+              searchQuery,
+            }) async {
+              return List.generate(
+                pageSize,
+                (i) => {
+                  'id': (page - 1) * pageSize + i + 1,
+                  'name': 'Item ${(page - 1) * pageSize + i + 1}',
+                },
+              );
             },
-          );
-        },
         totalRowCountGetter: () => 100,
       );
 
@@ -402,7 +540,9 @@ void main() {
 
       final tools = AiGridSkill.createTools(controller);
       final pageTool = tools.firstWhere((t) => t.name == 'grid_go_to_page');
-      final paginationStatusTool = tools.firstWhere((t) => t.name == 'grid_get_pagination_status');
+      final paginationStatusTool = tools.firstWhere(
+        (t) => t.name == 'grid_get_pagination_status',
+      );
 
       final statusRes = await paginationStatusTool.execute({});
       expect(statusRes.content.first.text?.contains('currentPage'), isTrue);
@@ -411,79 +551,118 @@ void main() {
       expect(pageRes.content.first.text?.contains('success'), isTrue);
     });
 
-    testWidgets('AiGrid widget initializes safely with initialSettings containing empty groupColumns', (tester) async {
-      final sample = [
-        {'id': 1, 'name': 'A'},
-        {'id': 2, 'name': 'B'},
-      ];
-      final cols = [
-        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text),
-      ];
-      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
-      final controller = AiGridController();
+    testWidgets(
+      'AiGrid widget initializes safely with initialSettings containing empty groupColumns',
+      (tester) async {
+        final sample = [
+          {'id': 1, 'name': 'A'},
+          {'id': 2, 'name': 'B'},
+        ];
+        final cols = [
+          const AiGridColumn(
+            field: 'id',
+            title: 'ID',
+            type: AiGridColumnType.number,
+          ),
+          const AiGridColumn(
+            field: 'name',
+            title: 'Name',
+            type: AiGridColumnType.text,
+          ),
+        ];
+        final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+        final controller = AiGridController();
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: AiGrid(
-              controller: controller,
-              dataSource: ds,
-              initialSettings: const {
-                'groupColumns': [],
-                'visibleColumns': ['id', 'name'],
-              },
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AiGrid(
+                controller: controller,
+                dataSource: ds,
+                initialSettings: const {
+                  'groupColumns': [],
+                  'visibleColumns': ['id', 'name'],
+                },
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(controller.activeGrouping.isEmpty, isTrue);
-    });
+        expect(controller.activeGrouping.isEmpty, isTrue);
+      },
+    );
 
-    testWidgets('AiGrid autoSave automatically restores saved group columns on startup', (tester) async {
-      AiGridSettingsStorage.save('persist_test_key', {
-        'groupColumns': ['name'],
-        'visibleColumns': ['id', 'name'],
-      });
+    testWidgets(
+      'AiGrid autoSave automatically restores saved group columns on startup',
+      (tester) async {
+        AiGridSettingsStorage.save('persist_test_key', {
+          'groupColumns': ['name'],
+          'visibleColumns': ['id', 'name'],
+        });
 
-      final sample = [
-        {'id': 1, 'name': 'A'},
-        {'id': 2, 'name': 'B'},
-      ];
-      final cols = [
-        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text),
-      ];
-      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
-      final controller = AiGridController();
+        final sample = [
+          {'id': 1, 'name': 'A'},
+          {'id': 2, 'name': 'B'},
+        ];
+        final cols = [
+          const AiGridColumn(
+            field: 'id',
+            title: 'ID',
+            type: AiGridColumnType.number,
+          ),
+          const AiGridColumn(
+            field: 'name',
+            title: 'Name',
+            type: AiGridColumnType.text,
+          ),
+        ];
+        final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+        final controller = AiGridController();
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: AiGrid(
-              controller: controller,
-              dataSource: ds,
-              autoSave: true,
-              persistenceKey: 'persist_test_key',
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AiGrid(
+                controller: controller,
+                dataSource: ds,
+                autoSave: true,
+                persistenceKey: 'persist_test_key',
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(controller.activeGrouping, ['name']);
-    });
+        expect(controller.activeGrouping, ['name']);
+      },
+    );
 
-    testWidgets('AiGrid renders both vertical and horizontal Scrollbars', (tester) async {
+    testWidgets('AiGrid renders both vertical and horizontal Scrollbars', (
+      tester,
+    ) async {
       final sample = [
         {'id': 1, 'name': 'A', 'val': 10},
       ];
       final cols = [
-        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number, width: 200),
-        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text, width: 300),
-        const AiGridColumn(field: 'val', title: 'Val', type: AiGridColumnType.number, width: 400),
+        const AiGridColumn(
+          field: 'id',
+          title: 'ID',
+          type: AiGridColumnType.number,
+          width: 200,
+        ),
+        const AiGridColumn(
+          field: 'name',
+          title: 'Name',
+          type: AiGridColumnType.text,
+          width: 300,
+        ),
+        const AiGridColumn(
+          field: 'val',
+          title: 'Val',
+          type: AiGridColumnType.number,
+          width: 400,
+        ),
       ];
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
       final controller = AiGridController();
@@ -494,10 +673,7 @@ void main() {
             body: SizedBox(
               width: 400,
               height: 300,
-              child: AiGrid(
-                controller: controller,
-                dataSource: ds,
-              ),
+              child: AiGrid(controller: controller, dataSource: ds),
             ),
           ),
         ),
@@ -517,7 +693,12 @@ void main() {
       expect(fitCol1.width, isA<FitGridAutoWidth>());
 
       // Resizable=false with explicit width -> fixed width (pinned)
-      const col2 = AiGridColumn(field: 'id', title: 'ID', width: 80, resizable: false);
+      const col2 = AiGridColumn(
+        field: 'id',
+        title: 'ID',
+        width: 80,
+        resizable: false,
+      );
       final fitCol2 = col2.toFitGridColumn();
       expect(fitCol2.resizable, isFalse);
       expect(fitCol2.width.isPinned, isTrue);
@@ -539,8 +720,18 @@ void main() {
         {'id': 1, 'name': 'Item 1'},
       ];
       final cols = [
-        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number, width: 100),
-        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text, width: 200),
+        const AiGridColumn(
+          field: 'id',
+          title: 'ID',
+          type: AiGridColumnType.number,
+          width: 100,
+        ),
+        const AiGridColumn(
+          field: 'name',
+          title: 'Name',
+          type: AiGridColumnType.text,
+          width: 200,
+        ),
       ];
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
       final controller = AiGridController();
@@ -565,32 +756,66 @@ void main() {
         {'id': 4, 'city': 'San Francisco'},
       ];
       final cols = [
-        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'city', title: 'City', type: AiGridColumnType.text),
+        const AiGridColumn(
+          field: 'id',
+          title: 'ID',
+          type: AiGridColumnType.number,
+        ),
+        const AiGridColumn(
+          field: 'city',
+          title: 'City',
+          type: AiGridColumnType.text,
+        ),
       ];
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
       final controller = AiGridController();
       controller.attach(columns: cols, dataSource: ds);
 
       // Test 1: operator "inList" with List of values
-      controller.setFilter('city', operator: 'inList', value: ['New York', 'Denver']);
-      expect(controller.fitController!.filter.filters['city']?.operator, FitGridFilterOperator.inList);
+      controller.setFilter(
+        'city',
+        operator: 'inList',
+        value: ['New York', 'Denver'],
+      );
+      expect(
+        controller.fitController!.filter.filters['city']?.operator,
+        FitGridFilterOperator.inList,
+      );
       expect(controller.fitController!.data.view.length, 2);
-      expect(controller.fitController!.data.view.map((r) => r['city']), containsAll(['New York', 'Denver']));
+      expect(
+        controller.fitController!.data.view.map((r) => r['city']),
+        containsAll(['New York', 'Denver']),
+      );
 
       // Test 2: operator "or" with delimited string
       controller.setFilter('city', operator: 'or', value: 'Denver or Chicago');
-      expect(controller.fitController!.filter.filters['city']?.operator, FitGridFilterOperator.inList);
+      expect(
+        controller.fitController!.filter.filters['city']?.operator,
+        FitGridFilterOperator.inList,
+      );
       expect(controller.fitController!.data.view.length, 2);
-      expect(controller.fitController!.data.view.map((r) => r['city']), containsAll(['Denver', 'Chicago']));
+      expect(
+        controller.fitController!.data.view.map((r) => r['city']),
+        containsAll(['Denver', 'Chicago']),
+      );
 
       // Test 3: automatic OR detection with contains and "New York or Denver"
-      controller.setFilter('city', operator: 'contains', value: 'New York or Denver');
-      expect(controller.fitController!.filter.filters['city']?.operator, FitGridFilterOperator.inList);
+      controller.setFilter(
+        'city',
+        operator: 'contains',
+        value: 'New York or Denver',
+      );
+      expect(
+        controller.fitController!.filter.filters['city']?.operator,
+        FitGridFilterOperator.inList,
+      );
       expect(controller.fitController!.data.view.length, 2);
 
       // Test 4: parser and toText support
-      final parsed = FitGridColumnFilter.parse('New York or Denver', FitGridFilterKind.text);
+      final parsed = FitGridColumnFilter.parse(
+        'New York or Denver',
+        FitGridFilterKind.text,
+      );
       expect(parsed, isNotNull);
       expect(parsed!.operator, FitGridFilterOperator.inList);
       expect(parsed.values, containsAll(['New York', 'Denver']));
@@ -619,22 +844,33 @@ void main() {
       expect(col.validate('Valid'), isNull);
 
       final controller = AiGridController();
-      controller.setEditingOptions(const AiGridEditingOptions(
-        mode: AiGridEditMode.form,
-        allowAdding: true,
-        allowUpdating: true,
-        allowDeleting: true,
-        actionColumnPosition: AiGridActionColumnPosition.left,
-        insertRowPosition: AiGridInsertRowPosition.bottom,
-        formLayout: AiGridFormLayout.grid(columns: 3),
-      ));
+      controller.setEditingOptions(
+        const AiGridEditingOptions(
+          mode: AiGridEditMode.form,
+          allowAdding: true,
+          allowUpdating: true,
+          allowDeleting: true,
+          actionColumnPosition: AiGridActionColumnPosition.left,
+          insertRowPosition: AiGridInsertRowPosition.bottom,
+          formLayout: AiGridFormLayout.grid(columns: 3),
+        ),
+      );
 
       expect(controller.editingOptions.mode, AiGridEditMode.form);
       expect(controller.editingOptions.allowAdding, isTrue);
       expect(controller.editingOptions.allowDeleting, isTrue);
-      expect(controller.editingOptions.actionColumnPosition, AiGridActionColumnPosition.left);
-      expect(controller.editingOptions.insertRowPosition, AiGridInsertRowPosition.bottom);
-      expect(controller.editingOptions.formLayout.mode, AiGridFormLayoutMode.grid);
+      expect(
+        controller.editingOptions.actionColumnPosition,
+        AiGridActionColumnPosition.left,
+      );
+      expect(
+        controller.editingOptions.insertRowPosition,
+        AiGridInsertRowPosition.bottom,
+      );
+      expect(
+        controller.editingOptions.formLayout.mode,
+        AiGridFormLayoutMode.grid,
+      );
       expect(controller.editingOptions.formLayout.columns, 3);
     });
 
@@ -644,15 +880,26 @@ void main() {
         {'id': 2, 'name': 'Item 2', 'price': 20.0},
       ];
       final cols = [
-        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
+        const AiGridColumn(
+          field: 'id',
+          title: 'ID',
+          type: AiGridColumnType.number,
+        ),
         AiGridColumn(
           field: 'name',
           title: 'Name',
           type: AiGridColumnType.text,
           editable: true,
-          validator: (v) => v == null || v.toString().trim().isEmpty ? 'Name cannot be empty' : null,
+          validator: (v) => v == null || v.toString().trim().isEmpty
+              ? 'Name cannot be empty'
+              : null,
         ),
-        const AiGridColumn(field: 'price', title: 'Price', type: AiGridColumnType.number, editable: true),
+        const AiGridColumn(
+          field: 'price',
+          title: 'Price',
+          type: AiGridColumnType.number,
+          editable: true,
+        ),
       ];
 
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
@@ -662,14 +909,16 @@ void main() {
       final committedFields = <String, dynamic>{};
       Map<String, dynamic>? savedRowResult;
 
-      controller.setEditingOptions(AiGridEditingOptions(
-        mode: AiGridEditMode.row,
-        allowAdding: true,
-        allowUpdating: true,
-        allowDeleting: true,
-        commit: (col, val) => committedFields[col] = val,
-        afterSave: (row) => savedRowResult = row,
-      ));
+      controller.setEditingOptions(
+        AiGridEditingOptions(
+          mode: AiGridEditMode.row,
+          allowAdding: true,
+          allowUpdating: true,
+          allowDeleting: true,
+          commit: (col, val) => committedFields[col] = val,
+          afterSave: (row) => savedRowResult = row,
+        ),
+      );
 
       // 1. Test startEdit & updateDraftValue
       controller.startEdit(0);
@@ -711,312 +960,368 @@ void main() {
 
       // 5. Test deleteRow
       Map<String, dynamic>? deletedRow;
-      controller.setEditingOptions(AiGridEditingOptions(
-        afterDelete: (r) => deletedRow = r,
-      ));
+      controller.setEditingOptions(
+        AiGridEditingOptions(afterDelete: (r) => deletedRow = r),
+      );
       final delSuccess = await controller.deleteRow(0);
       expect(delSuccess, isTrue);
       expect(controller.fitController!.data.rows.length, 2);
       expect(deletedRow?['id'], 3);
     });
 
-    testWidgets('AiGridFormDialog renders editable fields respecting editorIndex order', (tester) async {
-      final cols = [
-        const AiGridColumn(
-          field: 'id',
-          title: 'ID',
-          type: AiGridColumnType.number,
-          editable: false,
-        ),
-        const AiGridColumn(
-          field: 'category',
-          title: 'Category',
-          type: AiGridColumnType.select,
-          editable: true,
-          editorIndex: 2,
-          selectOptions: ['Tech', 'Home', 'Auto'],
-        ),
-        const AiGridColumn(
-          field: 'name',
-          title: 'Item Name',
-          type: AiGridColumnType.text,
-          editable: true,
-          editorIndex: 1,
-        ),
-        const AiGridColumn(
-          field: 'inStock',
-          title: 'In Stock',
-          type: AiGridColumnType.boolean,
-          editable: true,
-          editorIndex: 3,
-        ),
-      ];
-
-      final ds = LocalAiGridDataSource(
-        columns: cols,
-        initialData: [
-          {'id': 1, 'name': 'Widget A', 'category': 'Tech', 'inStock': true},
-        ],
-      );
-
-      final controller = AiGridController();
-      controller.attach(columns: cols, dataSource: ds);
-      controller.setEditingOptions(const AiGridEditingOptions(
-        mode: AiGridEditMode.form,
-        allowUpdating: true,
-      ));
-
-      controller.startEdit(0);
-
-      await tester.pumpWidget(
-        fm.MaterialApp(
-          home: fm.Scaffold(
-            body: fm.Builder(
-              builder: (context) => fm.ElevatedButton(
-                onPressed: () => AiGridFormDialog.show(context, controller: controller),
-                child: const fm.Text('Open'),
-              ),
-            ),
+    testWidgets(
+      'AiGridFormDialog renders editable fields respecting editorIndex order',
+      (tester) async {
+        final cols = [
+          const AiGridColumn(
+            field: 'id',
+            title: 'ID',
+            type: AiGridColumnType.number,
+            editable: false,
           ),
-        ),
-      );
-
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-
-      // ID is not editable, should not appear as form input
-      expect(find.text('ID'), findsNothing);
-
-      // Name, Category, In Stock should be rendered
-      expect(find.text('Item Name'), findsOneWidget);
-      expect(find.text('Category'), findsOneWidget);
-      expect(find.text('In Stock'), findsOneWidget);
-
-      // Title defaults to Edit Record
-      expect(find.text('Edit Record'), findsOneWidget);
-
-      // Close dialog by tapping Cancel
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(AiGridFormDialog), findsNothing);
-      expect(controller.isEditingRow, isFalse);
-    });
-
-    testWidgets('AiGridFormDialog validates input, displays errors, and saves on success', (tester) async {
-      final cols = [
-        AiGridColumn(
-          field: 'name',
-          title: 'Item Name',
-          type: AiGridColumnType.text,
-          editable: true,
-          validator: (val) => (val == null || val.toString().trim().isEmpty) ? 'Name required' : null,
-        ),
-        const AiGridColumn(
-          field: 'price',
-          title: 'Price',
-          type: AiGridColumnType.currency,
-          editable: true,
-        ),
-      ];
-
-      final ds = LocalAiGridDataSource(
-        columns: cols,
-        initialData: [
-          {'name': 'Item 1', 'price': 50.0},
-        ],
-      );
-
-      final controller = AiGridController();
-      controller.attach(columns: cols, dataSource: ds);
-      controller.setEditingOptions(const AiGridEditingOptions(
-        mode: AiGridEditMode.form,
-        allowUpdating: true,
-      ));
-
-      controller.startEdit(0);
-
-      await tester.pumpWidget(
-        fm.MaterialApp(
-          home: fm.Scaffold(
-            body: fm.Builder(
-              builder: (context) => fm.ElevatedButton(
-                onPressed: () => AiGridFormDialog.show(context, controller: controller),
-                child: const fm.Text('Open'),
-              ),
-            ),
+          const AiGridColumn(
+            field: 'category',
+            title: 'Category',
+            type: AiGridColumnType.select,
+            editable: true,
+            editorIndex: 2,
+            selectOptions: ['Tech', 'Home', 'Auto'],
           ),
-        ),
-      );
-
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-
-      // Enter empty name to trigger validator
-      await tester.enterText(find.widgetWithText(TextFormField, 'Item Name'), '');
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Name required'), findsOneWidget);
-      expect(find.byType(AiGridFormDialog), findsOneWidget);
-
-      // Enter valid name and save
-      await tester.enterText(find.widgetWithText(TextFormField, 'Item Name'), 'Super Item');
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(AiGridFormDialog), findsNothing);
-      expect(controller.fitController!.data.rows[0]['name'], 'Super Item');
-    });
-
-    testWidgets('AiGridFormDialog supports wrap, grid, and custom form layouts', (tester) async {
-      final cols = [
-        const AiGridColumn(field: 'f1', title: 'Field 1', editable: true),
-        const AiGridColumn(field: 'f2', title: 'Field 2', editable: true),
-        const AiGridColumn(field: 'f3', title: 'Field 3', editable: true),
-      ];
-
-      final ds = LocalAiGridDataSource(
-        columns: cols,
-        initialData: [
-          {'f1': 'A', 'f2': 'B', 'f3': 'C'},
-        ],
-      );
-
-      final controller = AiGridController();
-      controller.attach(columns: cols, dataSource: ds);
-
-      // 1. Grid layout
-      controller.setEditingOptions(const AiGridEditingOptions(
-        mode: AiGridEditMode.form,
-        formLayout: AiGridFormLayout.grid(columns: 2),
-      ));
-      controller.startEdit(0);
-
-      await tester.pumpWidget(
-        fm.MaterialApp(
-          home: fm.Scaffold(
-            body: fm.Builder(
-              builder: (context) => fm.ElevatedButton(
-                onPressed: () => AiGridFormDialog.show(context, controller: controller),
-                child: const fm.Text('Open'),
-              ),
-            ),
+          const AiGridColumn(
+            field: 'name',
+            title: 'Item Name',
+            type: AiGridColumnType.text,
+            editable: true,
+            editorIndex: 1,
           ),
-        ),
-      );
-
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AiGridFormDialog), findsOneWidget);
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-
-      // 2. Custom layout
-      controller.setEditingOptions(AiGridEditingOptions(
-        mode: AiGridEditMode.form,
-        formLayout: AiGridFormLayout.custom(
-          (context, draftValues, onChanged) => Container(
-            key: const ValueKey('custom-form-container'),
-            child: const Text('Custom Form Layout Content'),
+          const AiGridColumn(
+            field: 'inStock',
+            title: 'In Stock',
+            type: AiGridColumnType.boolean,
+            editable: true,
+            editorIndex: 3,
           ),
-        ),
-      ));
-      controller.startEdit(0);
+        ];
 
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('custom-form-container')), findsOneWidget);
-      expect(find.text('Custom Form Layout Content'), findsOneWidget);
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-    });
+        final ds = LocalAiGridDataSource(
+          columns: cols,
+          initialData: [
+            {'id': 1, 'name': 'Widget A', 'category': 'Tech', 'inStock': true},
+          ],
+        );
 
-    testWidgets('AiGrid in row edit mode injects action column and toggles inline editing', (tester) async {
-      final sample = [
-        {'id': 1, 'name': 'Item A', 'price': 100.0},
-        {'id': 2, 'name': 'Item B', 'price': 200.0},
-      ];
-      final cols = [
-        const AiGridColumn(field: 'id', title: 'ID', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'name', title: 'Name', type: AiGridColumnType.text, editable: true),
-        const AiGridColumn(field: 'price', title: 'Price', type: AiGridColumnType.number, editable: true),
-      ];
-      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
-      final controller = AiGridController();
+        final controller = AiGridController();
+        controller.attach(columns: cols, dataSource: ds);
+        controller.setEditingOptions(
+          const AiGridEditingOptions(
+            mode: AiGridEditMode.form,
+            allowUpdating: true,
+          ),
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SizedBox(
-              width: 800,
-              height: 500,
-              child: AiGrid(
-                controller: controller,
-                dataSource: ds,
-                editingOptions: const AiGridEditingOptions(
-                  mode: AiGridEditMode.row,
-                  allowUpdating: true,
-                  allowDeleting: true,
-                  actionColumnPosition: AiGridActionColumnPosition.right,
+        controller.startEdit(0);
+
+        await tester.pumpWidget(
+          fm.MaterialApp(
+            home: fm.Scaffold(
+              body: fm.Builder(
+                builder: (context) => fm.ElevatedButton(
+                  onPressed: () =>
+                      AiGridFormDialog.show(context, controller: controller),
+                  child: const fm.Text('Open'),
                 ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
 
-      // Check edit and delete icons are rendered
-      expect(find.byIcon(Icons.edit_outlined), findsWidgets);
-      expect(find.byIcon(Icons.delete_outline), findsWidgets);
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
 
-      // Start editing first row
-      controller.startEdit(0);
-      await tester.pumpAndSettle();
+        // ID is not editable, should not appear as form input
+        expect(find.text('ID'), findsNothing);
 
-      // Now check and close icons are rendered for row 0
-      expect(find.byIcon(Icons.check), findsOneWidget);
-      expect(find.byIcon(Icons.close), findsOneWidget);
+        // Name, Category, In Stock should be rendered
+        expect(find.text('Item Name'), findsOneWidget);
+        expect(find.text('Category'), findsOneWidget);
+        expect(find.text('In Stock'), findsOneWidget);
 
-      // Cancel editing
-      controller.cancelEdit();
-      await tester.pumpAndSettle();
+        // Title defaults to Edit Record
+        expect(find.text('Edit Record'), findsOneWidget);
 
-      expect(find.byIcon(Icons.check), findsNothing);
-      expect(find.byIcon(Icons.close), findsNothing);
-    });
+        // Close dialog by tapping Cancel
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
 
-    test('AiGridController logs editing events and supports clearEditEvents', () async {
-      final controller = AiGridController();
-      final ds = LocalAiGridDataSource(
-        columns: [const AiGridColumn(field: 'id', title: 'ID', editable: true)],
-        initialData: [{'id': 1}, {'id': 2}],
-      );
-      controller.attach(columns: ds.columns, dataSource: ds);
+        expect(find.byType(AiGridFormDialog), findsNothing);
+        expect(controller.isEditingRow, isFalse);
+      },
+    );
 
-      expect(controller.editEvents, isEmpty);
+    testWidgets(
+      'AiGridFormDialog validates input, displays errors, and saves on success',
+      (tester) async {
+        final cols = [
+          AiGridColumn(
+            field: 'name',
+            title: 'Item Name',
+            type: AiGridColumnType.text,
+            editable: true,
+            validator: (val) => (val == null || val.toString().trim().isEmpty)
+                ? 'Name required'
+                : null,
+          ),
+          const AiGridColumn(
+            field: 'price',
+            title: 'Price',
+            type: AiGridColumnType.currency,
+            editable: true,
+          ),
+        ];
 
-      controller.startEdit(0);
-      expect(controller.editEvents.length, 1);
-      expect(controller.editEvents.last.action, 'startEdit');
+        final ds = LocalAiGridDataSource(
+          columns: cols,
+          initialData: [
+            {'name': 'Item 1', 'price': 50.0},
+          ],
+        );
 
-      controller.updateDraftValue('id', 99);
-      expect(controller.editEvents.length, 2);
-      expect(controller.editEvents.last.action, 'change');
-      expect(controller.editEvents.last.newValue, 99);
+        final controller = AiGridController();
+        controller.attach(columns: cols, dataSource: ds);
+        controller.setEditingOptions(
+          const AiGridEditingOptions(
+            mode: AiGridEditMode.form,
+            allowUpdating: true,
+          ),
+        );
 
-      await controller.saveEdit();
-      expect(controller.editEvents.length, 3);
-      expect(controller.editEvents.last.action, 'save');
+        controller.startEdit(0);
 
-      await controller.deleteRow(0);
-      expect(controller.editEvents.length, 4);
-      expect(controller.editEvents.last.action, 'delete');
+        await tester.pumpWidget(
+          fm.MaterialApp(
+            home: fm.Scaffold(
+              body: fm.Builder(
+                builder: (context) => fm.ElevatedButton(
+                  onPressed: () =>
+                      AiGridFormDialog.show(context, controller: controller),
+                  child: const fm.Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        );
 
-      controller.clearEditEvents();
-      expect(controller.editEvents, isEmpty);
-    });
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        // Enter empty name to trigger validator
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Item Name'),
+          '',
+        );
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Name required'), findsOneWidget);
+        expect(find.byType(AiGridFormDialog), findsOneWidget);
+
+        // Enter valid name and save
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Item Name'),
+          'Super Item',
+        );
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AiGridFormDialog), findsNothing);
+        expect(controller.fitController!.data.rows[0]['name'], 'Super Item');
+      },
+    );
+
+    testWidgets(
+      'AiGridFormDialog supports wrap, grid, and custom form layouts',
+      (tester) async {
+        final cols = [
+          const AiGridColumn(field: 'f1', title: 'Field 1', editable: true),
+          const AiGridColumn(field: 'f2', title: 'Field 2', editable: true),
+          const AiGridColumn(field: 'f3', title: 'Field 3', editable: true),
+        ];
+
+        final ds = LocalAiGridDataSource(
+          columns: cols,
+          initialData: [
+            {'f1': 'A', 'f2': 'B', 'f3': 'C'},
+          ],
+        );
+
+        final controller = AiGridController();
+        controller.attach(columns: cols, dataSource: ds);
+
+        // 1. Grid layout
+        controller.setEditingOptions(
+          const AiGridEditingOptions(
+            mode: AiGridEditMode.form,
+            formLayout: AiGridFormLayout.grid(columns: 2),
+          ),
+        );
+        controller.startEdit(0);
+
+        await tester.pumpWidget(
+          fm.MaterialApp(
+            home: fm.Scaffold(
+              body: fm.Builder(
+                builder: (context) => fm.ElevatedButton(
+                  onPressed: () =>
+                      AiGridFormDialog.show(context, controller: controller),
+                  child: const fm.Text('Open'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AiGridFormDialog), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+
+        // 2. Custom layout
+        controller.setEditingOptions(
+          AiGridEditingOptions(
+            mode: AiGridEditMode.form,
+            formLayout: AiGridFormLayout.custom(
+              (context, draftValues, onChanged) => Container(
+                key: const ValueKey('custom-form-container'),
+                child: const Text('Custom Form Layout Content'),
+              ),
+            ),
+          ),
+        );
+        controller.startEdit(0);
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('custom-form-container')),
+          findsOneWidget,
+        );
+        expect(find.text('Custom Form Layout Content'), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
+      'AiGrid in row edit mode injects action column and toggles inline editing',
+      (tester) async {
+        final sample = [
+          {'id': 1, 'name': 'Item A', 'price': 100.0},
+          {'id': 2, 'name': 'Item B', 'price': 200.0},
+        ];
+        final cols = [
+          const AiGridColumn(
+            field: 'id',
+            title: 'ID',
+            type: AiGridColumnType.number,
+          ),
+          const AiGridColumn(
+            field: 'name',
+            title: 'Name',
+            type: AiGridColumnType.text,
+            editable: true,
+          ),
+          const AiGridColumn(
+            field: 'price',
+            title: 'Price',
+            type: AiGridColumnType.number,
+            editable: true,
+          ),
+        ];
+        final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+        final controller = AiGridController();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 800,
+                height: 500,
+                child: AiGrid(
+                  controller: controller,
+                  dataSource: ds,
+                  editingOptions: const AiGridEditingOptions(
+                    mode: AiGridEditMode.row,
+                    allowUpdating: true,
+                    allowDeleting: true,
+                    actionColumnPosition: AiGridActionColumnPosition.right,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Check edit and delete icons are rendered
+        expect(find.byIcon(Icons.edit_outlined), findsWidgets);
+        expect(find.byIcon(Icons.delete_outline), findsWidgets);
+
+        // Start editing first row
+        controller.startEdit(0);
+        await tester.pumpAndSettle();
+
+        // Now check and close icons are rendered for row 0
+        expect(find.byIcon(Icons.check), findsOneWidget);
+        expect(find.byIcon(Icons.close), findsOneWidget);
+
+        // Cancel editing
+        controller.cancelEdit();
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(Icons.check), findsNothing);
+        expect(find.byIcon(Icons.close), findsNothing);
+      },
+    );
+
+    test(
+      'AiGridController logs editing events and supports clearEditEvents',
+      () async {
+        final controller = AiGridController();
+        final ds = LocalAiGridDataSource(
+          columns: [
+            const AiGridColumn(field: 'id', title: 'ID', editable: true),
+          ],
+          initialData: [
+            {'id': 1},
+            {'id': 2},
+          ],
+        );
+        controller.attach(columns: ds.columns, dataSource: ds);
+
+        expect(controller.editEvents, isEmpty);
+
+        controller.startEdit(0);
+        expect(controller.editEvents.length, 1);
+        expect(controller.editEvents.last.action, 'startEdit');
+
+        controller.updateDraftValue('id', 99);
+        expect(controller.editEvents.length, 2);
+        expect(controller.editEvents.last.action, 'change');
+        expect(controller.editEvents.last.newValue, 99);
+
+        await controller.saveEdit();
+        expect(controller.editEvents.length, 3);
+        expect(controller.editEvents.last.action, 'save');
+
+        await controller.deleteRow(0);
+        expect(controller.editEvents.length, 4);
+        expect(controller.editEvents.last.action, 'delete');
+
+        controller.clearEditEvents();
+        expect(controller.editEvents, isEmpty);
+      },
+    );
 
     test('AiGridPivotConfig models serialize to/from JSON and support aggregations', () {
       const valConfig = AiGridPivotValueConfig(
@@ -1059,10 +1364,26 @@ void main() {
         {'region': 'West', 'category': 'Office', 'sales': 80.0, 'profit': 15.0},
       ];
       final cols = [
-        const AiGridColumn(field: 'region', title: 'Region', type: AiGridColumnType.text),
-        const AiGridColumn(field: 'category', title: 'Category', type: AiGridColumnType.text),
-        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'profit', title: 'Profit', type: AiGridColumnType.number),
+        const AiGridColumn(
+          field: 'region',
+          title: 'Region',
+          type: AiGridColumnType.text,
+        ),
+        const AiGridColumn(
+          field: 'category',
+          title: 'Category',
+          type: AiGridColumnType.text,
+        ),
+        const AiGridColumn(
+          field: 'sales',
+          title: 'Sales',
+          type: AiGridColumnType.number,
+        ),
+        const AiGridColumn(
+          field: 'profit',
+          title: 'Profit',
+          type: AiGridColumnType.number,
+        ),
       ];
 
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
@@ -1075,16 +1396,24 @@ void main() {
       expect(controller.isPivotActive, isFalse);
 
       // Set Pivot: Rows: region, Columns: category, Measures: sales (sum) & profit (average)
-      controller.setPivot(const AiGridPivotConfig(
-        rowFieldIds: ['region'],
-        columnFieldIds: ['category'],
-        values: [
-          AiGridPivotValueConfig(columnId: 'sales', aggregation: AiGridPivotAggregation.sum),
-          AiGridPivotValueConfig(columnId: 'profit', aggregation: AiGridPivotAggregation.average),
-        ],
-        showChart: true,
-        chartType: AiGridPivotChartType.groupedBar,
-      ));
+      controller.setPivot(
+        const AiGridPivotConfig(
+          rowFieldIds: ['region'],
+          columnFieldIds: ['category'],
+          values: [
+            AiGridPivotValueConfig(
+              columnId: 'sales',
+              aggregation: AiGridPivotAggregation.sum,
+            ),
+            AiGridPivotValueConfig(
+              columnId: 'profit',
+              aggregation: AiGridPivotAggregation.average,
+            ),
+          ],
+          showChart: true,
+          chartType: AiGridPivotChartType.groupedBar,
+        ),
+      );
 
       expect(controller.isPivotActive, isTrue);
       expect(controller.pivotConfig, isNotNull);
@@ -1122,7 +1451,11 @@ void main() {
       ];
       final cols = [
         const AiGridColumn(field: 'region', title: 'Region'),
-        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+        const AiGridColumn(
+          field: 'sales',
+          title: 'Sales',
+          type: AiGridColumnType.number,
+        ),
       ];
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
       final fitCtrl = FitGridController<Map<String, dynamic>>(
@@ -1144,135 +1477,179 @@ void main() {
       });
 
       expect(result.isError, isFalse);
-      expect(result.content.first.text, contains('Pivot Table created successfully'));
+      expect(
+        result.content.first.text,
+        contains('Pivot Table created successfully'),
+      );
       expect(controller.isPivotActive, isTrue);
       expect(controller.pivotConfig!.chartType, AiGridPivotChartType.column);
 
       // Reset
       final resetResult = await resetTool.execute({});
       expect(resetResult.isError, isFalse);
-      expect(resetResult.content.first.text, contains('Pivot mode deactivated'));
+      expect(
+        resetResult.content.first.text,
+        contains('Pivot mode deactivated'),
+      );
       expect(controller.isPivotActive, isFalse);
     });
 
-    testWidgets('AiGrid renders Pivot Table and side-by-side Chart in pivot mode', (tester) async {
-      final controller = AiGridController();
-      final sample = [
-        {'category': 'Furniture', 'sales': 500.0},
-        {'category': 'Office', 'sales': 300.0},
-      ];
-      final cols = [
-        const AiGridColumn(field: 'category', title: 'Category'),
-        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
-      ];
-      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+    testWidgets(
+      'AiGrid renders Pivot Table and side-by-side Chart in pivot mode',
+      (tester) async {
+        final controller = AiGridController();
+        final sample = [
+          {'category': 'Furniture', 'sales': 500.0},
+          {'category': 'Office', 'sales': 300.0},
+        ];
+        final cols = [
+          const AiGridColumn(field: 'category', title: 'Category'),
+          const AiGridColumn(
+            field: 'sales',
+            title: 'Sales',
+            type: AiGridColumnType.number,
+          ),
+        ];
+        final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
 
-      tester.view.physicalSize = const Size(1200, 800);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+        tester.view.physicalSize = const Size(1200, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SizedBox(
-              width: 1200,
-              height: 800,
-              child: AiGrid(
-                dataSource: ds,
-                controller: controller,
-                enableAiAssistant: false,
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 1200,
+                height: 800,
+                child: AiGrid(
+                  dataSource: ds,
+                  controller: controller,
+                  enableAiAssistant: false,
+                ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Normal table mode
-      expect(find.byType(AiGridPivotChart), findsNothing);
+        // Normal table mode
+        expect(find.byType(AiGridPivotChart), findsNothing);
 
-      // Activate Pivot with Chart
-      controller.setPivot(const AiGridPivotConfig(
-        rowFieldIds: ['category'],
-        values: [
-          AiGridPivotValueConfig(columnId: 'sales', aggregation: AiGridPivotAggregation.sum),
-        ],
-        showChart: true,
-      ));
-      await tester.pumpAndSettle();
+        // Activate Pivot with Chart
+        controller.setPivot(
+          const AiGridPivotConfig(
+            rowFieldIds: ['category'],
+            values: [
+              AiGridPivotValueConfig(
+                columnId: 'sales',
+                aggregation: AiGridPivotAggregation.sum,
+              ),
+            ],
+            showChart: true,
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      // Pivot Chart is rendered beside table
-      expect(find.byType(AiGridPivotChart), findsOneWidget);
-      expect(find.text('Pivot Chart'), findsOneWidget);
+        // Pivot Chart is rendered beside table
+        expect(find.byType(AiGridPivotChart), findsOneWidget);
+        expect(find.text('Pivot Chart'), findsOneWidget);
 
-      // Close chart via chart close button
-      await tester.tap(find.byTooltip('Hide Chart'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AiGridPivotChart), findsNothing);
+        // Close chart via chart close button
+        await tester.tap(find.byTooltip('Hide Chart'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AiGridPivotChart), findsNothing);
 
-      // Clear pivot
-      controller.clearPivot();
-      await tester.pumpAndSettle();
-      expect(controller.isPivotActive, isFalse);
-    });
+        // Clear pivot
+        controller.clearPivot();
+        await tester.pumpAndSettle();
+        expect(controller.isPivotActive, isFalse);
+      },
+    );
 
-    testWidgets('AiGridPivotChooserDialog opens safely without MaterialLocalizations errors', (tester) async {
-      final controller = AiGridController();
-      final sample = [
-        {'category': 'Furniture', 'sales': 500.0},
-      ];
-      final cols = [
-        const AiGridColumn(field: 'category', title: 'Category'),
-        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
-      ];
-      final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
+    testWidgets(
+      'AiGridPivotChooserDialog opens safely without MaterialLocalizations errors',
+      (tester) async {
+        final controller = AiGridController();
+        final sample = [
+          {'category': 'Furniture', 'sales': 500.0},
+        ];
+        final cols = [
+          const AiGridColumn(field: 'category', title: 'Category'),
+          const AiGridColumn(
+            field: 'sales',
+            title: 'Sales',
+            type: AiGridColumnType.number,
+          ),
+        ];
+        final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SizedBox(
-              width: 1200,
-              height: 800,
-              child: AiGrid(
-                dataSource: ds,
-                controller: controller,
-                enableAiAssistant: false,
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 1200,
+                height: 800,
+                child: AiGrid(
+                  dataSource: ds,
+                  controller: controller,
+                  enableAiAssistant: false,
+                ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Tap on Pivot Table button in toolbar
-      final pivotBtn = find.byTooltip('Pivot Table (Field Chooser)...');
-      expect(pivotBtn, findsOneWidget);
-      await tester.tap(pivotBtn);
-      await tester.pumpAndSettle();
+        // Tap on Pivot Table button in toolbar
+        final pivotBtn = find.byTooltip('Pivot Table (Field Chooser)...');
+        expect(pivotBtn, findsOneWidget);
+        await tester.tap(pivotBtn);
+        await tester.pumpAndSettle();
 
-      // Dialog is displayed
-      expect(find.byType(AiGridPivotChooserDialog), findsOneWidget);
-      expect(find.text('Pivot Table Field Chooser'), findsOneWidget);
+        // Dialog is displayed
+        expect(find.byType(AiGridPivotChooserDialog), findsOneWidget);
+        expect(find.text('Pivot Table Field Chooser'), findsOneWidget);
 
-      // Close dialog
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AiGridPivotChooserDialog), findsNothing);
-    });
+        // Close dialog
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AiGridPivotChooserDialog), findsNothing);
+      },
+    );
 
     test('AiGridController applies DevExtreme-style hierarchical grouping when groupByRows is enabled', () {
       final controller = AiGridController();
       final sample = [
-        {'category': 'Furniture', 'subCategory': 'Chairs', 'region': 'East', 'sales': 200.0},
-        {'category': 'Furniture', 'subCategory': 'Tables', 'region': 'East', 'sales': 300.0},
-        {'category': 'Technology', 'subCategory': 'Phones', 'region': 'West', 'sales': 500.0},
+        {
+          'category': 'Furniture',
+          'subCategory': 'Chairs',
+          'region': 'East',
+          'sales': 200.0,
+        },
+        {
+          'category': 'Furniture',
+          'subCategory': 'Tables',
+          'region': 'East',
+          'sales': 300.0,
+        },
+        {
+          'category': 'Technology',
+          'subCategory': 'Phones',
+          'region': 'West',
+          'sales': 500.0,
+        },
       ];
       final cols = [
         const AiGridColumn(field: 'category', title: 'Category'),
         const AiGridColumn(field: 'subCategory', title: 'SubCategory'),
         const AiGridColumn(field: 'region', title: 'Region'),
-        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+        const AiGridColumn(
+          field: 'sales',
+          title: 'Sales',
+          type: AiGridColumnType.number,
+        ),
       ];
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
       final fitCtrl = FitGridController<Map<String, dynamic>>(
@@ -1281,14 +1658,19 @@ void main() {
       );
       controller.attach(columns: cols, dataSource: ds, fitController: fitCtrl);
 
-      controller.setPivot(const AiGridPivotConfig(
-        rowFieldIds: ['category', 'subCategory'],
-        columnFieldIds: ['region'],
-        values: [
-          AiGridPivotValueConfig(columnId: 'sales', aggregation: AiGridPivotAggregation.sum),
-        ],
-        groupByRows: true,
-      ));
+      controller.setPivot(
+        const AiGridPivotConfig(
+          rowFieldIds: ['category', 'subCategory'],
+          columnFieldIds: ['region'],
+          values: [
+            AiGridPivotValueConfig(
+              columnId: 'sales',
+              aggregation: AiGridPivotAggregation.sum,
+            ),
+          ],
+          groupByRows: true,
+        ),
+      );
 
       expect(controller.isPivotActive, isTrue);
       // Grouping should be set on 'category' (all row dimensions except the last)
@@ -1303,16 +1685,42 @@ void main() {
     test('AiGridController generates DevExtreme-style banded column groups and clean sub-titles in pivot mode', () {
       final controller = AiGridController();
       final sample = [
-        {'category': 'Tech', 'segment': 'Consumer', 'region': 'Central', 'sales': 100.0, 'discount': 0.1},
-        {'category': 'Tech', 'segment': 'Consumer', 'region': 'Central', 'sales': 200.0, 'discount': 0.2},
-        {'category': 'Tech', 'segment': 'Corporate', 'region': 'East', 'sales': 300.0, 'discount': 0.05},
+        {
+          'category': 'Tech',
+          'segment': 'Consumer',
+          'region': 'Central',
+          'sales': 100.0,
+          'discount': 0.1,
+        },
+        {
+          'category': 'Tech',
+          'segment': 'Consumer',
+          'region': 'Central',
+          'sales': 200.0,
+          'discount': 0.2,
+        },
+        {
+          'category': 'Tech',
+          'segment': 'Corporate',
+          'region': 'East',
+          'sales': 300.0,
+          'discount': 0.05,
+        },
       ];
       final cols = [
         const AiGridColumn(field: 'category', title: 'Category'),
         const AiGridColumn(field: 'segment', title: 'Segment'),
         const AiGridColumn(field: 'region', title: 'Region'),
-        const AiGridColumn(field: 'sales', title: 'Sales', type: AiGridColumnType.number),
-        const AiGridColumn(field: 'discount', title: 'Discount', type: AiGridColumnType.number),
+        const AiGridColumn(
+          field: 'sales',
+          title: 'Sales',
+          type: AiGridColumnType.number,
+        ),
+        const AiGridColumn(
+          field: 'discount',
+          title: 'Discount',
+          type: AiGridColumnType.number,
+        ),
       ];
       final ds = LocalAiGridDataSource(initialData: sample, columns: cols);
       final fitCtrl = FitGridController<Map<String, dynamic>>(
@@ -1321,33 +1729,49 @@ void main() {
       );
       controller.attach(columns: cols, dataSource: ds, fitController: fitCtrl);
 
-      controller.setPivot(const AiGridPivotConfig(
-        rowFieldIds: ['category'],
-        columnFieldIds: ['segment', 'region'],
-        values: [
-          AiGridPivotValueConfig(columnId: 'sales', aggregation: AiGridPivotAggregation.sum),
-          AiGridPivotValueConfig(columnId: 'discount', aggregation: AiGridPivotAggregation.average),
-        ],
-        showColumnTotals: true,
-      ));
+      controller.setPivot(
+        const AiGridPivotConfig(
+          rowFieldIds: ['category'],
+          columnFieldIds: ['segment', 'region'],
+          values: [
+            AiGridPivotValueConfig(
+              columnId: 'sales',
+              aggregation: AiGridPivotAggregation.sum,
+            ),
+            AiGridPivotValueConfig(
+              columnId: 'discount',
+              aggregation: AiGridPivotAggregation.average,
+            ),
+          ],
+          showColumnTotals: true,
+        ),
+      );
 
       expect(controller.isPivotActive, isTrue);
       // Verify column groups: Should have 'Consumer / Central', 'Corporate / East', 'Grand Total'
       expect(controller.pivotColumnGroups.isNotEmpty, isTrue);
-      final groupLabels = controller.pivotColumnGroups.map((g) => g.label).toList();
+      final groupLabels = controller.pivotColumnGroups
+          .map((g) => g.label)
+          .toList();
       expect(groupLabels, contains('Consumer / Central'));
       expect(groupLabels, contains('Corporate / East'));
       expect(groupLabels, contains('Grand Total'));
 
       // Verify that under 'Consumer / Central', there are 2 sub-columns for Sales and Discount
-      final consumerCentralGroup = controller.pivotColumnGroups.firstWhere((g) => g.label == 'Consumer / Central');
+      final consumerCentralGroup = controller.pivotColumnGroups.firstWhere(
+        (g) => g.label == 'Consumer / Central',
+      );
       expect(consumerCentralGroup.columnIds.length, 2);
 
       // Verify clean sub-titles on columns
-      final salesCol = controller.columns.firstWhere((c) => c.field == consumerCentralGroup.columnIds[0]);
+      final salesCol = controller.columns.firstWhere(
+        (c) => c.field == consumerCentralGroup.columnIds[0],
+      );
       expect(salesCol.title, 'Sales (Sum)');
 
-      final discountCol = controller.columns.firstWhere((c) => c.field == consumerCentralGroup.columnIds[1]);
+      final discountCol = controller.columns.firstWhere(
+        (c) => c.field == consumerCentralGroup.columnIds[1],
+      );
       expect(discountCol.title, 'Discount (Average)');
 
       // Clearing pivot resets column groups
@@ -1357,6 +1781,3 @@ void main() {
     });
   });
 }
-
-
-

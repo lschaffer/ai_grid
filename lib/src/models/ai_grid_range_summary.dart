@@ -98,16 +98,16 @@ class AiGridRangeSummary {
   }
 
   Map<String, dynamic> toJson() => {
-        'cellCount': cellCount,
-        'rowCount': rowCount,
-        'columnCount': columnCount,
-        'columnFields': columnFields,
-        'sum': sum,
-        'average': average,
-        'min': min,
-        'max': max,
-        'numericCount': numericCount,
-      };
+    'cellCount': cellCount,
+    'rowCount': rowCount,
+    'columnCount': columnCount,
+    'columnFields': columnFields,
+    'sum': sum,
+    'average': average,
+    'min': min,
+    'max': max,
+    'numericCount': numericCount,
+  };
 
   @override
   String toString() {

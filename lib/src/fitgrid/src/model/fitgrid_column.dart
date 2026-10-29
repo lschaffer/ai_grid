@@ -1,4 +1,5 @@
 import '../controller/fitgrid_sort.dart';
+
 import 'package:flutter/widgets.dart';
 
 import 'cell_visual.dart';
@@ -34,8 +35,11 @@ typedef FitGridCellValue<T> = String Function(T row);
 ///
 /// Widget width is not measured. Give a builder column a
 /// [FitGridColumnWidth.fixed] or [FitGridColumnWidth.fitHeader] width.
-typedef FitGridCellBuilder<T> =
-    Widget Function(BuildContext context, T row, int rowIndex);
+typedef FitGridCellBuilder<T> = Widget Function(
+  BuildContext context,
+  T row,
+  int rowIndex,
+);
 
 /// Per-cell text style override, layered on top of the theme's cell style.
 ///

@@ -23,7 +23,8 @@ class PdfTableExtractor {
       if (streamPos == -1) break;
 
       // Ensure it's the keyword "stream" (not part of "endstream")
-      if (streamPos >= 3 && content.substring(streamPos - 3, streamPos) == 'end') {
+      if (streamPos >= 3 &&
+          content.substring(streamPos - 3, streamPos) == 'end') {
         pos = streamPos + 6;
         continue;
       }
@@ -41,12 +42,14 @@ class PdfTableExtractor {
       var dataStart = streamPos + 6;
       if (content.startsWith('\r\n', dataStart)) {
         dataStart += 2;
-      } else if (content.startsWith('\n', dataStart) || content.startsWith('\r', dataStart)) {
+      } else if (content.startsWith('\n', dataStart) ||
+          content.startsWith('\r', dataStart)) {
         dataStart += 1;
       }
 
       var dataEnd = endPos;
-      if (dataEnd > dataStart && (content[dataEnd - 1] == '\n' || content[dataEnd - 1] == '\r')) {
+      if (dataEnd > dataStart &&
+          (content[dataEnd - 1] == '\n' || content[dataEnd - 1] == '\r')) {
         dataEnd--;
         if (dataEnd > dataStart && content[dataEnd - 1] == '\r') {
           dataEnd--;
@@ -145,7 +148,8 @@ class PdfTableExtractor {
       final tjArrayRegex = RegExp(r'\[([\s\S]*?)\]\s*TJ');
       for (final m in tjArrayRegex.allMatches(btContent)) {
         final arrayContent = m.group(1) ?? '';
-        final innerStrings = RegExp(r'\(((?:[^\\)]|\\.)*)\)').allMatches(arrayContent);
+        final innerStrings = RegExp(r'\(((?:[^\\)]|\\.)*)\)')
+            .allMatches(arrayContent);
         for (final inner in innerStrings) {
           final raw = _unescapePdfString(inner.group(1) ?? '');
           if (raw.isNotEmpty) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Storage cache for persisting and restoring grid settings across sessions.
@@ -12,11 +13,13 @@ class AiGridSettingsStorage {
 
     // Persist to SharedPreferences for survival across app restarts
     try {
-      SharedPreferences.getInstance().then((prefs) {
-        prefs.setString('ai_grid_settings_$key', jsonEncode(copy));
-      }).catchError((_) {
-        // Ignore errors if persistent storage is unavailable
-      });
+      SharedPreferences.getInstance()
+          .then((prefs) {
+            prefs.setString('ai_grid_settings_$key', jsonEncode(copy));
+          })
+          .catchError((_) {
+            // Ignore errors if persistent storage is unavailable
+          });
     } catch (_) {
       // Ignore synchronous exceptions
     }
@@ -50,9 +53,11 @@ class AiGridSettingsStorage {
   static void clear(String key) {
     _cache.remove(key);
     try {
-      SharedPreferences.getInstance().then((prefs) {
-        prefs.remove('ai_grid_settings_$key');
-      }).catchError((_) {});
+      SharedPreferences.getInstance()
+          .then((prefs) {
+            prefs.remove('ai_grid_settings_$key');
+          })
+          .catchError((_) {});
     } catch (_) {}
   }
 }

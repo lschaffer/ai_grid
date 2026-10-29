@@ -1,6 +1,13 @@
 import 'dart:convert';
+import 'dart:io' as io;
+
+import 'package:flutter/foundation.dart';
+
+import '../data/excel_table_parser.dart';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
+
 import '../config/ai_grid_dynamic_storage.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../data/web_table_fetcher.dart';
@@ -9,6 +16,7 @@ import '../models/ai_grid_conditional_format.dart';
 import '../models/ai_grid_dynamic_datasource.dart';
 import '../models/ai_grid_pivot.dart';
 import '../models/ai_grid_smart_column.dart';
+import '../models/ai_grid_data_auditor.dart';
 
 /// Exposes all local tools and skill manifest for [AiGrid] control via MCP.
 class AiGridSkill {
@@ -56,6 +64,9 @@ class AiGridSkill {
       GridExpandAllDetailsTool(controller),
       GridCollapseAllDetailsTool(controller),
       GridGetDetailStatusTool(controller),
+      GridImportExcelTool(controller),
+      GridAuditDataTool(controller),
+      GridApplyDataCleanseTool(controller),
     ];
   }
 
@@ -135,6 +146,17 @@ IMPORTANT RULES FOR DYNAMIC DATAGRIDS & ATTACHMENTS:
 • When the user asks to fetch data from a web URL (e.g. "fetch webpage from https://... and extract data into grid"):
   Use `grid_fetch_web_data` with the url. If table data is extracted, it will automatically register it as a read-only dynamic DataGrid.
 • To list or switch between saved dynamic datasets, use `grid_list_datasources` and `grid_load_datasource`.
+• When the user asks to import, inspect, or load an Excel (.xlsx) workbook (e.g. "import excel file", "load sales.xlsx"):
+  Use `grid_import_excel`! To check sheet names first without loading, set `inspectOnly: true`. To load a specific sheet, specify `sheetName`.
+
+IMPORTANT RULES FOR DATA QUALITY AUDITING & CLEANING:
+• When the user asks to "audit data", "check data health", "find duplicates", "find dirty numbers", "detect outliers", "inspect quality", or "check data hygiene":
+  ALWAYS use `grid_audit_data`.
+  This analyzes the dataset and returns an overall health score (0-100), issue counts, affected rows, and sample dirty values.
+• When the user asks to "clean data", "fix dirty data", "remove duplicates", "fix dates", "clean currency", "impute missing values", or "auto clean":
+  ALWAYS use `grid_apply_data_cleanse`.
+  - Use `action: "clean_all"` when asked to clean everything or fix all anomalies.
+  - Or use specific actions: "remove_duplicates", "clean_numbers", "standardize_dates", "trim_whitespace", "impute_missing", "cap_outliers".
 
 Confirm the actions and calculations clearly and concisely to the user. Do not append extra explanatory notes like "(active filters joined by AND)" or "(joined by AND)".
 ''';
@@ -148,11 +170,13 @@ Confirm the actions and calculations clearly and concisely to the user. Do not a
       version: '1.1.0',
       systemPrompt: defaultSystemPrompt,
       tools: tools
-          .map((t) => SkillToolDeclaration(
-                name: t.name,
-                description: t.description,
-                inputSchema: t.inputSchema,
-              ))
+          .map(
+            (t) => SkillToolDeclaration(
+              name: t.name,
+              description: t.description,
+              inputSchema: t.inputSchema,
+            ),
+          )
           .toList(),
     );
   }
@@ -170,10 +194,7 @@ class GridGetSchemaTool extends McpLocalTool {
       'Returns the grid column schema (field names, titles, data types, groupable/sortable/filterable flags).';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -196,10 +217,7 @@ class GridGetStateTool extends McpLocalTool {
       'Returns current grid state (active grouping, active filters, active sorting, search query, filtered row count, visible/hidden columns, sortedColumns).';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -223,14 +241,14 @@ class GridGetSampleTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'limit': {
-            'type': 'integer',
-            'description': 'Number of rows to return (default: 5, max: 10)',
-          }
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'limit': {
+        'type': 'integer',
+        'description': 'Number of rows to return (default: 5, max: 10)',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -258,31 +276,28 @@ class GridCalculateTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'required': ['field', 'operation'],
-        'properties': {
-          'field': {
-            'type': 'string',
-            'description':
-                'The numeric column field or title to calculate over (e.g. "Sales", "Profit", "Quantity", "Discount").',
-          },
-          'operation': {
-            'type': 'string',
-            'enum': ['average', 'sum', 'min', 'max', 'count', 'median'],
-            'description': 'The mathematical calculation to perform.',
-          },
-          'filteredOnly': {
-            'type': 'boolean',
-            'description':
-                'If true, calculates over currently filtered rows (default true). If false, calculates over all rows.',
-          },
-          'groupBy': {
-            'type': 'string',
-            'description':
-                'Optional column to group calculations by (e.g. "Category", "Region", "Segment").',
-          },
-        },
-      };
+    'type': 'object',
+    'required': ['field', 'operation'],
+    'properties': {
+      'field': {
+        'type': 'string',
+        'description': 'The numeric column field or title to calculate over (e.g. "Sales", "Profit", "Quantity", "Discount").',
+      },
+      'operation': {
+        'type': 'string',
+        'enum': ['average', 'sum', 'min', 'max', 'count', 'median'],
+        'description': 'The mathematical calculation to perform.',
+      },
+      'filteredOnly': {
+        'type': 'boolean',
+        'description': 'If true, calculates over currently filtered rows (default true). If false, calculates over all rows.',
+      },
+      'groupBy': {
+        'type': 'string',
+        'description': 'Optional column to group calculations by (e.g. "Category", "Region", "Segment").',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -309,8 +324,10 @@ class GridCalculateTool extends McpLocalTool {
     if (result['results'] != null) {
       final groupMap = result['results'] as Map<String, dynamic>;
       final lines = groupMap.entries
-          .map((e) =>
-              '• ${e.key}: ${e.value['formatted']} (${e.value['count']} items)')
+          .map(
+            (e) =>
+                '• ${e.key}: ${e.value['formatted']} (${e.value['count']} items)',
+          )
           .join('\n');
       summaryText =
           '${result['operation'].toString().toUpperCase()} of ${result['columnTitle']} grouped by ${result['groupedBy']}:\n$lines';
@@ -320,9 +337,7 @@ class GridCalculateTool extends McpLocalTool {
     }
 
     return MCPToolResult(
-      content: [
-        MCPContent(type: 'text', text: summaryText),
-      ],
+      content: [MCPContent(type: 'text', text: summaryText)],
     );
   }
 }
@@ -340,57 +355,54 @@ class GridSetFilterTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'column': {
-            'type': 'string',
-            'description': 'The field name of the column (e.g. Region, Category, Sales).',
+    'type': 'object',
+    'properties': {
+      'column': {
+        'type': 'string',
+        'description':
+            'The field name of the column (e.g. Region, Category, Sales).',
+      },
+      'operator': {
+        'type': 'string',
+        'enum': [
+          'contains',
+          'equals',
+          'not equals',
+          'does not contain',
+          'startsWith',
+          'endsWith',
+          'greaterThan',
+          'lessThan',
+          'inList',
+          'oneOf',
+          'in',
+          'or',
+          'between',
+          'isEmpty',
+          'isNotEmpty',
+        ],
+        'description': 'Filter operator to apply. Use "inList" or "or" for matching one of multiple values.',
+      },
+      'value': {'description': 'The filter value to match against.'},
+      'filters': {
+        'type': 'array',
+        'description': 'List of multiple filter conditions to apply simultaneously (joined by AND). E.g. [{"column": "Region", "operator": "equals", "value": "South"}, {"column": "Category", "operator": "equals", "value": "Furniture"}]',
+        'items': {
+          'type': 'object',
+          'required': ['column', 'operator', 'value'],
+          'properties': {
+            'column': {'type': 'string'},
+            'operator': {'type': 'string'},
+            'value': {},
           },
-          'operator': {
-            'type': 'string',
-            'enum': [
-              'contains',
-              'equals',
-              'not equals',
-              'does not contain',
-              'startsWith',
-              'endsWith',
-              'greaterThan',
-              'lessThan',
-              'inList',
-              'oneOf',
-              'in',
-              'or',
-              'between',
-              'isEmpty',
-              'isNotEmpty'
-            ],
-            'description': 'Filter operator to apply. Use "inList" or "or" for matching one of multiple values.',
-          },
-          'value': {
-            'description': 'The filter value to match against.',
-          },
-          'filters': {
-            'type': 'array',
-            'description':
-                'List of multiple filter conditions to apply simultaneously (joined by AND). E.g. [{"column": "Region", "operator": "equals", "value": "South"}, {"column": "Category", "operator": "equals", "value": "Furniture"}]',
-            'items': {
-              'type': 'object',
-              'required': ['column', 'operator', 'value'],
-              'properties': {
-                'column': {'type': 'string'},
-                'operator': {'type': 'string'},
-                'value': {},
-              },
-            },
-          },
-          'replace': {
-            'type': 'boolean',
-            'description':
-                'If true, replaces all existing filters. Default is false (appends to active filters with AND).',
-          }
         },
-      };
+      },
+      'replace': {
+        'type': 'boolean',
+        'description': 'If true, replaces all existing filters. Default is false (appends to active filters with AND).',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -398,19 +410,18 @@ class GridSetFilterTool extends McpLocalTool {
     final replace = arguments['replace'] as bool? ?? false;
 
     if (filters != null && filters.isNotEmpty) {
-      final list =
-          filters.map((f) => Map<String, dynamic>.from(f as Map)).toList();
+      final list = filters
+          .map((f) => Map<String, dynamic>.from(f as Map))
+          .toList();
       controller.setFilters(list, replace: replace);
       final desc = list
-          .map((f) => '${f['column'] ?? f['field']} ${f['operator']} "${f['value']}"')
+          .map(
+            (f) =>
+                '${f['column'] ?? f['field']} ${f['operator']} "${f['value']}"',
+          )
           .join(' AND ');
       return MCPToolResult(
-        content: [
-          MCPContent(
-            type: 'text',
-            text: 'Filters applied: $desc.',
-          )
-        ],
+        content: [MCPContent(type: 'text', text: 'Filters applied: $desc.')],
       );
     }
 
@@ -421,7 +432,7 @@ class GridSetFilterTool extends McpLocalTool {
 
       if (replace) {
         controller.setFilters([
-          {'column': column, 'operator': op, 'value': value}
+          {'column': column, 'operator': op, 'value': value},
         ], replace: true);
       } else {
         controller.setFilter(column, operator: op, value: value);
@@ -432,7 +443,7 @@ class GridSetFilterTool extends McpLocalTool {
           MCPContent(
             type: 'text',
             text: 'Filter applied: $column $op "$value".',
-          )
+          ),
         ],
       );
     }
@@ -462,15 +473,14 @@ class GridClearFiltersTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'column': {
-            'type': 'string',
-            'description':
-                'Optional specific column to clear filter from. If omitted, clears all filters.',
-          }
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'column': {
+        'type': 'string',
+        'description': 'Optional specific column to clear filter from. If omitted, clears all filters.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -479,13 +489,18 @@ class GridClearFiltersTool extends McpLocalTool {
       controller.removeFilter(column);
       return MCPToolResult(
         content: [
-          MCPContent(type: 'text', text: 'Filter cleared for column "$column".')
+          MCPContent(
+            type: 'text',
+            text: 'Filter cleared for column "$column".',
+          ),
         ],
       );
     } else {
       controller.clearAllFilters();
       return MCPToolResult(
-        content: [MCPContent(type: 'text', text: 'All column filters cleared.')],
+        content: [
+          MCPContent(type: 'text', text: 'All column filters cleared.'),
+        ],
       );
     }
   }
@@ -504,15 +519,15 @@ class GridSearchTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'query': {
-            'type': 'string',
-            'description':
-                'Search string to filter rows across all columns. Empty to clear.',
-          }
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'query': {
+        'type': 'string',
+        'description':
+            'Search string to filter rows across all columns. Empty to clear.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -525,7 +540,7 @@ class GridSearchTool extends McpLocalTool {
           text: query.isEmpty
               ? 'Global search cleared.'
               : 'Global search applied for: "$query".',
-        )
+        ),
       ],
     );
   }
@@ -544,54 +559,54 @@ class GridSortTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'column': {
-            'type': 'string',
-            'description': 'Single column field name to sort by (e.g. Region, Sales).',
-          },
-          'descending': {
-            'type': 'boolean',
-            'description': 'True for descending sort, false for ascending (default: false).',
-          },
-          'append': {
-            'type': 'boolean',
-            'description':
-                'If true, appends this column to existing sorts (multi-column sorting). Default is false.',
-          },
-          'sorts': {
-            'type': 'array',
-            'description':
-                'Ordered list of column sort definitions for multi-column sorting. E.g. [{"column": "Region", "descending": false}, {"column": "Sales", "descending": true}].',
-            'items': {
-              'type': 'object',
-              'required': ['column'],
-              'properties': {
-                'column': {'type': 'string'},
-                'descending': {'type': 'boolean'},
-              },
-            },
+    'type': 'object',
+    'properties': {
+      'column': {
+        'type': 'string',
+        'description':
+            'Single column field name to sort by (e.g. Region, Sales).',
+      },
+      'descending': {
+        'type': 'boolean',
+        'description':
+            'True for descending sort, false for ascending (default: false).',
+      },
+      'append': {
+        'type': 'boolean',
+        'description': 'If true, appends this column to existing sorts (multi-column sorting). Default is false.',
+      },
+      'sorts': {
+        'type': 'array',
+        'description': 'Ordered list of column sort definitions for multi-column sorting. E.g. [{"column": "Region", "descending": false}, {"column": "Sales", "descending": true}].',
+        'items': {
+          'type': 'object',
+          'required': ['column'],
+          'properties': {
+            'column': {'type': 'string'},
+            'descending': {'type': 'boolean'},
           },
         },
-      };
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final sorts = arguments['sorts'] as List<dynamic>?;
     if (sorts != null && sorts.isNotEmpty) {
-      final configs =
-          sorts.map((s) => Map<String, dynamic>.from(s as Map)).toList();
+      final configs = sorts
+          .map((s) => Map<String, dynamic>.from(s as Map))
+          .toList();
       controller.multiSort(configs);
       final descList = configs
-          .map((c) =>
-              '${c['column'] ?? c['field']} (${(c['descending'] == true) ? 'desc' : 'asc'})')
+          .map(
+            (c) =>
+                '${c['column'] ?? c['field']} (${(c['descending'] == true) ? 'desc' : 'asc'})',
+          )
           .join(', ');
       return MCPToolResult(
         content: [
-          MCPContent(
-            type: 'text',
-            text: 'Grid multi-sorted by: $descList.',
-          )
+          MCPContent(type: 'text', text: 'Grid multi-sorted by: $descList.'),
         ],
       );
     }
@@ -607,19 +622,14 @@ class GridSortTool extends McpLocalTool {
             type: 'text',
             text:
                 'Grid sorted by "$column" ${descending ? "descending" : "ascending"}${append ? " (appended to multi-sort)" : ""}.',
-          )
+          ),
         ],
       );
     }
 
     controller.clearSorting();
     return MCPToolResult(
-      content: [
-        MCPContent(
-          type: 'text',
-          text: 'Grid sorting cleared.',
-        )
-      ],
+      content: [MCPContent(type: 'text', text: 'Grid sorting cleared.')],
     );
   }
 }
@@ -637,17 +647,16 @@ class GridGroupTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'required': ['columns'],
-        'properties': {
-          'columns': {
-            'type': 'array',
-            'items': {'type': 'string'},
-            'description':
-                'Ordered list of column fields to group by. Empty array removes all grouping.',
-          }
-        },
-      };
+    'type': 'object',
+    'required': ['columns'],
+    'properties': {
+      'columns': {
+        'type': 'array',
+        'items': {'type': 'string'},
+        'description': 'Ordered list of column fields to group by. Empty array removes all grouping.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -660,7 +669,7 @@ class GridGroupTool extends McpLocalTool {
           text: cols.isEmpty
               ? 'Grouping cleared.'
               : 'Grid grouped by: ${cols.join(", ")}.',
-        )
+        ),
       ],
     );
   }
@@ -679,22 +688,23 @@ class GridSetColumnVisibilityTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
+    'type': 'object',
+    'properties': {
+      'column': {
+        'type': 'string',
+        'description': 'The field name of the column to show or hide.',
+      },
+      'visible': {
+        'type': 'boolean',
+        'description': 'True to show the column, false to hide it.',
+      },
+      'visibility': {
         'type': 'object',
-        'properties': {
-          'column': {
-            'type': 'string',
-            'description': 'The field name of the column to show or hide.',
-          },
-          'visible': {
-            'type': 'boolean',
-            'description': 'True to show the column, false to hide it.',
-          },
-          'visibility': {
-            'type': 'object',
-            'description': 'Optional map of column fields to boolean visibility values.',
-          },
-        },
-      };
+        'description':
+            'Optional map of column fields to boolean visibility values.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -751,17 +761,14 @@ class GridResetTool extends McpLocalTool {
       'Resets all grouping, filters, search query, column visibility, and sorting back to initial defaults.';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     controller.reset();
     return MCPToolResult(
       content: [
-        MCPContent(type: 'text', text: 'Grid reset to initial default state.')
+        MCPContent(type: 'text', text: 'Grid reset to initial default state.'),
       ],
     );
   }
@@ -782,25 +789,22 @@ class ExportTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'fileName': {
-            'type': 'string',
-            'description':
-                'Optional initial filename without extension (e.g. "sales_report"). Defaults to grid_export_<timestamp>.',
-          },
-          'includeHeaders': {
-            'type': 'boolean',
-            'description':
-                'Whether to include column headers as the first row. Defaults to true.',
-          },
-          'selectedOnly': {
-            'type': 'boolean',
-            'description':
-                'Whether to export only selected rows instead of all visible rows. Defaults to false.',
-          },
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'fileName': {
+        'type': 'string',
+        'description': 'Optional initial filename without extension (e.g. "sales_report"). Defaults to grid_export_<timestamp>.',
+      },
+      'includeHeaders': {
+        'type': 'boolean',
+        'description': 'Whether to include column headers as the first row. Defaults to true.',
+      },
+      'selectedOnly': {
+        'type': 'boolean',
+        'description': 'Whether to export only selected rows instead of all visible rows. Defaults to false.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -838,9 +842,7 @@ class ExportTool extends McpLocalTool {
     } catch (e) {
       return MCPToolResult(
         isError: true,
-        content: [
-          MCPContent(type: 'text', text: 'Failed to export table: $e'),
-        ],
+        content: [MCPContent(type: 'text', text: 'Failed to export table: $e')],
       );
     }
   }
@@ -860,32 +862,29 @@ class GridExportTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'format': {
-            'type': 'string',
-            'description':
-                'Export file format: "xlsx", "csv", "tsv", or "json". Defaults to "xlsx".',
-            'enum': ['xlsx', 'csv', 'tsv', 'json'],
-          },
-          'columns': {
-            'type': 'array',
-            'items': {'type': 'string'},
-            'description':
-                'Optional list of column titles or field names to include in export. If omitted, all visible columns are exported.',
-          },
-          'includeHeaders': {
-            'type': 'boolean',
-            'description':
-                'Whether to include column header row. Defaults to true.',
-          },
-          'separator': {
-            'type': 'string',
-            'description':
-                'Delimiter character for CSV format (e.g. ",", ";", "\t"). Defaults to ",".',
-          },
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'format': {
+        'type': 'string',
+        'description': 'Export file format: "xlsx", "csv", "tsv", or "json". Defaults to "xlsx".',
+        'enum': ['xlsx', 'csv', 'tsv', 'json'],
+      },
+      'columns': {
+        'type': 'array',
+        'items': {'type': 'string'},
+        'description': 'Optional list of column titles or field names to include in export. If omitted, all visible columns are exported.',
+      },
+      'includeHeaders': {
+        'type': 'boolean',
+        'description':
+            'Whether to include column header row. Defaults to true.',
+      },
+      'separator': {
+        'type': 'string',
+        'description': 'Delimiter character for CSV format (e.g. ",", ";", "\t"). Defaults to ",".',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -915,9 +914,7 @@ class GridExportTool extends McpLocalTool {
     } catch (e) {
       return MCPToolResult(
         isError: true,
-        content: [
-          MCPContent(type: 'text', text: 'Failed to export grid: $e'),
-        ],
+        content: [MCPContent(type: 'text', text: 'Failed to export grid: $e')],
       );
     }
   }
@@ -937,23 +934,23 @@ class GridGoToPageTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'page': {
-            'type': 'integer',
-            'description': 'Target page number (1-based index).',
-          },
-          'direction': {
-            'type': 'string',
-            'enum': ['next', 'previous', 'first', 'last'],
-            'description': 'Relative page move direction.',
-          },
-          'pageSize': {
-            'type': 'integer',
-            'description': 'Optional new page size to set.',
-          },
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'page': {
+        'type': 'integer',
+        'description': 'Target page number (1-based index).',
+      },
+      'direction': {
+        'type': 'string',
+        'enum': ['next', 'previous', 'first', 'last'],
+        'description': 'Relative page move direction.',
+      },
+      'pageSize': {
+        'type': 'integer',
+        'description': 'Optional new page size to set.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -1015,10 +1012,7 @@ class GridGetPaginationTool extends McpLocalTool {
       'Returns current pagination state: current page, total pages, page size, and whether pagination is active.';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -1051,21 +1045,13 @@ class GridExportSettingsTool extends McpLocalTool {
       'Exports the current grid settings (visible columns, grouping, sorts, filters, column filter row) as a JSON string.';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final settingsJson = controller.exportSettingsJson();
     return MCPToolResult(
-      content: [
-        MCPContent(
-          type: 'text',
-          text: settingsJson,
-        ),
-      ],
+      content: [MCPContent(type: 'text', text: settingsJson)],
     );
   }
 }
@@ -1084,18 +1070,18 @@ class GridRestoreSettingsTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
+    'type': 'object',
+    'properties': {
+      'settingsJson': {
+        'type': 'string',
+        'description': 'JSON string containing grid settings.',
+      },
+      'settings': {
         'type': 'object',
-        'properties': {
-          'settingsJson': {
-            'type': 'string',
-            'description': 'JSON string containing grid settings.',
-          },
-          'settings': {
-            'type': 'object',
-            'description': 'Settings object containing visibleColumns, groupColumns, sorts, filters.',
-          },
-        },
-      };
+        'description': 'Settings object containing visibleColumns, groupColumns, sorts, filters.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -1109,7 +1095,7 @@ class GridRestoreSettingsTool extends McpLocalTool {
           MCPContent(
             type: 'text',
             text: 'Grid settings restored successfully from JSON.',
-          )
+          ),
         ],
       );
     } else if (settingsMap != null) {
@@ -1119,7 +1105,7 @@ class GridRestoreSettingsTool extends McpLocalTool {
           MCPContent(
             type: 'text',
             text: 'Grid settings restored successfully from settings map.',
-          )
+          ),
         ],
       );
     } else {
@@ -1129,7 +1115,7 @@ class GridRestoreSettingsTool extends McpLocalTool {
           MCPContent(
             type: 'text',
             text: 'Please provide either "settingsJson" or "settings".',
-          )
+          ),
         ],
       );
     }
@@ -1149,76 +1135,75 @@ class GridCreatePivotTableTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'rows': {
-            'type': 'array',
-            'items': {'type': 'string'},
-            'description':
-                'Field names or column titles to use as vertical row dimensions (e.g. ["order_id", "order_date"] or ["category", "sub_category"]).',
-          },
-          'columns': {
-            'type': 'array',
-            'items': {'type': 'string'},
-            'description':
-                'Optional field names or column titles to expand as horizontal columns (e.g. ["country", "city", "segment"] or ["region"]).',
-          },
-          'data': {
-            'type': 'array',
-            'items': {
-              'type': 'object',
-              'properties': {
-                'column': {
-                  'type': 'string',
-                  'description': 'Field name or column title'
-                },
-                'aggregation': {
-                  'type': 'string',
-                  'enum': ['sum', 'count', 'average', 'min', 'max'],
-                  'description':
-                      'Aggregation type: sum (default), count, average (avg), min, or max',
-                },
-                'label': {'type': 'string', 'description': 'Optional custom label'},
-              },
-              'required': ['column'],
+    'type': 'object',
+    'properties': {
+      'rows': {
+        'type': 'array',
+        'items': {'type': 'string'},
+        'description': 'Field names or column titles to use as vertical row dimensions (e.g. ["order_id", "order_date"] or ["category", "sub_category"]).',
+      },
+      'columns': {
+        'type': 'array',
+        'items': {'type': 'string'},
+        'description': 'Optional field names or column titles to expand as horizontal columns (e.g. ["country", "city", "segment"] or ["region"]).',
+      },
+      'data': {
+        'type': 'array',
+        'items': {
+          'type': 'object',
+          'properties': {
+            'column': {
+              'type': 'string',
+              'description': 'Field name or column title',
             },
-            'description': 'Numeric measure fields to aggregate in cells.',
+            'aggregation': {
+              'type': 'string',
+              'enum': ['sum', 'count', 'average', 'min', 'max'],
+              'description': 'Aggregation type: sum (default), count, average (avg), min, or max',
+            },
+            'label': {'type': 'string', 'description': 'Optional custom label'},
           },
-          'values': {
-            'type': 'array',
-            'items': {'type': 'object'},
-            'description': 'Alias for data.',
-          },
-          'showChart': {
-            'type': 'boolean',
-            'description':
-                'Whether to display the side-by-side pivot chart (default true).',
-          },
-          'chartType': {
-            'type': 'string',
-            'enum': ['groupedBar', 'column', 'line', 'pie'],
-            'description':
-                'Chart visualization type: groupedBar (default), column, line, or pie.',
-          },
-          'showTotals': {
-            'type': 'boolean',
-            'description': 'Whether to display grand totals (default true).',
-          },
+          'required': ['column'],
         },
-        'required': ['rows'],
-      };
+        'description': 'Numeric measure fields to aggregate in cells.',
+      },
+      'values': {
+        'type': 'array',
+        'items': {'type': 'object'},
+        'description': 'Alias for data.',
+      },
+      'showChart': {
+        'type': 'boolean',
+        'description':
+            'Whether to display the side-by-side pivot chart (default true).',
+      },
+      'chartType': {
+        'type': 'string',
+        'enum': ['groupedBar', 'column', 'line', 'pie'],
+        'description': 'Chart visualization type: groupedBar (default), column, line, or pie.',
+      },
+      'showTotals': {
+        'type': 'boolean',
+        'description': 'Whether to display grand totals (default true).',
+      },
+    },
+    'required': ['rows'],
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final rawRows = (arguments['rows'] as List<dynamic>?)
+    final rawRows =
+        (arguments['rows'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList() ??
         [];
-    final rawCols = (arguments['columns'] as List<dynamic>?)
+    final rawCols =
+        (arguments['columns'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList() ??
         [];
-    final rawData = (arguments['data'] as List<dynamic>?) ??
+    final rawData =
+        (arguments['data'] as List<dynamic>?) ??
         (arguments['values'] as List<dynamic>?) ??
         [];
 
@@ -1237,8 +1222,8 @@ class GridCreatePivotTableTool extends McpLocalTool {
     final valueConfigs = <AiGridPivotValueConfig>[];
     for (final item in rawData) {
       if (item is Map<String, dynamic>) {
-        final colName =
-            (item['column'] ?? item['field'] ?? item['id'])?.toString();
+        final colName = (item['column'] ?? item['field'] ?? item['id'])
+            ?.toString();
         if (colName != null && colName.isNotEmpty) {
           final aggStr = (item['aggregation'] ?? item['type'])?.toString();
           valueConfigs.add(
@@ -1262,8 +1247,9 @@ class GridCreatePivotTableTool extends McpLocalTool {
     }
 
     final showChart = arguments['showChart'] as bool? ?? true;
-    final chartType =
-        AiGridPivotChartType.fromString(arguments['chartType'] as String?);
+    final chartType = AiGridPivotChartType.fromString(
+      arguments['chartType'] as String?,
+    );
     final showTotals = arguments['showTotals'] as bool? ?? true;
 
     final config = AiGridPivotConfig(
@@ -1280,9 +1266,15 @@ class GridCreatePivotTableTool extends McpLocalTool {
       final colCount = controller.columns.length;
       final rowCount = controller.fitController?.data.rows.length ?? 0;
 
-      final colsSummary = rawCols.isNotEmpty ? '; Columns: ${rawCols.join(", ")}' : '';
-      final measuresSummary = valueConfigs.map((v) => '${v.columnId} (${v.aggregation.displayName})').join(', ');
-      final chartSummary = showChart ? ' Pivot chart (${chartType.displayName}) is enabled.' : '';
+      final colsSummary = rawCols.isNotEmpty
+          ? '; Columns: ${rawCols.join(", ")}'
+          : '';
+      final measuresSummary = valueConfigs
+          .map((v) => '${v.columnId} (${v.aggregation.displayName})')
+          .join(', ');
+      final chartSummary = showChart
+          ? ' Pivot chart (${chartType.displayName}) is enabled.'
+          : '';
 
       return MCPToolResult(
         content: [
@@ -1297,10 +1289,7 @@ class GridCreatePivotTableTool extends McpLocalTool {
       return MCPToolResult(
         isError: true,
         content: [
-          MCPContent(
-            type: 'text',
-            text: 'Failed to create pivot table: $e',
-          ),
+          MCPContent(type: 'text', text: 'Failed to create pivot table: $e'),
         ],
       );
     }
@@ -1319,10 +1308,7 @@ class GridResetPivotTableTool extends McpLocalTool {
       'Exits pivot mode and returns the grid to the original standard editable table view.';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -1342,7 +1328,8 @@ class GridResetPivotTableTool extends McpLocalTool {
       content: [
         MCPContent(
           type: 'text',
-          text: 'Pivot mode deactivated. Restored standard editable table view.',
+          text:
+              'Pivot mode deactivated. Restored standard editable table view.',
         ),
       ],
     );
@@ -1362,39 +1349,39 @@ class GridCreateDynamicDatasourceTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'name': {
-            'type': 'string',
-            'description': 'Unique identifier for the datasource (e.g. monthly_sales, product_inventory).',
-          },
-          'title': {
-            'type': 'string',
-            'description': 'Display title for the datasource.',
-          },
-          'model': {
-            'description': 'Column definitions as a list of objects or a YAML/JSON string. Each column has field, title, type (text, number, currency, date, boolean), and optional editable (bool).',
-          },
-          'data': {
-            'type': 'array',
-            'description': 'Array of JSON row maps matching the column fields.',
-            'items': {'type': 'object'},
-          },
-          'source_type': {
-            'type': 'string',
-            'description': 'Source of data: file, web, or clipboard.',
-          },
-          'source_origin': {
-            'type': 'string',
-            'description': 'Original filename or URL.',
-          },
-          'is_readonly': {
-            'type': 'boolean',
-            'description': 'Whether the dataset is read-only. Defaults to false.',
-          },
-        },
-        'required': ['name', 'model', 'data'],
-      };
+    'type': 'object',
+    'properties': {
+      'name': {
+        'type': 'string',
+        'description': 'Unique identifier for the datasource (e.g. monthly_sales, product_inventory).',
+      },
+      'title': {
+        'type': 'string',
+        'description': 'Display title for the datasource.',
+      },
+      'model': {
+        'description': 'Column definitions as a list of objects or a YAML/JSON string. Each column has field, title, type (text, number, currency, date, boolean), and optional editable (bool).',
+      },
+      'data': {
+        'type': 'array',
+        'description': 'Array of JSON row maps matching the column fields.',
+        'items': {'type': 'object'},
+      },
+      'source_type': {
+        'type': 'string',
+        'description': 'Source of data: file, web, or clipboard.',
+      },
+      'source_origin': {
+        'type': 'string',
+        'description': 'Original filename or URL.',
+      },
+      'is_readonly': {
+        'type': 'boolean',
+        'description': 'Whether the dataset is read-only. Defaults to false.',
+      },
+    },
+    'required': ['name', 'model', 'data'],
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -1413,12 +1400,20 @@ class GridCreateDynamicDatasourceTool extends McpLocalTool {
     final rawModel = arguments['model'];
     if (rawModel is List) {
       columns = rawModel
-          .map((c) => AiGridDynamicColumnModel.fromJson(Map<String, dynamic>.from(c as Map)))
+          .map(
+            (c) => AiGridDynamicColumnModel.fromJson(
+              Map<String, dynamic>.from(c as Map),
+            ),
+          )
           .toList();
     } else if (rawModel is Map) {
       final cols = rawModel['columns'] as List? ?? [];
       columns = cols
-          .map((c) => AiGridDynamicColumnModel.fromJson(Map<String, dynamic>.from(c as Map)))
+          .map(
+            (c) => AiGridDynamicColumnModel.fromJson(
+              Map<String, dynamic>.from(c as Map),
+            ),
+          )
           .toList();
     } else if (rawModel is String) {
       try {
@@ -1430,7 +1425,11 @@ class GridCreateDynamicDatasourceTool extends McpLocalTool {
         } else if (parsed is Map) {
           final cols = parsed['columns'] as List? ?? [];
           columns = cols
-              .map((c) => AiGridDynamicColumnModel.fromJson(Map<String, dynamic>.from(c as Map)))
+              .map(
+                (c) => AiGridDynamicColumnModel.fromJson(
+                  Map<String, dynamic>.from(c as Map),
+                ),
+              )
               .toList();
         }
       } catch (e) {
@@ -1441,7 +1440,9 @@ class GridCreateDynamicDatasourceTool extends McpLocalTool {
     // 2. Parse data rows
     final rawData = arguments['data'];
     if (rawData is! List) {
-      return MCPToolResult.error('Parameter "data" must be an array of row objects.');
+      return MCPToolResult.error(
+        'Parameter "data" must be an array of row objects.',
+      );
     }
     final rows = rawData
         .map((r) => Map<String, dynamic>.from(r as Map))
@@ -1522,10 +1523,7 @@ class GridListDatasourcesTool extends McpLocalTool {
       'Lists all saved dynamic DataGrid datasources, their row counts, origins, and active status.';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -1533,7 +1531,9 @@ class GridListDatasourcesTool extends McpLocalTool {
     final activeName = controller.activeDynamicDatasource?.name;
 
     if (list.isEmpty) {
-      return MCPToolResult.text('No dynamic datasources currently saved in storage.');
+      return MCPToolResult.text(
+        'No dynamic datasources currently saved in storage.',
+      );
     }
 
     final buffer = StringBuffer();
@@ -1562,34 +1562,34 @@ class GridLoadDatasourceTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'name': {
-            'type': 'string',
-            'description': 'Name of the datasource to load.',
-          },
-        },
-        'required': ['name'],
-      };
+    'type': 'object',
+    'properties': {
+      'name': {
+        'type': 'string',
+        'description': 'Name of the datasource to load.',
+      },
+    },
+    'required': ['name'],
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final name = arguments['name']?.toString().trim() ?? '';
-    if (name.isEmpty) return MCPToolResult.error('Parameter "name" is required.');
+    if (name.isEmpty) {
+      return MCPToolResult.error('Parameter "name" is required.');
+    }
 
     final desc = await AiGridDynamicStorage.getDescriptor(name);
     final model = await AiGridDynamicStorage.getModel(name);
     final rows = await AiGridDynamicStorage.getDataRows(name);
 
     if (desc == null || model == null || rows == null) {
-      return MCPToolResult.error('Datasource "$name" not found in local storage.');
+      return MCPToolResult.error(
+        'Datasource "$name" not found in local storage.',
+      );
     }
 
-    controller.loadDynamicDatasource(
-      desc,
-      model.toColumns(),
-      rows,
-    );
+    controller.loadDynamicDatasource(desc, model.toColumns(), rows);
 
     return MCPToolResult.text(
       'Loaded dynamic datasource "${desc.name}" (${desc.title}) with ${rows.length} rows and ${model.columns.length} columns into the DataGrid.',
@@ -1605,30 +1605,35 @@ class GridDeleteDatasourceTool extends McpLocalTool {
   String get name => 'grid_delete_datasource';
 
   @override
-  String get description => 'Deletes a dynamic datasource from storage by name.';
+  String get description =>
+      'Deletes a dynamic datasource from storage by name.';
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'name': {
-            'type': 'string',
-            'description': 'Name of the datasource to delete.',
-          },
-        },
-        'required': ['name'],
-      };
+    'type': 'object',
+    'properties': {
+      'name': {
+        'type': 'string',
+        'description': 'Name of the datasource to delete.',
+      },
+    },
+    'required': ['name'],
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final name = arguments['name']?.toString().trim() ?? '';
-    if (name.isEmpty) return MCPToolResult.error('Parameter "name" is required.');
+    if (name.isEmpty) {
+      return MCPToolResult.error('Parameter "name" is required.');
+    }
 
     final success = await AiGridDynamicStorage.deleteDatasource(name);
     if (!success) {
       return MCPToolResult.error('Failed to delete datasource "$name".');
     }
-    return MCPToolResult.text('Successfully deleted dynamic datasource "$name".');
+    return MCPToolResult.text(
+      'Successfully deleted dynamic datasource "$name".',
+    );
   }
 }
 
@@ -1645,23 +1650,24 @@ class GridFetchWebDataTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'url': {
-            'type': 'string',
-            'description': 'HTTP or HTTPS URL to fetch data from.',
-          },
-          'name': {
-            'type': 'string',
-            'description': 'Optional name for the datasource. If omitted, inferred from URL.',
-          },
-          'create_datasource': {
-            'type': 'boolean',
-            'description': 'Whether to immediately register and display as dynamic DataGrid. Defaults to true.',
-          },
-        },
-        'required': ['url'],
-      };
+    'type': 'object',
+    'properties': {
+      'url': {
+        'type': 'string',
+        'description': 'HTTP or HTTPS URL to fetch data from.',
+      },
+      'name': {
+        'type': 'string',
+        'description':
+            'Optional name for the datasource. If omitted, inferred from URL.',
+      },
+      'create_datasource': {
+        'type': 'boolean',
+        'description': 'Whether to immediately register and display as dynamic DataGrid. Defaults to true.',
+      },
+    },
+    'required': ['url'],
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -1675,7 +1681,8 @@ class GridFetchWebDataTool extends McpLocalTool {
       final result = await WebTableFetcher.fetch(url);
 
       if (!result.hasTableData) {
-        final snippet = result.rawContent != null && result.rawContent!.length > 1000
+        final snippet =
+            result.rawContent != null && result.rawContent!.length > 1000
             ? '${result.rawContent!.substring(0, 1000)}...'
             : result.rawContent ?? 'No tabular content found.';
         return MCPToolResult.text(
@@ -1686,7 +1693,8 @@ class GridFetchWebDataTool extends McpLocalTool {
 
       if (createDs) {
         final uri = Uri.parse(url);
-        final baseName = customName ??
+        final baseName =
+            customName ??
             (uri.pathSegments.isNotEmpty ? uri.pathSegments.last : uri.host)
                 .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
                 .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
@@ -1760,18 +1768,19 @@ class GridExportDatasourceYamlTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'name': {
-            'type': 'string',
-            'description': 'Name of the datasource to export. Defaults to the active dynamic datasource.',
-          },
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'name': {
+        'type': 'string',
+        'description': 'Name of the datasource to export. Defaults to the active dynamic datasource.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
-    final name = arguments['name']?.toString().trim() ??
+    final name =
+        arguments['name']?.toString().trim() ??
         controller.activeDynamicDatasource?.name ??
         '';
 
@@ -1783,10 +1792,204 @@ class GridExportDatasourceYamlTool extends McpLocalTool {
 
     final yamlString = await AiGridDynamicStorage.exportBundleYaml(name);
     if (yamlString == null) {
-      return MCPToolResult.error('Datasource "$name" not found in local storage.');
+      return MCPToolResult.error(
+        'Datasource "$name" not found in local storage.',
+      );
     }
 
     return MCPToolResult.text(yamlString);
+  }
+}
+
+/// Tool for importing Excel (.xlsx) workbooks, inspecting worksheets, and loading tables.
+class GridImportExcelTool extends McpLocalTool {
+  final AiGridController controller;
+  GridImportExcelTool(this.controller);
+
+  @override
+  String get name => 'grid_import_excel';
+
+  @override
+  String get description =>
+      'Imports an Excel spreadsheet (.xlsx) into the grid, inspects worksheets, and activates the imported tabular dataset. Can inspect available sheets or import a specific sheet.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+    'type': 'object',
+    'properties': {
+      'base64': {
+        'type': 'string',
+        'description': 'Base64 encoded bytes of the .xlsx file.',
+      },
+      'filePath': {
+        'type': 'string',
+        'description': 'Path to the .xlsx file on disk (desktop environments).',
+      },
+      'sheetName': {
+        'type': 'string',
+        'description': 'Optional name of the worksheet to import. If omitted, the first worksheet is imported.',
+      },
+      'inspectOnly': {
+        'type': 'boolean',
+        'description': 'If true, returns sheet metadata, column headers, and row counts without activating the dataset.',
+      },
+    },
+  };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    Uint8List? bytes;
+    String fileName = 'workbook.xlsx';
+
+    if (arguments['base64'] != null) {
+      try {
+        bytes = base64Decode(arguments['base64'].toString().trim());
+      } catch (e) {
+        return MCPToolResult.error('Invalid base64 encoding: $e');
+      }
+    } else if (arguments['filePath'] != null) {
+      final path = arguments['filePath'].toString().trim();
+      if (!kIsWeb) {
+        final f = io.File(path);
+        if (!await f.exists()) {
+          return MCPToolResult.error('File not found: $path');
+        }
+        bytes = await f.readAsBytes();
+        fileName = path.split(RegExp(r'[\\/]')).last;
+      } else {
+        return MCPToolResult.error(
+          'Direct filePath is not supported on web. Provide base64 bytes.',
+        );
+      }
+    }
+
+    if (bytes == null || bytes.isEmpty) {
+      return MCPToolResult.error(
+        'Either "base64" or "filePath" must be provided to import an Excel file.',
+      );
+    }
+
+    AiGridExcelWorkbook workbook;
+    try {
+      workbook = AiGridExcelParser.parseBytes(bytes, fileName: fileName);
+    } catch (e) {
+      return MCPToolResult.error('Failed to parse Excel workbook: $e');
+    }
+
+    if (workbook.sheets.isEmpty) {
+      return MCPToolResult.error(
+        'No readable worksheets found in this Excel workbook.',
+      );
+    }
+
+    final inspectOnly = arguments['inspectOnly'] as bool? ?? false;
+    if (inspectOnly) {
+      final sheetSummaries = workbook.sheets
+          .map(
+            (s) => {
+              'name': s.name,
+              'rowCount': s.rowCount,
+              'columnCount': s.columnCount,
+              'headers': s.headers,
+              'preview': s.previewRows.take(2).toList(),
+            },
+          )
+          .toList();
+
+      return MCPToolResult(
+        content: [
+          MCPContent(
+            type: 'text',
+            text: jsonEncode({
+              'fileName': workbook.fileName,
+              'sheetCount': workbook.sheets.length,
+              'sheets': sheetSummaries,
+            }),
+          ),
+        ],
+      );
+    }
+
+    final requestedSheet = arguments['sheetName']?.toString().trim();
+    AiGridExcelSheet? sheet;
+    if (requestedSheet != null && requestedSheet.isNotEmpty) {
+      sheet = workbook.getSheet(requestedSheet);
+      if (sheet == null) {
+        return MCPToolResult.error(
+          'Worksheet "$requestedSheet" not found. Available sheets: ${workbook.sheets.map((s) => s.name).join(", ")}',
+        );
+      }
+    } else {
+      sheet = workbook.primarySheet!;
+    }
+
+    final rawName = fileName
+        .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+        .toLowerCase();
+    final cleanSheet = sheet.name
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+        .toLowerCase();
+    final dsName = rawName.isEmpty ? 'excel_dataset' : '${rawName}_$cleanSheet';
+    final modelName = '${dsName}_mdl.yaml';
+    final datasourceName = '$dsName.json';
+    final now = DateTime.now();
+
+    final dynamicModel = AiGridDynamicModel(
+      modelName: modelName,
+      datasourceName: datasourceName,
+      title: '${sheet.name} ($fileName)',
+      sourceType: 'file',
+      sourceOrigin: fileName,
+      createdAt: now,
+      columns: sheet.columns,
+    );
+
+    final descriptor = AiGridDynamicDescriptor(
+      name: dsName,
+      modelName: modelName,
+      datasourceName: datasourceName,
+      title: dynamicModel.title,
+      sourceType: 'file',
+      sourceOrigin: fileName,
+      rowCount: sheet.rows.length,
+      createdAt: now,
+      updatedAt: now,
+      isReadonly: false,
+    );
+
+    await AiGridDynamicStorage.saveDatasource(
+      descriptor: descriptor,
+      model: dynamicModel,
+      rows: sheet.rows,
+    );
+
+    controller.loadDynamicDatasource(
+      descriptor,
+      sheet.columns.map((c) => c.toAiGridColumn()).toList(),
+      sheet.rows,
+    );
+
+    return MCPToolResult(
+      content: [
+        MCPContent(
+          type: 'text',
+          text: jsonEncode({
+            'status': 'success',
+            'message':
+                'Successfully imported worksheet "${sheet.name}" ($fileName) into AI Grid.',
+            'activeDatasource': dsName,
+            'sheet': sheet.name,
+            'rowCount': sheet.rows.length,
+            'columnCount': sheet.columns.length,
+            'columns': sheet.columns
+                .map((c) => '${c.title} (${c.type.name})')
+                .toList(),
+            'availableSheets': workbook.sheets.map((s) => s.name).toList(),
+          }),
+        ),
+      ],
+    );
   }
 }
 
@@ -1805,50 +2008,50 @@ class GridSetConditionalFormatTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'field': {
-            'type': 'string',
-            'description': 'Column field name to format, or "*" to highlight the full row.',
-          },
-          'format_type': {
-            'type': 'string',
-            'enum': ['data_bar', 'highlight', 'color_scale'],
-            'description': 'Type of conditional format: "data_bar", "highlight", or "color_scale".',
-          },
-          'operator': {
-            'type': 'string',
-            'description': 'Comparison operator for highlights: ">", "<", ">=", "<=", "==", "!=", "between", "contains".',
-          },
-          'value': {
-            'description': 'Target value for comparison.',
-          },
-          'secondary_value': {
-            'description': 'Secondary value for "between" operator.',
-          },
-          'color': {
-            'type': 'string',
-            'description': 'Hex color code or name (e.g. "#4CAF50", "green", "red", "blue") for bar or highlight.',
-          },
-          'negative_color': {
-            'type': 'string',
-            'description': 'Color for negative data bars.',
-          },
-          'text_color': {
-            'type': 'string',
-            'description': 'Color for cell text in highlights.',
-          },
-          'bold': {
-            'type': 'boolean',
-            'description': 'Whether text should be bold in highlights.',
-          },
-          'apply_to_row': {
-            'type': 'boolean',
-            'description': 'Whether highlight background color applies to the entire row.',
-          },
-        },
-        'required': ['field', 'format_type'],
-      };
+    'type': 'object',
+    'properties': {
+      'field': {
+        'type': 'string',
+        'description':
+            'Column field name to format, or "*" to highlight the full row.',
+      },
+      'format_type': {
+        'type': 'string',
+        'enum': ['data_bar', 'highlight', 'color_scale'],
+        'description': 'Type of conditional format: "data_bar", "highlight", or "color_scale".',
+      },
+      'operator': {
+        'type': 'string',
+        'description': 'Comparison operator for highlights: ">", "<", ">=", "<=", "==", "!=", "between", "contains".',
+      },
+      'value': {'description': 'Target value for comparison.'},
+      'secondary_value': {
+        'description': 'Secondary value for "between" operator.',
+      },
+      'color': {
+        'type': 'string',
+        'description': 'Hex color code or name (e.g. "#4CAF50", "green", "red", "blue") for bar or highlight.',
+      },
+      'negative_color': {
+        'type': 'string',
+        'description': 'Color for negative data bars.',
+      },
+      'text_color': {
+        'type': 'string',
+        'description': 'Color for cell text in highlights.',
+      },
+      'bold': {
+        'type': 'boolean',
+        'description': 'Whether text should be bold in highlights.',
+      },
+      'apply_to_row': {
+        'type': 'boolean',
+        'description':
+            'Whether highlight background color applies to the entire row.',
+      },
+    },
+    'required': ['field', 'format_type'],
+  };
 
   Color? _parseColor(String? input) {
     if (input == null || input.isEmpty) return null;
@@ -1879,7 +2082,9 @@ class GridSetConditionalFormatTool extends McpLocalTool {
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final field = arguments['field']?.toString().trim() ?? '';
-    final typeStr = arguments['format_type']?.toString().toLowerCase().trim() ?? 'highlight';
+    final typeStr =
+        arguments['format_type']?.toString().toLowerCase().trim() ??
+        'highlight';
 
     if (field.isEmpty) {
       return MCPToolResult.error('Field parameter is required.');
@@ -1901,8 +2106,12 @@ class GridSetConditionalFormatTool extends McpLocalTool {
     } else if (typeStr == 'color_scale') {
       format = AiGridConditionalFormat.colorScale(
         field: field,
-        minColor: _parseColor(arguments['min_color']?.toString()) ?? const Color(0xFFE53935),
-        maxColor: _parseColor(arguments['max_color']?.toString()) ?? const Color(0xFF43A047),
+        minColor:
+            _parseColor(arguments['min_color']?.toString()) ??
+            const Color(0xFFE53935),
+        maxColor:
+            _parseColor(arguments['max_color']?.toString()) ??
+            const Color(0xFF43A047),
       );
     } else {
       final op = arguments['operator']?.toString() ?? '>';
@@ -1921,7 +2130,9 @@ class GridSetConditionalFormatTool extends McpLocalTool {
     }
 
     controller.addConditionalFormat(format);
-    return MCPToolResult.text('Successfully applied conditional format ($typeStr) to "$field".');
+    return MCPToolResult.text(
+      'Successfully applied conditional format ($typeStr) to "$field".',
+    );
   }
 }
 
@@ -1939,21 +2150,23 @@ class GridClearConditionalFormatsTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'field': {
-            'type': 'string',
-            'description': 'Optional field name to clear rules for. If omitted, clears all rules.',
-          },
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'field': {
+        'type': 'string',
+        'description': 'Optional field name to clear rules for. If omitted, clears all rules.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final field = arguments['field']?.toString().trim();
     if (field != null && field.isNotEmpty) {
       controller.clearConditionalFormats(field);
-      return MCPToolResult.text('Cleared conditional formatting for column "$field".');
+      return MCPToolResult.text(
+        'Cleared conditional formatting for column "$field".',
+      );
     } else {
       controller.clearConditionalFormats();
       return MCPToolResult.text('Cleared all conditional formatting.');
@@ -1975,33 +2188,34 @@ class GridGetSelectedRangeTool extends McpLocalTool {
       'Retrieves the currently selected rectangular cell range coordinates, dimensions, and computed statistics (count, sum, average, min, max).';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final range = controller.selectedCellRange;
     if (range == null) {
-      return MCPToolResult.text(jsonEncode({
-        'hasSelection': false,
-        'message': 'No cell range is currently selected.',
-      }));
+      return MCPToolResult.text(
+        jsonEncode({
+          'hasSelection': false,
+          'message': 'No cell range is currently selected.',
+        }),
+      );
     }
 
     final summary = controller.calculateSelectedRangeSummary();
-    return MCPToolResult.text(jsonEncode({
-      'hasSelection': true,
-      'anchorRow': range.anchorRow,
-      'anchorColumn': range.anchorColumnId,
-      'extentRow': range.extentRow,
-      'extentColumn': range.extentColumnId,
-      'firstRow': range.firstRow,
-      'lastRow': range.lastRow,
-      'isSingleCell': range.isSingleCell,
-      'summary': summary?.toJson(),
-    }));
+    return MCPToolResult.text(
+      jsonEncode({
+        'hasSelection': true,
+        'anchorRow': range.anchorRow,
+        'anchorColumn': range.anchorColumnId,
+        'extentRow': range.extentRow,
+        'extentColumn': range.extentColumnId,
+        'firstRow': range.firstRow,
+        'lastRow': range.lastRow,
+        'isSingleCell': range.isSingleCell,
+        'summary': summary?.toJson(),
+      }),
+    );
   }
 }
 
@@ -2020,50 +2234,45 @@ class GridSelectRangeTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'field': {
-            'type': 'string',
-            'description':
-                'Target column field name or title to evaluate (e.g. "urgency", "margin", "profit", "sales").',
-          },
-          'condition': {
-            'type': 'string',
-            'description':
-                'Selection criterion: "lowest", "highest", "lessThan", "greaterThan", "negative", "equals", "contains", or "all".',
-          },
-          'targetValue': {
-            'description':
-                'Target threshold or category value for criteria (can be a number like 0.20 or a string like "Critical", "P1", "Positive").',
-          },
-          'entireRow': {
-            'type': 'boolean',
-            'description':
-                'Whether to select all columns across the matching rows rather than just the target column.',
-          },
-          'count': {
-            'type': 'integer',
-            'description':
-                'Optional number of cells/rows to select (e.g. 3, 5). Defaults to 3 or matching count.',
-          },
-          'startRow': {
-            'type': 'integer',
-            'description': '0-indexed starting row index for coordinate selection.',
-          },
-          'startColumn': {
-            'type': 'string',
-            'description': 'Starting column field name for coordinate selection.',
-          },
-          'endRow': {
-            'type': 'integer',
-            'description': '0-indexed ending row index for coordinate selection.',
-          },
-          'endColumn': {
-            'type': 'string',
-            'description': 'Ending column field name for coordinate selection.',
-          },
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'field': {
+        'type': 'string',
+        'description': 'Target column field name or title to evaluate (e.g. "urgency", "margin", "profit", "sales").',
+      },
+      'condition': {
+        'type': 'string',
+        'description': 'Selection criterion: "lowest", "highest", "lessThan", "greaterThan", "negative", "equals", "contains", or "all".',
+      },
+      'targetValue': {
+        'description': 'Target threshold or category value for criteria (can be a number like 0.20 or a string like "Critical", "P1", "Positive").',
+      },
+      'entireRow': {
+        'type': 'boolean',
+        'description': 'Whether to select all columns across the matching rows rather than just the target column.',
+      },
+      'count': {
+        'type': 'integer',
+        'description': 'Optional number of cells/rows to select (e.g. 3, 5). Defaults to 3 or matching count.',
+      },
+      'startRow': {
+        'type': 'integer',
+        'description': '0-indexed starting row index for coordinate selection.',
+      },
+      'startColumn': {
+        'type': 'string',
+        'description': 'Starting column field name for coordinate selection.',
+      },
+      'endRow': {
+        'type': 'integer',
+        'description': '0-indexed ending row index for coordinate selection.',
+      },
+      'endColumn': {
+        'type': 'string',
+        'description': 'Ending column field name for coordinate selection.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -2091,17 +2300,19 @@ class GridSelectRangeTool extends McpLocalTool {
       );
 
       final summary = controller.calculateSelectedRangeSummary();
-      return MCPToolResult.text(jsonEncode({
-        'status': 'selected',
-        'mode': 'coordinates',
-        'anchorRow': startRow,
-        'anchorColumn': startColumn,
-        'extentRow': endRow,
-        'extentColumn': endColumn,
-        'summary': summary?.toJson(),
-        'message':
-            'Selected cells from ($startRow, $startColumn) to ($endRow, $endColumn).',
-      }));
+      return MCPToolResult.text(
+        jsonEncode({
+          'status': 'selected',
+          'mode': 'coordinates',
+          'anchorRow': startRow,
+          'anchorColumn': startColumn,
+          'extentRow': endRow,
+          'extentColumn': endColumn,
+          'summary': summary?.toJson(),
+          'message':
+              'Selected cells from ($startRow, $startColumn) to ($endRow, $endColumn).',
+        }),
+      );
     }
 
     // 2. Semantic query mode (e.g. "select all Critical urgency tickets" or "select low margin cells"):
@@ -2111,13 +2322,18 @@ class GridSelectRangeTool extends McpLocalTool {
     final rawTarget = arguments['targetValue'];
     final num? targetNum = (rawTarget is num)
         ? rawTarget
-        : num.tryParse(rawTarget?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '');
-    final String? targetString = (rawTarget != null) ? rawTarget.toString().trim() : null;
+        : num.tryParse(
+            rawTarget?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '',
+          );
+    final String? targetString = (rawTarget != null)
+        ? rawTarget.toString().trim()
+        : null;
     final rawCount = arguments['count'];
     final count = (rawCount is num)
         ? rawCount.toInt()
         : int.tryParse(rawCount?.toString() ?? '');
-    final bool entireRow = arguments['entireRow'] == true ||
+    final bool entireRow =
+        arguments['entireRow'] == true ||
         arguments['entireRow']?.toString().toLowerCase() == 'true' ||
         arguments['allColumns'] == true;
 
@@ -2133,16 +2349,20 @@ class GridSelectRangeTool extends McpLocalTool {
         }
       }
     }
-    targetCol ??= controller.columns
-        .where((c) =>
-            c.type == AiGridColumnType.number ||
-            c.type == AiGridColumnType.currency)
-        .firstOrNull ??
+    targetCol ??=
+        controller.columns
+            .where(
+              (c) =>
+                  c.type == AiGridColumnType.number ||
+                  c.type == AiGridColumnType.currency,
+            )
+            .firstOrNull ??
         (controller.columns.isNotEmpty ? controller.columns.first : null);
 
     if (targetCol == null || controller.rows.isEmpty) {
       return MCPToolResult.error(
-          'No rows or valid column found to select cells.');
+        'No rows or valid column found to select cells.',
+      );
     }
 
     final totalRows = controller.rows.length;
@@ -2156,17 +2376,20 @@ class GridSelectRangeTool extends McpLocalTool {
         extentColumn: lastCol,
       );
       final summary = controller.calculateSelectedRangeSummary();
-      return MCPToolResult.text(jsonEncode({
-        'status': 'selected',
-        'mode': 'all',
-        'rowCount': totalRows,
-        'summary': summary?.toJson(),
-        'message': 'Selected all cells across $totalRows rows.',
-      }));
+      return MCPToolResult.text(
+        jsonEncode({
+          'status': 'selected',
+          'mode': 'all',
+          'rowCount': totalRows,
+          'summary': summary?.toJson(),
+          'message': 'Selected all cells across $totalRows rows.',
+        }),
+      );
     }
 
     // 2a. Text / Categorical matching (e.g. "Critical", "P1 (Critical)", "Positive", "Refund"):
-    final bool isTextCondition = targetString != null &&
+    final bool isTextCondition =
+        targetString != null &&
         targetString.isNotEmpty &&
         (targetNum == null || condition == 'equals' || condition == 'contains');
 
@@ -2201,21 +2424,24 @@ class GridSelectRangeTool extends McpLocalTool {
       );
 
       final summary = controller.calculateSelectedRangeSummary();
-      return MCPToolResult.text(jsonEncode({
-        'status': 'selected',
-        'mode': 'categorical',
-        'field': targetCol.field,
-        'columnTitle': targetCol.title,
-        'targetValue': targetString,
-        'selectedCount': extentRow + 1,
-        'summary': summary?.toJson(),
-        'message':
-            'Selected ${extentRow + 1} rows matching "$targetString" in "${targetCol.title}".',
-      }));
+      return MCPToolResult.text(
+        jsonEncode({
+          'status': 'selected',
+          'mode': 'categorical',
+          'field': targetCol.field,
+          'columnTitle': targetCol.title,
+          'targetValue': targetString,
+          'selectedCount': extentRow + 1,
+          'summary': summary?.toJson(),
+          'message':
+              'Selected ${extentRow + 1} rows matching "$targetString" in "${targetCol.title}".',
+        }),
+      );
     }
 
     // 2b. Numeric condition matching (e.g. "lowest", "highest", "lessThan", "greaterThan"):
-    final bool isDescending = (condition == 'highest' ||
+    final bool isDescending =
+        (condition == 'highest' ||
         condition == 'greaterthan' ||
         condition == 'top');
 
@@ -2231,7 +2457,9 @@ class GridSelectRangeTool extends McpLocalTool {
         final val = row[targetCol.field];
         final num? nVal = (val is num)
             ? val
-            : num.tryParse(val?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '');
+            : num.tryParse(
+                val?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '',
+              );
         if (nVal != null) {
           if (condition == 'lessthan' && nVal < targetValue) matching++;
           if (condition == 'greaterthan' && nVal > targetValue) matching++;
@@ -2247,7 +2475,9 @@ class GridSelectRangeTool extends McpLocalTool {
         final val = row[targetCol.field];
         final num? nVal = (val is num)
             ? val
-            : num.tryParse(val?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '');
+            : num.tryParse(
+                val?.toString().replaceAll(RegExp(r'[^0-9.-]'), '') ?? '',
+              );
         if (nVal != null && nVal < 0) matching++;
       }
       if (matching > 0) {
@@ -2271,17 +2501,19 @@ class GridSelectRangeTool extends McpLocalTool {
     );
 
     final summary = controller.calculateSelectedRangeSummary();
-    return MCPToolResult.text(jsonEncode({
-      'status': 'selected',
-      'mode': 'semantic',
-      'field': targetCol.field,
-      'columnTitle': targetCol.title,
-      'condition': condition,
-      'selectedCellsCount': (extentRow + 1),
-      'summary': summary?.toJson(),
-      'message':
-          'Selected ${extentRow + 1} ${isDescending ? "highest" : "lowest"} cells in "${targetCol.title}". Selection stats: Count: ${summary?.cellCount}, Sum: ${summary?.sum}, Avg: ${summary?.average}, Min: ${summary?.min}, Max: ${summary?.max}.',
-    }));
+    return MCPToolResult.text(
+      jsonEncode({
+        'status': 'selected',
+        'mode': 'semantic',
+        'field': targetCol.field,
+        'columnTitle': targetCol.title,
+        'condition': condition,
+        'selectedCellsCount': (extentRow + 1),
+        'summary': summary?.toJson(),
+        'message':
+            'Selected ${extentRow + 1} ${isDescending ? "highest" : "lowest"} cells in "${targetCol.title}". Selection stats: Count: ${summary?.cellCount}, Sum: ${summary?.sum}, Avg: ${summary?.average}, Min: ${summary?.min}, Max: ${summary?.max}.',
+      }),
+    );
   }
 }
 
@@ -2299,37 +2531,32 @@ class GridAddSmartColumnTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'required': ['field', 'title', 'promptTemplate'],
-        'properties': {
-          'field': {
-            'type': 'string',
-            'description':
-                'Unique identifier for the new smart column (e.g. "sentiment", "urgency").',
-          },
-          'title': {
-            'type': 'string',
-            'description':
-                'Display header title for the column (e.g. "AI Sentiment", "Urgency").',
-          },
-          'promptTemplate': {
-            'type': 'string',
-            'description':
-                'Prompt template with {fieldName} interpolation placeholders (e.g. "Classify sentiment of \'{feedback}\' into Positive, Neutral, or Negative").',
-          },
-          'options': {
-            'type': 'array',
-            'items': {'type': 'string'},
-            'description':
-                'Optional list of discrete allowed option values (e.g. ["Positive", "Neutral", "Negative"]).',
-          },
-          'autoRun': {
-            'type': 'boolean',
-            'description':
-                'Whether to immediately trigger LLM evaluation across all rows (default: true).',
-          },
-        },
-      };
+    'type': 'object',
+    'required': ['field', 'title', 'promptTemplate'],
+    'properties': {
+      'field': {
+        'type': 'string',
+        'description': 'Unique identifier for the new smart column (e.g. "sentiment", "urgency").',
+      },
+      'title': {
+        'type': 'string',
+        'description': 'Display header title for the column (e.g. "AI Sentiment", "Urgency").',
+      },
+      'promptTemplate': {
+        'type': 'string',
+        'description': 'Prompt template with {fieldName} interpolation placeholders (e.g. "Classify sentiment of \'{feedback}\' into Positive, Neutral, or Negative").',
+      },
+      'options': {
+        'type': 'array',
+        'items': {'type': 'string'},
+        'description': 'Optional list of discrete allowed option values (e.g. ["Positive", "Neutral", "Negative"]).',
+      },
+      'autoRun': {
+        'type': 'boolean',
+        'description': 'Whether to immediately trigger LLM evaluation across all rows (default: true).',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -2345,13 +2572,15 @@ class GridAddSmartColumnTool extends McpLocalTool {
         promptTemplate == null ||
         promptTemplate.isEmpty) {
       return MCPToolResult.error(
-          'Parameters "field", "title", and "promptTemplate" are required.');
+        'Parameters "field", "title", and "promptTemplate" are required.',
+      );
     }
 
     List<String>? options;
     if (arguments['options'] is List) {
-      options =
-          (arguments['options'] as List).map((e) => e.toString()).toList();
+      options = (arguments['options'] as List)
+          .map((e) => e.toString())
+          .toList();
     }
 
     final smartCol = AiGridSmartColumn(
@@ -2364,16 +2593,18 @@ class GridAddSmartColumnTool extends McpLocalTool {
 
     controller.addSmartColumn(smartCol, autoRun: autoRun);
 
-    return MCPToolResult.text(jsonEncode({
-      'status': 'added',
-      'field': field,
-      'title': title,
-      'promptTemplate': promptTemplate,
-      'options': options,
-      'autoRun': autoRun,
-      'message':
-          'Successfully added AI Smart Column "$title" ($field). Evaluation initiated.',
-    }));
+    return MCPToolResult.text(
+      jsonEncode({
+        'status': 'added',
+        'field': field,
+        'title': title,
+        'promptTemplate': promptTemplate,
+        'options': options,
+        'autoRun': autoRun,
+        'message':
+            'Successfully added AI Smart Column "$title" ($field). Evaluation initiated.',
+      }),
+    );
   }
 }
 
@@ -2391,20 +2622,18 @@ class GridRunSmartColumnsTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'field': {
-            'type': 'string',
-            'description':
-                'Optional field name to run. If omitted, all smart columns are evaluated.',
-          },
-          'force': {
-            'type': 'boolean',
-            'description':
-                'Whether to re-evaluate cells that already have generated values (default: false).',
-          },
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'field': {
+        'type': 'string',
+        'description': 'Optional field name to run. If omitted, all smart columns are evaluated.',
+      },
+      'force': {
+        'type': 'boolean',
+        'description': 'Whether to re-evaluate cells that already have generated values (default: false).',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
@@ -2413,18 +2642,21 @@ class GridRunSmartColumnsTool extends McpLocalTool {
 
     if (controller.smartColumns.isEmpty) {
       return MCPToolResult.error(
-          'No AI Smart Columns found in the current DataGrid.');
+        'No AI Smart Columns found in the current DataGrid.',
+      );
     }
 
     await controller.runSmartColumns(field: field, force: force);
 
-    return MCPToolResult.text(jsonEncode({
-      'status': 'completed',
-      'targetField': field ?? 'all',
-      'force': force,
-      'smartColumnsCount': controller.smartColumns.length,
-      'message': 'Completed AI smart column evaluation across all rows.',
-    }));
+    return MCPToolResult.text(
+      jsonEncode({
+        'status': 'completed',
+        'targetField': field ?? 'all',
+        'force': force,
+        'smartColumnsCount': controller.smartColumns.length,
+        'message': 'Completed AI smart column evaluation across all rows.',
+      }),
+    );
   }
 }
 
@@ -2442,31 +2674,31 @@ class GridToggleRowDetailTool extends McpLocalTool {
 
   @override
   Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {
-          'rowIndex': {
-            'type': 'integer',
-            'description':
-                '0-based row index in the active grid view to expand/collapse.',
-          },
-          'rowKey': {
-            'type': 'string',
-            'description':
-                'Unique row key or ID (e.g. "CA-2016-152156") of the record.',
-          },
-          'expand': {
-            'type': 'boolean',
-            'description':
-                'Optional explicit target state. If true, expands; if false, collapses; if omitted, toggles.',
-          },
-        },
-      };
+    'type': 'object',
+    'properties': {
+      'rowIndex': {
+        'type': 'integer',
+        'description':
+            '0-based row index in the active grid view to expand/collapse.',
+      },
+      'rowKey': {
+        'type': 'string',
+        'description':
+            'Unique row key or ID (e.g. "CA-2016-152156") of the record.',
+      },
+      'expand': {
+        'type': 'boolean',
+        'description': 'Optional explicit target state. If true, expands; if false, collapses; if omitted, toggles.',
+      },
+    },
+  };
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     if (!controller.isMasterDetailEnabled) {
       return MCPToolResult.error(
-          'Master-detail child rows are not enabled on this DataGrid.');
+        'Master-detail child rows are not enabled on this DataGrid.',
+      );
     }
 
     final rowIndex = arguments['rowIndex'] as int?;
@@ -2480,11 +2712,14 @@ class GridToggleRowDetailTool extends McpLocalTool {
       final rows = controller.fitController?.data.view ?? [];
       if (rowIndex < 0 || rowIndex >= rows.length) {
         return MCPToolResult.error(
-            'Row index $rowIndex is out of range (0 to ${rows.length - 1}).');
+          'Row index $rowIndex is out of range (0 to ${rows.length - 1}).',
+        );
       }
       targetKey = controller.resolveRowKey(rows[rowIndex]);
     } else {
-      return MCPToolResult.error('Either "rowIndex" or "rowKey" must be provided.');
+      return MCPToolResult.error(
+        'Either "rowIndex" or "rowKey" must be provided.',
+      );
     }
 
     if (targetKey == null) {
@@ -2503,14 +2738,16 @@ class GridToggleRowDetailTool extends McpLocalTool {
 
     final isNowExpanded = controller.isRowExpanded(effectiveKey);
 
-    return MCPToolResult.text(jsonEncode({
-      'targetKey': targetKey.toString(),
-      'wasExpanded': wasExpanded,
-      'isNowExpanded': isNowExpanded,
-      'totalExpanded': controller.expandedDetailCount,
-      'message':
-          'Row "$targetKey" detail panel is now ${isNowExpanded ? "expanded" : "collapsed"}.',
-    }));
+    return MCPToolResult.text(
+      jsonEncode({
+        'targetKey': targetKey.toString(),
+        'wasExpanded': wasExpanded,
+        'isNowExpanded': isNowExpanded,
+        'totalExpanded': controller.expandedDetailCount,
+        'message':
+            'Row "$targetKey" detail panel is now ${isNowExpanded ? "expanded" : "collapsed"}.',
+      }),
+    );
   }
 }
 
@@ -2527,30 +2764,31 @@ class GridExpandAllDetailsTool extends McpLocalTool {
       'Expands all master-detail child panels across visible rows in the grid (unless accordion mode is enabled).';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     if (!controller.isMasterDetailEnabled) {
       return MCPToolResult.error(
-          'Master-detail child rows are not enabled on this DataGrid.');
+        'Master-detail child rows are not enabled on this DataGrid.',
+      );
     }
     if (controller.masterDetailOptions?.autoCollapseOthers == true) {
       return MCPToolResult.error(
-          'Cannot expand all rows because accordion mode (autoCollapseOthers) is active.');
+        'Cannot expand all rows because accordion mode (autoCollapseOthers) is active.',
+      );
     }
 
     controller.expandAllDetails();
 
-    return MCPToolResult.text(jsonEncode({
-      'status': 'expanded_all',
-      'totalExpanded': controller.expandedDetailCount,
-      'message':
-          'Successfully expanded ${controller.expandedDetailCount} row detail panels.',
-    }));
+    return MCPToolResult.text(
+      jsonEncode({
+        'status': 'expanded_all',
+        'totalExpanded': controller.expandedDetailCount,
+        'message':
+            'Successfully expanded ${controller.expandedDetailCount} row detail panels.',
+      }),
+    );
   }
 }
 
@@ -2567,27 +2805,27 @@ class GridCollapseAllDetailsTool extends McpLocalTool {
       'Collapses all currently open master-detail child panels in the DataGrid.';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     if (!controller.isMasterDetailEnabled) {
       return MCPToolResult.error(
-          'Master-detail child rows are not enabled on this DataGrid.');
+        'Master-detail child rows are not enabled on this DataGrid.',
+      );
     }
 
     final prevCount = controller.expandedDetailCount;
     controller.collapseAllDetails();
 
-    return MCPToolResult.text(jsonEncode({
-      'status': 'collapsed_all',
-      'previouslyExpanded': prevCount,
-      'totalExpanded': 0,
-      'message': 'Successfully collapsed all ($prevCount) row detail panels.',
-    }));
+    return MCPToolResult.text(
+      jsonEncode({
+        'status': 'collapsed_all',
+        'previouslyExpanded': prevCount,
+        'totalExpanded': 0,
+        'message': 'Successfully collapsed all ($prevCount) row detail panels.',
+      }),
+    );
   }
 }
 
@@ -2604,27 +2842,154 @@ class GridGetDetailStatusTool extends McpLocalTool {
       'Returns the current master-detail configuration, whether child rows are enabled, and the list of currently expanded row keys.';
 
   @override
-  Map<String, dynamic> get inputSchema => {
-        'type': 'object',
-        'properties': {},
-      };
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
 
   @override
   Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
     final isEnabled = controller.isMasterDetailEnabled;
     final opts = controller.masterDetailOptions;
-    final expanded = controller.expandedDetailKeys.map((k) => k.toString()).toList();
+    final expanded = controller.expandedDetailKeys
+        .map((k) => k.toString())
+        .toList();
 
-    return MCPToolResult.text(jsonEncode({
-      'enabled': isEnabled,
-      'autoCollapseOthers': opts?.autoCollapseOthers ?? false,
-      'detailRowHeight': opts?.detailRowHeight ?? 240.0,
-      'expandedCount': expanded.length,
-      'expandedKeys': expanded,
-    }));
+    return MCPToolResult.text(
+      jsonEncode({
+        'enabled': isEnabled,
+        'autoCollapseOthers': opts?.autoCollapseOthers ?? false,
+        'detailRowHeight': opts?.detailRowHeight ?? 240.0,
+        'expandedCount': expanded.length,
+        'expandedKeys': expanded,
+      }),
+    );
   }
 }
 
+/// Tool performing comprehensive data quality auditing on the active dataset.
+class GridAuditDataTool extends McpLocalTool {
+  final AiGridController controller;
+  GridAuditDataTool(this.controller);
 
+  @override
+  String get name => 'grid_audit_data';
 
+  @override
+  String get description =>
+      'Performs an automated data quality audit across all grid rows and columns, detecting duplicates, missing values, dirty numbers, mixed date formats, inconsistent whitespace, and statistical outliers. Returns an overall health score (0-100) and actionable remediation proposals.';
 
+  @override
+  Map<String, dynamic> get inputSchema => {'type': 'object', 'properties': {}};
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final report = controller.auditData();
+    return MCPToolResult.text(jsonEncode(report.toJson()));
+  }
+}
+
+/// Tool applying automated data cleaning transformations to resolve detected anomalies.
+class GridApplyDataCleanseTool extends McpLocalTool {
+  final AiGridController controller;
+  GridApplyDataCleanseTool(this.controller);
+
+  @override
+  String get name => 'grid_apply_data_cleanse';
+
+  @override
+  String get description =>
+      'Applies automated data cleaning transformations to resolve detected quality anomalies (e.g. clean_all, remove_duplicates, clean_numbers, standardize_dates, trim_whitespace, impute_missing, cap_outliers).';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+    'type': 'object',
+    'properties': {
+      'action': {
+        'type': 'string',
+        'enum': [
+          'clean_all',
+          'remove_duplicates',
+          'clean_numbers',
+          'standardize_dates',
+          'trim_whitespace',
+          'impute_missing',
+          'cap_outliers',
+        ],
+        'description': 'The data cleansing action to execute.',
+      },
+      'field': {
+        'type': 'string',
+        'description': 'Target column field name for column-specific actions.',
+      },
+      'impute_strategy': {
+        'type': 'string',
+        'enum': ['median', 'mean', 'mode', 'zero', 'empty', 'constant'],
+        'description': 'Imputation strategy when action is impute_missing.',
+      },
+      'constant_value': {
+        'description': 'Value to fill when impute_strategy is constant.',
+      },
+    },
+    'required': ['action'],
+  };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final rawAction =
+        arguments['action']?.toString().toLowerCase().trim() ?? '';
+    final field = arguments['field']?.toString().trim();
+
+    if (rawAction == 'clean_all') {
+      final res = controller.cleanAllData();
+      return MCPToolResult.text(jsonEncode(res.toJson()));
+    }
+
+    AiGridCleanseAction action;
+    switch (rawAction) {
+      case 'remove_duplicates':
+        action = AiGridCleanseAction.removeDuplicates;
+        break;
+      case 'clean_numbers':
+        action = AiGridCleanseAction.cleanNumbers;
+        break;
+      case 'standardize_dates':
+        action = AiGridCleanseAction.standardizeDates;
+        break;
+      case 'trim_whitespace':
+        action = AiGridCleanseAction.trimWhitespace;
+        break;
+      case 'impute_missing':
+        action = AiGridCleanseAction.imputeMissing;
+        break;
+      case 'cap_outliers':
+        action = AiGridCleanseAction.capOutliers;
+        break;
+      default:
+        return MCPToolResult.error('Unrecognized action "$rawAction".');
+    }
+
+    AiGridImputeStrategy? imputeStrategy;
+    if (arguments['impute_strategy'] != null) {
+      final stratStr = arguments['impute_strategy']
+          .toString()
+          .toLowerCase()
+          .trim();
+      for (final s in AiGridImputeStrategy.values) {
+        if (s.name.toLowerCase() == stratStr) {
+          imputeStrategy = s;
+          break;
+        }
+      }
+    }
+
+    final remediation = AiGridAuditRemediation(
+      action: action,
+      label: 'Execute $rawAction',
+      description: 'Applied $rawAction cleanse',
+      field: field,
+      imputeStrategy: imputeStrategy,
+      constantValue: arguments['constant_value'],
+    );
+
+    final res = controller.cleanData(remediation);
+    return MCPToolResult.text(jsonEncode(res.toJson()));
+  }
+}

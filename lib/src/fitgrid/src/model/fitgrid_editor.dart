@@ -34,8 +34,10 @@ typedef FitGridCellCommit<T> = void Function(T row, int rowIndex, String value);
 /// Use it for a dropdown, a date picker, a stepper — anything whose editing
 /// affordance is not a line of text. [commit] ends the edit with a value,
 /// [cancel] abandons it; call one of them or the editor stays open.
-typedef FitGridEditorBuilder<T> =
-    Widget Function(BuildContext context, FitGridEditorSession<T> session);
+typedef FitGridEditorBuilder<T> = Widget Function(
+  BuildContext context,
+  FitGridEditorSession<T> session,
+);
 
 /// Everything a custom editor needs to do its job.
 @immutable

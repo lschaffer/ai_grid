@@ -1,8 +1,11 @@
 import 'dart:convert';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:ai_grid/ai_grid.dart';
+
 import '../dynamic_ai_grid_example.dart';
+
 class SuperstoreGridPage extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
@@ -58,7 +61,9 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Order ${row['OrderID'] ?? ''} saved successfully!'),
+              content: Text(
+                'Order ${row['OrderID'] ?? ''} saved successfully!',
+              ),
               duration: const Duration(seconds: 2),
               behavior: SnackBarBehavior.floating,
               backgroundColor: Colors.green.shade700,
@@ -84,68 +89,77 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
 
   Future<void> _loadSuperstoreJson() async {
     try {
-      final jsonString =
-          await rootBundle.loadString('assets/superstore_sales_1000.json');
+      final jsonString = await rootBundle.loadString(
+        'assets/superstore_sales_1000.json',
+      );
       final List<dynamic> decoded = jsonDecode(jsonString);
       final records = decoded.cast<Map<String, dynamic>>();
 
       // Extract distinct sorted values for select/dropdown fields
-      final shipModes = records
-          .map((r) => r['ShipMode']?.toString())
-          .whereType<String>()
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-      final segments = records
-          .map((r) => r['Segment']?.toString())
-          .whereType<String>()
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-      final countries = records
-          .map((r) => r['Country']?.toString())
-          .whereType<String>()
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-      final cities = records
-          .map((r) => r['City']?.toString())
-          .whereType<String>()
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-      final states = records
-          .map((r) => r['State']?.toString())
-          .whereType<String>()
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-      final regions = records
-          .map((r) => r['Region']?.toString())
-          .whereType<String>()
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-      final categories = records
-          .map((r) => r['Category']?.toString())
-          .whereType<String>()
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-      final subCategories = records
-          .map((r) => r['SubCategory']?.toString())
-          .whereType<String>()
-          .where((s) => s.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
+      final shipModes =
+          records
+              .map((r) => r['ShipMode']?.toString())
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final segments =
+          records
+              .map((r) => r['Segment']?.toString())
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final countries =
+          records
+              .map((r) => r['Country']?.toString())
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final cities =
+          records
+              .map((r) => r['City']?.toString())
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final states =
+          records
+              .map((r) => r['State']?.toString())
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final regions =
+          records
+              .map((r) => r['Region']?.toString())
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final categories =
+          records
+              .map((r) => r['Category']?.toString())
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
+      final subCategories =
+          records
+              .map((r) => r['SubCategory']?.toString())
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
 
       final columns = [
         const AiGridColumn(
@@ -325,10 +339,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
         ),
       ];
 
-      final ds = LocalAiGridDataSource(
-        columns: columns,
-        initialData: records,
-      );
+      final ds = LocalAiGridDataSource(columns: columns, initialData: records);
 
       if (mounted) {
         setState(() {
@@ -398,7 +409,9 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
   }
 
   void _showRestoreSettingsDialog() {
-    final textController = TextEditingController(text: _controller.exportSettingsJson());
+    final textController = TextEditingController(
+      text: _controller.exportSettingsJson(),
+    );
     final isMobile = MediaQuery.sizeOf(context).width < 600;
 
     showDialog(
@@ -448,9 +461,14 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                         controller: textController,
                         maxLines: null,
                         expands: true,
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
                         decoration: InputDecoration(
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           filled: true,
                         ),
                       ),
@@ -480,7 +498,9 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   maxLines: 10,
                   style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                   decoration: InputDecoration(
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     filled: true,
                   ),
                 ),
@@ -568,111 +588,143 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
             }
 
             final contentBody = events.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.history_outlined,
+                          size: 48,
+                          color: colorScheme.outlineVariant,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No editing events recorded yet',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Edit a row, change cell values, or delete/add records to see live event logs here.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.outline,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: events.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final event = events[index];
+                      final actionColor = getActionColor(event.action);
+                      final timeStr =
+                          '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}';
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 4,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.history_outlined, size: 48, color: colorScheme.outlineVariant),
-                            const SizedBox(height: 12),
-                            Text(
-                              'No editing events recorded yet',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: actionColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: actionColor.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    getActionIcon(event.action),
+                                    size: 12,
+                                    color: actionColor,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    event.action.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: actionColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    event.message,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (event.data != null &&
+                                      event.data!.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme
+                                            .surfaceContainerHighest
+                                            .withValues(alpha: 0.4),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        event.data!.entries
+                                            .take(4)
+                                            .map((e) => '${e.key}: ${e.value}')
+                                            .join(' â€¢ '),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontFamily: 'monospace',
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Text(
-                              'Edit a row, change cell values, or delete/add records to see live event logs here.',
-                              style: TextStyle(fontSize: 12, color: colorScheme.outline),
-                              textAlign: TextAlign.center,
+                              timeStr,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colorScheme.outline,
+                                fontFamily: 'monospace',
+                              ),
                             ),
                           ],
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: events.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final event = events[index];
-                          final actionColor = getActionColor(event.action);
-                          final timeStr =
-                              '${event.timestamp.hour.toString().padLeft(2, '0')}:${event.timestamp.minute.toString().padLeft(2, '0')}:${event.timestamp.second.toString().padLeft(2, '0')}';
-
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: actionColor.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: actionColor.withValues(alpha: 0.4)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(getActionIcon(event.action), size: 12, color: actionColor),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        event.action.toUpperCase(),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: actionColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        event.message,
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                      ),
-                                      if (event.data != null && event.data!.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            event.data!.entries
-                                                .take(4)
-                                                .map((e) => '${e.key}: ${e.value}')
-                                                .join(' â€¢ '),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontFamily: 'monospace',
-                                              color: colorScheme.onSurfaceVariant,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  timeStr,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: colorScheme.outline,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
                       );
+                    },
+                  );
 
             if (isMobile) {
               return Dialog.fullscreen(
@@ -709,29 +761,39 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                       color: colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.receipt_long, size: 20, color: colorScheme.onPrimaryContainer),
+                    child: Icon(
+                      Icons.receipt_long,
+                      size: 20,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
                   ),
                   const SizedBox(width: 10),
-                  const Text('Editing Event Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Editing Event Log',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${events.length} events',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
               ),
-              content: SizedBox(
-                width: 620,
-                height: 460,
-                child: contentBody,
-              ),
+              content: SizedBox(width: 620, height: 460, child: contentBody),
               actions: [
                 if (events.isNotEmpty)
                   TextButton.icon(
@@ -772,7 +834,10 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
             Flexible(
               child: Text(
                 isMobile ? 'Superstore' : 'Superstore Sales (1,000 JSON)',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -819,49 +884,65 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                     } else if (val == 'edit_mode_row') {
                       setState(() {
                         _editMode = AiGridEditMode.row;
-                        _controller.editingOptions =
-                            _controller.editingOptions.copyWith(mode: AiGridEditMode.row);
+                        _controller.editingOptions = _controller.editingOptions
+                            .copyWith(mode: AiGridEditMode.row);
                       });
                     } else if (val == 'edit_mode_cell') {
                       setState(() {
                         _editMode = AiGridEditMode.cell;
-                        _controller.editingOptions =
-                            _controller.editingOptions.copyWith(mode: AiGridEditMode.cell);
+                        _controller.editingOptions = _controller.editingOptions
+                            .copyWith(mode: AiGridEditMode.cell);
                       });
                     } else if (val == 'edit_mode_form') {
                       setState(() {
                         _editMode = AiGridEditMode.form;
-                        _controller.editingOptions =
-                            _controller.editingOptions.copyWith(mode: AiGridEditMode.form);
+                        _controller.editingOptions = _controller.editingOptions
+                            .copyWith(mode: AiGridEditMode.form);
                       });
                     } else if (val == 'event_log') {
                       _showEditingEventLogDialog(context);
                     } else if (val == 'preset_pivot_category_region') {
-                      _controller.setPivot(const AiGridPivotConfig(
-                        rowFieldIds: ['Category', 'SubCategory'],
-                        columnFieldIds: ['Region'],
-                        values: [
-                          AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
-                          AiGridPivotValueConfig(columnId: 'Profit', aggregation: AiGridPivotAggregation.average),
-                        ],
-                        showChart: true,
-                        chartType: AiGridPivotChartType.column,
-                        showRowTotals: true,
-                        showColumnTotals: true,
-                      ));
+                      _controller.setPivot(
+                        const AiGridPivotConfig(
+                          rowFieldIds: ['Category', 'SubCategory'],
+                          columnFieldIds: ['Region'],
+                          values: [
+                            AiGridPivotValueConfig(
+                              columnId: 'Sales',
+                              aggregation: AiGridPivotAggregation.sum,
+                            ),
+                            AiGridPivotValueConfig(
+                              columnId: 'Profit',
+                              aggregation: AiGridPivotAggregation.average,
+                            ),
+                          ],
+                          showChart: true,
+                          chartType: AiGridPivotChartType.column,
+                          showRowTotals: true,
+                          showColumnTotals: true,
+                        ),
+                      );
                     } else if (val == 'preset_pivot_segment_ship') {
-                      _controller.setPivot(const AiGridPivotConfig(
-                        rowFieldIds: ['Segment'],
-                        columnFieldIds: ['ShipMode'],
-                        values: [
-                          AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
-                          AiGridPivotValueConfig(columnId: 'OrderID', aggregation: AiGridPivotAggregation.count),
-                        ],
-                        showChart: true,
-                        chartType: AiGridPivotChartType.groupedBar,
-                        showRowTotals: true,
-                        showColumnTotals: true,
-                      ));
+                      _controller.setPivot(
+                        const AiGridPivotConfig(
+                          rowFieldIds: ['Segment'],
+                          columnFieldIds: ['ShipMode'],
+                          values: [
+                            AiGridPivotValueConfig(
+                              columnId: 'Sales',
+                              aggregation: AiGridPivotAggregation.sum,
+                            ),
+                            AiGridPivotValueConfig(
+                              columnId: 'OrderID',
+                              aggregation: AiGridPivotAggregation.count,
+                            ),
+                          ],
+                          showChart: true,
+                          chartType: AiGridPivotChartType.groupedBar,
+                          showRowTotals: true,
+                          showColumnTotals: true,
+                        ),
+                      );
                     } else if (val == 'export_json_file') {
                       await _exportSettingsToJsonFile();
                     } else if (val == 'restore_json') {
@@ -920,7 +1001,9 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                         children: [
                           const Icon(Icons.receipt_long_outlined, size: 18),
                           const SizedBox(width: 10),
-                          Text('Editing Events (${_controller.editEvents.length})'),
+                          Text(
+                            'Editing Events (${_controller.editEvents.length})',
+                          ),
                         ],
                       ),
                     ),
@@ -971,14 +1054,25 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
               ]
             : [
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
                   child: FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     icon: const Icon(Icons.auto_awesome, size: 16),
-                    label: const Text('Dynamic AI Grid', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Dynamic AI Grid',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -994,10 +1088,15 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                 // Top bar switch among editing modes (Row, Cell, Form)
                 Container(
                   height: 36,
-                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.5,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: colorScheme.outlineVariant),
                   ),
@@ -1050,8 +1149,9 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                         if (mode != null) {
                           setState(() {
                             _editMode = mode;
-                            _controller.editingOptions =
-                                _controller.editingOptions.copyWith(mode: mode);
+                            _controller.editingOptions = _controller
+                                .editingOptions
+                                .copyWith(mode: mode);
                           });
                         }
                       },
@@ -1074,223 +1174,276 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                   },
                 ),
                 PopupMenuButton<String>(
-            icon: const Icon(Icons.tune_outlined),
-            tooltip: 'Layout Presets & Settings',
-            constraints: const BoxConstraints(minWidth: 340, maxWidth: 400),
-            onSelected: (val) async {
-              if (val == 'preset_pivot_category_region') {
-                _controller.setPivot(const AiGridPivotConfig(
-                  rowFieldIds: ['Category', 'SubCategory'],
-                  columnFieldIds: ['Region'],
-                  values: [
-                    AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
-                    AiGridPivotValueConfig(columnId: 'Profit', aggregation: AiGridPivotAggregation.average),
-                  ],
-                  showChart: true,
-                  chartType: AiGridPivotChartType.column,
-                  showRowTotals: true,
-                  showColumnTotals: true,
-                ));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Applied Pivot: Category & Sub-Category by Region (Sales Sum, Profit Avg) + Chart'),
-                    behavior: SnackBarBehavior.floating,
+                  icon: const Icon(Icons.tune_outlined),
+                  tooltip: 'Layout Presets & Settings',
+                  constraints: const BoxConstraints(
+                    minWidth: 340,
+                    maxWidth: 400,
                   ),
-                );
-              } else if (val == 'preset_pivot_segment_ship') {
-                _controller.setPivot(const AiGridPivotConfig(
-                  rowFieldIds: ['Segment'],
-                  columnFieldIds: ['ShipMode'],
-                  values: [
-                    AiGridPivotValueConfig(columnId: 'Sales', aggregation: AiGridPivotAggregation.sum),
-                    AiGridPivotValueConfig(columnId: 'OrderID', aggregation: AiGridPivotAggregation.count),
-                  ],
-                  showChart: true,
-                  chartType: AiGridPivotChartType.groupedBar,
-                  showRowTotals: true,
-                  showColumnTotals: true,
-                ));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Applied Pivot: Segment by Ship Mode (Sales Sum, Order Count) + Chart'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              } else if (val == 'preset_grouping') {
-                _controller.restoreSettings({
-                  'groupColumns': ['Category', 'Region'],
-                  'sort': [
-                    {'column': 'Sales', 'dir': 'descending'},
-                  ],
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Applied Preset: Grouped by Category & Region, sorted by Sales'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              } else if (val == 'preset_financial') {
-                _controller.restoreSettings({
-                  'widths': {
-                    'OrderID': 110.0,
-                    'CustomerName': 180.0,
-                    'Sales': 140.0,
-                    'Profit': 140.0,
-                    'Discount': 100.0,
+                  onSelected: (val) async {
+                    if (val == 'preset_pivot_category_region') {
+                      _controller.setPivot(
+                        const AiGridPivotConfig(
+                          rowFieldIds: ['Category', 'SubCategory'],
+                          columnFieldIds: ['Region'],
+                          values: [
+                            AiGridPivotValueConfig(
+                              columnId: 'Sales',
+                              aggregation: AiGridPivotAggregation.sum,
+                            ),
+                            AiGridPivotValueConfig(
+                              columnId: 'Profit',
+                              aggregation: AiGridPivotAggregation.average,
+                            ),
+                          ],
+                          showChart: true,
+                          chartType: AiGridPivotChartType.column,
+                          showRowTotals: true,
+                          showColumnTotals: true,
+                        ),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Applied Pivot: Category & Sub-Category by Region (Sales Sum, Profit Avg) + Chart',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else if (val == 'preset_pivot_segment_ship') {
+                      _controller.setPivot(
+                        const AiGridPivotConfig(
+                          rowFieldIds: ['Segment'],
+                          columnFieldIds: ['ShipMode'],
+                          values: [
+                            AiGridPivotValueConfig(
+                              columnId: 'Sales',
+                              aggregation: AiGridPivotAggregation.sum,
+                            ),
+                            AiGridPivotValueConfig(
+                              columnId: 'OrderID',
+                              aggregation: AiGridPivotAggregation.count,
+                            ),
+                          ],
+                          showChart: true,
+                          chartType: AiGridPivotChartType.groupedBar,
+                          showRowTotals: true,
+                          showColumnTotals: true,
+                        ),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Applied Pivot: Segment by Ship Mode (Sales Sum, Order Count) + Chart',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else if (val == 'preset_grouping') {
+                      _controller.restoreSettings({
+                        'groupColumns': ['Category', 'Region'],
+                        'sort': [
+                          {'column': 'Sales', 'dir': 'descending'},
+                        ],
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Applied Preset: Grouped by Category & Region, sorted by Sales',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else if (val == 'preset_financial') {
+                      _controller.restoreSettings({
+                        'widths': {
+                          'OrderID': 110.0,
+                          'CustomerName': 180.0,
+                          'Sales': 140.0,
+                          'Profit': 140.0,
+                          'Discount': 100.0,
+                        },
+                        'sort': [
+                          {'column': 'Profit', 'dir': 'descending'},
+                        ],
+                        'groupColumns': <String>[],
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Applied Preset: Financial Focus (Custom column widths & sorted by Profit)',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else if (val == 'preset_high_value') {
+                      _controller.restoreSettings({
+                        'filters': {
+                          'Sales': {'op': 'greaterThan', 'value': 500},
+                        },
+                        'sort': [
+                          {'column': 'Sales', 'dir': 'descending'},
+                        ],
+                        'groupColumns': <String>[],
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Applied Preset: High Value Orders (Sales > \$500)',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else if (val == 'export_json_file') {
+                      await _exportSettingsToJsonFile();
+                    } else if (val == 'restore_json') {
+                      _showRestoreSettingsDialog();
+                    } else if (val == 'clear_settings') {
+                      AiGridSettingsStorage.clear('superstore_grid_settings');
+                      _controller.reset();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Layout settings cleared and grid reset to defaults.',
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    }
                   },
-                  'sort': [
-                    {'column': 'Profit', 'dir': 'descending'},
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'preset_pivot_category_region',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.pivot_table_chart,
+                            size: 18,
+                            color: Color(0xFF0078D4),
+                          ),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text('Pivot: Category x Region + Chart'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'preset_pivot_segment_ship',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.pie_chart_outline,
+                            size: 18,
+                            color: Color(0xFF107C41),
+                          ),
+                          SizedBox(width: 8),
+                          Flexible(child: Text('Pivot: Segment x Ship Mode')),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'preset_grouping',
+                      child: Row(
+                        children: [
+                          Icon(Icons.layers_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text('Preset: Group by Category & Region'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'preset_financial',
+                      child: Row(
+                        children: [
+                          Icon(Icons.attach_money, size: 18),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              'Preset: Financial Focus (Custom Widths)',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'preset_high_value',
+                      child: Row(
+                        children: [
+                          Icon(Icons.filter_alt_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text('Preset: High Value Sales (> \$500)'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'export_json_file',
+                      child: Row(
+                        children: [
+                          Icon(Icons.file_download_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Flexible(child: Text('Export Layout (FitGrid JSON)')),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'restore_json',
+                      child: Row(
+                        children: [
+                          Icon(Icons.file_upload_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Flexible(child: Text('Restore Layout from JSON')),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'clear_settings',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.restore_outlined,
+                            size: 18,
+                            color: Colors.orange,
+                          ),
+                          SizedBox(width: 8),
+                          Flexible(child: Text('Reset Layout to Defaults')),
+                        ],
+                      ),
+                    ),
                   ],
-                  'groupColumns': <String>[],
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Applied Preset: Financial Focus (Custom column widths & sorted by Profit)'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              } else if (val == 'preset_high_value') {
-                _controller.restoreSettings({
-                  'filters': {
-                    'Sales': {'op': 'greaterThan', 'value': 500},
+                ),
+                IconButton(
+                  icon: const Icon(Icons.schema_outlined),
+                  tooltip: 'Inspect MCP Skill Schema',
+                  onPressed: () {
+                    final schema = _controller.getSchemaSummary();
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('MCP Grid Skill Schema'),
+                        content: SingleChildScrollView(
+                          child: Text(schema.toString()),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
                   },
-                  'sort': [
-                    {'column': 'Sales', 'dir': 'descending'},
-                  ],
-                  'groupColumns': <String>[],
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Applied Preset: High Value Orders (Sales > \$500)'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              } else if (val == 'export_json_file') {
-                await _exportSettingsToJsonFile();
-              } else if (val == 'restore_json') {
-                _showRestoreSettingsDialog();
-              } else if (val == 'clear_settings') {
-                AiGridSettingsStorage.clear('superstore_grid_settings');
-                _controller.reset();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Layout settings cleared and grid reset to defaults.'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-            },
-            itemBuilder: (ctx) => [
-              const PopupMenuItem(
-                value: 'preset_pivot_category_region',
-                child: Row(
-                  children: [
-                    Icon(Icons.pivot_table_chart, size: 18, color: Color(0xFF0078D4)),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Pivot: Category x Region + Chart')),
-                  ],
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'preset_pivot_segment_ship',
-                child: Row(
-                  children: [
-                    Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFF107C41)),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Pivot: Segment x Ship Mode')),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'preset_grouping',
-                child: Row(
-                  children: [
-                    Icon(Icons.layers_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Preset: Group by Category & Region')),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'preset_financial',
-                child: Row(
-                  children: [
-                    Icon(Icons.attach_money, size: 18),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Preset: Financial Focus (Custom Widths)')),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'preset_high_value',
-                child: Row(
-                  children: [
-                    Icon(Icons.filter_alt_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Preset: High Value Sales (> \$500)')),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'export_json_file',
-                child: Row(
-                  children: [
-                    Icon(Icons.file_download_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Export Layout (FitGrid JSON)')),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'restore_json',
-                child: Row(
-                  children: [
-                    Icon(Icons.file_upload_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Restore Layout from JSON')),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'clear_settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.restore_outlined, size: 18, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Flexible(child: Text('Reset Layout to Defaults')),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.schema_outlined),
-            tooltip: 'Inspect MCP Skill Schema',
-            onPressed: () {
-              final schema = _controller.getSchemaSummary();
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('MCP Grid Skill Schema'),
-                  content: SingleChildScrollView(
-                    child: Text(schema.toString()),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
+              ],
       ),
       body: _isLoading
           ? const Center(
@@ -1304,27 +1457,27 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
               ),
             )
           : _errorMessage != null
-              ? Center(
-                  child: Text(
-                    'Failed to load JSON dataset: $_errorMessage',
-                    style: TextStyle(color: colorScheme.error),
-                  ),
-                )
-              : Padding(
-                  padding: EdgeInsets.all(
-                    MediaQuery.of(context).size.width < 600 ? 0.0 : 12.0,
-                  ),
-                  child: AiGrid(
-                    dataSource: _dataSource!,
-                    controller: _controller,
-                    aiConfig: _aiConfig,
-                    editingOptions: _controller.editingOptions,
-                    enableAiAssistant: true,
-                    enablePagination: false,
-                    autoSave: true,
-                    persistenceKey: 'superstore_grid_settings',
-                  ),
-                ),
+          ? Center(
+              child: Text(
+                'Failed to load JSON dataset: $_errorMessage',
+                style: TextStyle(color: colorScheme.error),
+              ),
+            )
+          : Padding(
+              padding: EdgeInsets.all(
+                MediaQuery.of(context).size.width < 600 ? 0.0 : 12.0,
+              ),
+              child: AiGrid(
+                dataSource: _dataSource!,
+                controller: _controller,
+                aiConfig: _aiConfig,
+                editingOptions: _controller.editingOptions,
+                enableAiAssistant: true,
+                enablePagination: false,
+                autoSave: true,
+                persistenceKey: 'superstore_grid_settings',
+              ),
+            ),
     );
   }
 }

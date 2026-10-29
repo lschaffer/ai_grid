@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/ai_grid_dynamic_datasource.dart';
 
 /// Manages persistence, discovery, and storage of dynamic DataGrid models and datasets.
@@ -21,7 +23,11 @@ class AiGridDynamicStorage {
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw) as List;
         final list = decoded
-            .map((item) => AiGridDynamicDescriptor.fromJson(Map<String, dynamic>.from(item as Map)))
+            .map(
+              (item) => AiGridDynamicDescriptor.fromJson(
+                Map<String, dynamic>.from(item as Map),
+              ),
+            )
             .toList();
         for (final d in list) {
           _descriptorCache[d.name] = d;
@@ -51,7 +57,9 @@ class AiGridDynamicStorage {
       final raw = prefs.getString('ai_grid_dyn_model_$name');
       if (raw != null && raw.isNotEmpty) {
         final model = raw.trim().startsWith('{')
-            ? AiGridDynamicModel.fromJson(jsonDecode(raw) as Map<String, dynamic>)
+            ? AiGridDynamicModel.fromJson(
+                jsonDecode(raw) as Map<String, dynamic>,
+              )
             : AiGridDynamicModel.fromYamlString(raw);
         _modelCache[name] = model;
         return model;
@@ -86,11 +94,7 @@ class AiGridDynamicStorage {
     final model = await getModel(name);
     final rows = await getDataRows(name);
     if (desc == null || model == null || rows == null) return null;
-    return AiGridDynamicBundle(
-      descriptor: desc,
-      model: model,
-      rows: rows,
-    );
+    return AiGridDynamicBundle(descriptor: desc, model: model, rows: rows);
   }
 
   /// Saves or updates a dynamic datasource along with its model and data rows.
@@ -107,20 +111,33 @@ class AiGridDynamicStorage {
       final prefs = await SharedPreferences.getInstance();
       // 1. Update registry list
       final currentList = await listDatasources();
-      final updatedList = currentList.where((d) => d.name != descriptor.name).toList()
-        ..add(descriptor);
-      await prefs.setString(_registryKey, jsonEncode(updatedList.map((d) => d.toJson()).toList()));
+      final updatedList =
+          currentList.where((d) => d.name != descriptor.name).toList()
+            ..add(descriptor);
+      await prefs.setString(
+        _registryKey,
+        jsonEncode(updatedList.map((d) => d.toJson()).toList()),
+      );
 
       // 2. Save model as YAML string
-      await prefs.setString('ai_grid_dyn_model_${descriptor.name}', model.toYamlString());
+      await prefs.setString(
+        'ai_grid_dyn_model_${descriptor.name}',
+        model.toYamlString(),
+      );
 
       // 3. Save rows as JSON
-      await prefs.setString('ai_grid_dyn_data_${descriptor.name}', jsonEncode(rows));
+      await prefs.setString(
+        'ai_grid_dyn_data_${descriptor.name}',
+        jsonEncode(rows),
+      );
     } catch (_) {}
   }
 
   /// Fast update of only the data rows (e.g. after DevExtreme editing).
-  static Future<void> updateDataRows(String name, List<Map<String, dynamic>> rows) async {
+  static Future<void> updateDataRows(
+    String name,
+    List<Map<String, dynamic>> rows,
+  ) async {
     _dataCache[name] = List<Map<String, dynamic>>.from(rows);
 
     final desc = await getDescriptor(name);
@@ -136,8 +153,13 @@ class AiGridDynamicStorage {
         await prefs.setString('ai_grid_dyn_data_$name', jsonEncode(rows));
 
         final list = await listDatasources();
-        final updatedList = list.map((d) => d.name == name ? updatedDesc : d).toList();
-        await prefs.setString(_registryKey, jsonEncode(updatedList.map((d) => d.toJson()).toList()));
+        final updatedList = list
+            .map((d) => d.name == name ? updatedDesc : d)
+            .toList();
+        await prefs.setString(
+          _registryKey,
+          jsonEncode(updatedList.map((d) => d.toJson()).toList()),
+        );
       } catch (_) {}
     }
   }
@@ -165,7 +187,10 @@ class AiGridDynamicStorage {
 
       final current = await listDatasources();
       final updated = current.where((d) => d.name != name).toList();
-      await prefs.setString(_registryKey, jsonEncode(updated.map((d) => d.toJson()).toList()));
+      await prefs.setString(
+        _registryKey,
+        jsonEncode(updated.map((d) => d.toJson()).toList()),
+      );
 
       if (prefs.getString(_activeKey) == name) {
         await prefs.remove(_activeKey);
@@ -183,7 +208,9 @@ class AiGridDynamicStorage {
   }
 
   /// Imports a datasource from a YAML bundle string and persists it.
-  static Future<AiGridDynamicDescriptor> importBundleYaml(String yamlContent) async {
+  static Future<AiGridDynamicDescriptor> importBundleYaml(
+    String yamlContent,
+  ) async {
     final bundle = AiGridDynamicBundle.fromYamlString(yamlContent);
     await saveDatasource(
       descriptor: bundle.descriptor,

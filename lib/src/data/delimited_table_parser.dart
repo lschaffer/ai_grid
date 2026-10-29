@@ -139,7 +139,8 @@ class DelimitedTableParser {
     if (trimmed.toLowerCase() == 'true') return true;
     if (trimmed.toLowerCase() == 'false') return false;
 
-    final currencyMatch = RegExp(r'^[\$\€\£\¥]\s*([\d,]+(?:\.\d+)?)$').firstMatch(trimmed);
+    final currencyMatch = RegExp(r'^[\$\€\£\¥]\s*([\d,]+(?:\.\d+)?)$')
+        .firstMatch(trimmed);
     if (currencyMatch != null) {
       final clean = currencyMatch.group(1)!.replaceAll(',', '');
       final numVal = double.tryParse(clean);
@@ -169,7 +170,8 @@ class DelimitedTableParser {
         numCount++;
       } else if (v is bool) {
         boolCount++;
-      } else if (DateTime.tryParse(v.toString()) != null && v.toString().length >= 8) {
+      } else if (DateTime.tryParse(v.toString()) != null &&
+          v.toString().length >= 8) {
         dateCount++;
       }
     }
@@ -187,8 +189,5 @@ class DelimitedTableResult {
   final List<AiGridDynamicColumnModel> columns;
   final List<Map<String, dynamic>> rows;
 
-  const DelimitedTableResult({
-    required this.columns,
-    required this.rows,
-  });
+  const DelimitedTableResult({required this.columns, required this.rows});
 }

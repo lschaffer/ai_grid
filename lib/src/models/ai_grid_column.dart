@@ -1,6 +1,8 @@
 import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
+
 import '../fitgrid/fitgrid_table.dart';
 import 'ai_grid_editing_options.dart';
 
@@ -17,14 +19,7 @@ enum AiGridColumnType {
 }
 
 /// Aggregate calculation type for column footers and group summaries.
-enum AiGridAggregateType {
-  none,
-  sum,
-  average,
-  min,
-  max,
-  count,
-}
+enum AiGridAggregateType { none, sum, average, min, max, count }
 
 /// Represents a column in the [AiGrid].
 class AiGridColumn {
@@ -69,7 +64,8 @@ class AiGridColumn {
     BuildContext context,
     dynamic value,
     ValueChanged<dynamic> onChanged,
-  )? editorBuilder;
+  )?
+  editorBuilder;
 
   final AiGridAggregateType aggregateType;
   final String? numberFormat;
@@ -125,15 +121,14 @@ class AiGridColumn {
     Color? color,
     Color? negativeColor,
     bool showText = true,
-  }) =>
-      FitGridCellVisual.bar(
-        valueOf ?? (row) => null,
-        min: min,
-        max: max,
-        color: color,
-        negativeColor: negativeColor,
-        showText: showText,
-      );
+  }) => FitGridCellVisual.bar(
+    valueOf ?? (row) => null,
+    min: min,
+    max: max,
+    color: color,
+    negativeColor: negativeColor,
+    showText: showText,
+  );
 
   /// Creates a progress track visual filled to a fraction between 0 and 1.
   static FitGridCellVisual<Map<String, dynamic>> progress({
@@ -141,23 +136,14 @@ class AiGridColumn {
     Color? color,
     bool showText = true,
   }) =>
-      FitGridCellVisual.progress(
-        fractionOf,
-        color: color,
-        showText: showText,
-      );
+      FitGridCellVisual.progress(fractionOf, color: color, showText: showText);
 
   /// Creates a sparkline visual through a series of values, scaled to the cell.
   static FitGridCellVisual<Map<String, dynamic>> sparkline({
     required List<num> Function(Map<String, dynamic> row) valuesOf,
     Color? color,
     bool filled = true,
-  }) =>
-      FitGridCellVisual.sparkline(
-        valuesOf,
-        color: color,
-        filled: filled,
-      );
+  }) => FitGridCellVisual.sparkline(valuesOf, color: color, filled: filled);
 
   /// Whether this column can be edited.
   bool get isEditable => editable ?? enableEditingMode;
@@ -195,7 +181,9 @@ class AiGridColumn {
           filterSpec = FitGridFilterSpec.values(options: selectOptions);
           break;
         case AiGridColumnType.boolean:
-          filterSpec = const FitGridFilterSpec.values(options: ['true', 'false']);
+          filterSpec = const FitGridFilterSpec.values(
+            options: ['true', 'false'],
+          );
           break;
         case AiGridColumnType.text:
           filterSpec = const FitGridFilterSpec.text();
@@ -265,14 +253,14 @@ class AiGridColumn {
     if (isEditable) {
       FitGridEditorBuilder<Map<String, dynamic>>? effectiveBuilder =
           editorBuilder != null
-              ? (context, session) => editorBuilder!(
-                    context,
-                    session.row[field] ?? session.initialText,
-                    (val) {
-                      session.commit(val?.toString() ?? '');
-                    },
-                  )
-              : null;
+          ? (context, session) => editorBuilder!(
+              context,
+              session.row[field] ?? session.initialText,
+              (val) {
+                session.commit(val?.toString() ?? '');
+              },
+            )
+          : null;
 
       if (effectiveBuilder == null) {
         if (editorType == AiGridEditorType.boolean ||
@@ -306,8 +294,9 @@ class AiGridColumn {
             effectiveBuilder = (context, session) {
               final currentStr =
                   session.row[field]?.toString() ?? session.initialText;
-              final effectiveVal =
-                  options.contains(currentStr) ? currentStr : null;
+              final effectiveVal = options.contains(currentStr)
+                  ? currentStr
+                  : null;
 
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -318,11 +307,15 @@ class AiGridColumn {
                     isExpanded: true,
                     value: effectiveVal,
                     items: options
-                        .map((opt) => DropdownMenuItem(
-                              value: opt,
-                              child: Text(opt,
-                                  style: const TextStyle(fontSize: 12)),
-                            ))
+                        .map(
+                          (opt) => DropdownMenuItem(
+                            value: opt,
+                            child: Text(
+                              opt,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) {
                       if (v != null) {
@@ -383,12 +376,11 @@ class AiGridColumn {
                         pickedTime?.hour ?? 0,
                         pickedTime?.minute ?? 0,
                       );
-                      final formatted =
-                          DateFormat('yyyy-MM-dd HH:mm').format(dt);
+                      final formatted = DateFormat('yyyy-MM-dd HH:mm')
+                          .format(dt);
                       session.commit(formatted);
                     } else {
-                      final formatted =
-                          DateFormat('yyyy-MM-dd').format(picked);
+                      final formatted = DateFormat('yyyy-MM-dd').format(picked);
                       session.commit(formatted);
                     }
                   }
@@ -441,17 +433,15 @@ class AiGridColumn {
 
     FitGridCellVisual<Map<String, dynamic>>? effectiveVisual = visual;
     if (effectiveVisual == null && type == AiGridColumnType.sparkline) {
-      effectiveVisual = FitGridCellVisual.sparkline(
-        (row) {
-          final raw = row[field];
-          if (raw is List) {
-            return raw
-                .map((e) => e is num ? e : num.tryParse(e.toString()) ?? 0)
-                .toList();
-          }
-          return const <num>[];
-        },
-      );
+      effectiveVisual = FitGridCellVisual.sparkline((row) {
+        final raw = row[field];
+        if (raw is List) {
+          return raw
+              .map((e) => e is num ? e : num.tryParse(e.toString()) ?? 0)
+              .toList();
+        }
+        return const <num>[];
+      });
     }
 
     FitGridCellStyle<Map<String, dynamic>>? effectiveCellStyle;
@@ -469,7 +459,8 @@ class AiGridColumn {
       };
     }
 
-    final effectiveWidth = columnWidth ??
+    final effectiveWidth =
+        columnWidth ??
         (!resizable && width != null && width! > 0
             ? FitGridColumnWidth.fixed(width!)
             : FitGridColumnWidth.auto(min: minWidth, max: maxWidth));
@@ -572,7 +563,8 @@ class AiGridColumn {
       BuildContext context,
       dynamic value,
       ValueChanged<dynamic> onChanged,
-    )? editorBuilder,
+    )?
+    editorBuilder,
     AiGridAggregateType? aggregateType,
     String? numberFormat,
     List<String>? selectOptions,
@@ -633,32 +625,32 @@ class AiGridColumn {
 
   @override
   int get hashCode => Object.hash(
-        field,
-        title,
-        type,
-        width,
-        minWidth,
-        maxWidth,
-        editable,
-        required,
-        editorType,
-        numberFormat,
-        isSortable,
-        isGroupable,
-        isFilterable,
-      );
+    field,
+    title,
+    type,
+    width,
+    minWidth,
+    maxWidth,
+    editable,
+    required,
+    editorType,
+    numberFormat,
+    isSortable,
+    isGroupable,
+    isFilterable,
+  );
 
   Map<String, dynamic> toJson() => {
-        'field': field,
-        'title': title,
-        'type': type.name,
-        'isGroupable': isGroupable,
-        'isSortable': isSortable,
-        'isFilterable': isFilterable,
-        'editable': isEditable,
-        'required': required,
-        if (maxWidth != null) 'max_width': maxWidth,
-        'editorIndex': editorIndex,
-        'aggregateType': aggregateType.name,
-      };
+    'field': field,
+    'title': title,
+    'type': type.name,
+    'isGroupable': isGroupable,
+    'isSortable': isSortable,
+    'isFilterable': isFilterable,
+    'editable': isEditable,
+    'required': required,
+    if (maxWidth != null) 'max_width': maxWidth,
+    'editorIndex': editorIndex,
+    'aggregateType': aggregateType.name,
+  };
 }

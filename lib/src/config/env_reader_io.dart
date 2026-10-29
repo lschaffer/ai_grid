@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 /// Reads `.env` from local filesystem on desktop/server/mobile.

@@ -106,8 +106,12 @@ class AiGrid extends StatefulWidget {
   final AiGridMasterDetailOptions? masterDetailOptions;
 
   /// Shorthand builder for the detail panel beneath an expanded row.
-  final Widget Function(BuildContext context, Map<String, dynamic> row, int rowIndex)?
-      detailRowBuilder;
+  final Widget Function(
+    BuildContext context,
+    Map<String, dynamic> row,
+    int rowIndex,
+  )?
+  detailRowBuilder;
 
   /// Whether rectangular cell range selection is enabled.
   final bool cellSelection;
@@ -191,7 +195,8 @@ class _AiGridState extends State<AiGrid> {
         _controller.addConditionalFormat(fmt);
       }
     }
-    final initialMasterDetail = widget.masterDetailOptions ??
+    final initialMasterDetail =
+        widget.masterDetailOptions ??
         (widget.detailRowBuilder != null
             ? AiGridMasterDetailOptions(detailBuilder: widget.detailRowBuilder!)
             : null);
@@ -323,9 +328,12 @@ class _AiGridState extends State<AiGrid> {
     }
     if (widget.masterDetailOptions != oldWidget.masterDetailOptions ||
         widget.detailRowBuilder != oldWidget.detailRowBuilder) {
-      final updatedMasterDetail = widget.masterDetailOptions ??
+      final updatedMasterDetail =
+          widget.masterDetailOptions ??
           (widget.detailRowBuilder != null
-              ? AiGridMasterDetailOptions(detailBuilder: widget.detailRowBuilder!)
+              ? AiGridMasterDetailOptions(
+                  detailBuilder: widget.detailRowBuilder!,
+                )
               : null);
       if (updatedMasterDetail != _controller.masterDetailOptions) {
         _controller.setMasterDetailOptions(updatedMasterDetail);
@@ -546,8 +554,9 @@ class _AiGridState extends State<AiGrid> {
           if (col.cellColor != null) {
             final c = col.cellColor!(val, row);
             if (c != null) {
-              effectiveStyle =
-                  (effectiveStyle ?? const TextStyle()).copyWith(color: c);
+              effectiveStyle = (effectiveStyle ?? const TextStyle()).copyWith(
+                color: c,
+              );
             }
           }
         }
@@ -1337,26 +1346,38 @@ class _AiGridState extends State<AiGrid> {
           ? Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(Icons.select_all_rounded, size: 14, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.select_all_rounded,
+                  size: 14,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   '${summary.rowCount} × ${summary.columnCount} (${summary.cellCount} cells)',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFDDDDDD) : const Color(0xFF1E293B),
+                    color: isDark
+                        ? const Color(0xFFDDDDDD)
+                        : const Color(0xFF1E293B),
                   ),
                 ),
                 if (summary.numericCount > 0) ...[
                   const SizedBox(width: 12),
-                  Container(height: 12, width: 1, color: isDark ? Colors.grey[700] : Colors.grey[300]),
+                  Container(
+                    height: 12,
+                    width: 1,
+                    color: isDark ? Colors.grey[700] : Colors.grey[300],
+                  ),
                   const SizedBox(width: 12),
                   if (summary.sum != null) ...[
                     Text(
                       'Sum: ${fmt(summary.sum!)}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFFEEEEEE) : const Color(0xFF0F172A),
+                        color: isDark
+                            ? const Color(0xFFEEEEEE)
+                            : const Color(0xFF0F172A),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1367,7 +1388,9 @@ class _AiGridState extends State<AiGrid> {
                       'Avg: ${fmt(summary.average!)}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF64748B),
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : const Color(0xFF64748B),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -1377,7 +1400,9 @@ class _AiGridState extends State<AiGrid> {
                       'Min: ${fmt(summary.min!)}  Max: ${fmt(summary.max!)}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF64748B),
+                        color: isDark
+                            ? const Color(0xFFAAAAAA)
+                            : const Color(0xFF64748B),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1387,14 +1412,19 @@ class _AiGridState extends State<AiGrid> {
                   icon: const Icon(Icons.copy_rounded, size: 13),
                   tooltip: 'Copy range to clipboard (TSV)',
                   splashRadius: 12,
-                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                  constraints: const BoxConstraints(
+                    minWidth: 20,
+                    minHeight: 20,
+                  ),
                   padding: EdgeInsets.zero,
                   onPressed: () async {
                     final ok = await _controller.copySelectedRangeToClipboard();
                     if (ok && context.mounted) {
                       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                         const SnackBar(
-                          content: Text('Selected range copied to clipboard (TSV)'),
+                          content: Text(
+                            'Selected range copied to clipboard (TSV)',
+                          ),
                           duration: Duration(seconds: 1),
                         ),
                       );
@@ -1409,7 +1439,9 @@ class _AiGridState extends State<AiGrid> {
                   'Ready',
                   style: TextStyle(
                     fontSize: 11,
-                    color: isDark ? const Color(0xFF888888) : const Color(0xFF94A3B8),
+                    color: isDark
+                        ? const Color(0xFF888888)
+                        : const Color(0xFF94A3B8),
                   ),
                 ),
               ],
@@ -1448,9 +1480,9 @@ class _AiGridState extends State<AiGrid> {
       );
     }
 
-    final isReadonly =
-        _controller.activeDynamicDatasource?.isReadonly ?? false;
-    final effectiveEditTrigger = (_controller.isPivotActive ||
+    final isReadonly = _controller.activeDynamicDatasource?.isReadonly ?? false;
+    final effectiveEditTrigger =
+        (_controller.isPivotActive ||
             isReadonly ||
             !_controller.editingOptions.enabled)
         ? FitGridEditTrigger.programmatic
@@ -1483,13 +1515,16 @@ class _AiGridState extends State<AiGrid> {
       editTrigger: effectiveEditTrigger,
       paginated: widget.enablePagination || widget.pageSize != null,
       pageSize: widget.pageSize ?? 40,
-      detailBuilder: (!_controller.isPivotActive && _controller.isMasterDetailEnabled)
+      detailBuilder:
+          (!_controller.isPivotActive && _controller.isMasterDetailEnabled)
           ? (context, row, rowIndex) {
               final opts = _controller.masterDetailOptions;
-              return opts?.detailBuilder(context, row, rowIndex) ?? const SizedBox.shrink();
+              return opts?.detailBuilder(context, row, rowIndex) ??
+                  const SizedBox.shrink();
             }
           : null,
-      detailRowHeight: _controller.masterDetailOptions?.detailRowHeight ?? 360.0,
+      detailRowHeight:
+          _controller.masterDetailOptions?.detailRowHeight ?? 360.0,
       detailHeight: _controller.masterDetailOptions?.detailHeight,
       rowKey: _controller.isMasterDetailEnabled
           ? (row) => _controller.resolveRowKey(row)
@@ -1853,7 +1888,9 @@ class _AiGridState extends State<AiGrid> {
     // Column Editor dialog for dynamic grid (enabled only for not read-only grid)
     final activeDynamic = _controller.activeDynamicDatasource;
     final isDynamic = widget.dynamicGrid || activeDynamic != null;
-    final isNotReadonly = activeDynamic == null ? true : !activeDynamic.isReadonly;
+    final isNotReadonly = activeDynamic == null
+        ? true
+        : !activeDynamic.isReadonly;
 
     if (isDynamic && isNotReadonly) {
       entries.add(
@@ -1869,9 +1906,7 @@ class _AiGridState extends State<AiGrid> {
                 width: 28,
                 child: Icon(Icons.tune_rounded, size: 18),
               ),
-              Flexible(
-                child: Text('Edit Column "${column.label}"'),
-              ),
+              Flexible(child: Text('Edit Column "${column.label}"')),
             ],
           ),
         ),
@@ -1889,9 +1924,7 @@ class _AiGridState extends State<AiGrid> {
                 width: 28,
                 child: Icon(Icons.view_column_rounded, size: 18),
               ),
-              Flexible(
-                child: Text('Edit All Columns...'),
-              ),
+              Flexible(child: Text('Edit All Columns...')),
             ],
           ),
         ),

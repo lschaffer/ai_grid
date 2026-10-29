@@ -1,15 +1,20 @@
 import 'dart:convert';
 import 'dart:io' as io;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
 import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
+
 import '../config/ai_grid_config.dart';
 import '../controllers/ai_grid_controller.dart';
 import '../data/clipboard_content_service.dart';
 import '../data/pdf_table_extractor.dart';
+import '../data/excel_table_parser.dart';
 import '../mcp/ai_grid_tools.dart';
 import '../models/ai_grid_column.dart';
 import '../theme/ai_grid_theme.dart';
@@ -83,12 +88,11 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
   }
 
   bool get _isDynamicMode =>
-      widget.dynamicGrid ||
-      widget.controller.activeDynamicDatasource != null;
+      widget.dynamicGrid || widget.controller.activeDynamicDatasource != null;
 
   void _initDefaultSuggestions() {
-    final llm = widget.aiConfig?.llmConfig ??
-        AiGridEnvLoader.createLlmConfigFromEnv();
+    final llm =
+        widget.aiConfig?.llmConfig ?? AiGridEnvLoader.createLlmConfigFromEnv();
     final modelName = llm != null && llm.isConfigured
         ? '${llm.provider.displayName} (${llm.model})'
         : 'Local Heuristic';
@@ -228,6 +232,9 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       'yml': 'text/yaml',
       'html': 'text/html',
       'pdf': 'application/pdf',
+      'xlsx':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xls': 'application/vnd.ms-excel',
       'png': 'image/png',
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',
@@ -258,7 +265,8 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       if (widget.onSendPrompt != null) {
         await widget.onSendPrompt!(displayText);
       } else {
-        final llm = widget.aiConfig?.llmConfig ??
+        final llm =
+            widget.aiConfig?.llmConfig ??
             AiGridEnvLoader.createLlmConfigFromEnv();
 
         if (llm != null && llm.isConfigured) {
@@ -293,9 +301,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     List<MessageAttachment> attachments,
     LlmConfig config,
   ) async {
-    final parts = <ChatContentPart>[
-      TextPart(prompt),
-    ];
+    final parts = <ChatContentPart>[TextPart(prompt)];
 
     final promptBuilder = StringBuffer(prompt);
 
@@ -310,7 +316,33 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                 att.mimeType == 'application/pdf') {
               text = PdfTableExtractor.extractText(att.bytes!);
             } else {
-              text = utf8.decode(att.bytes!);
+              final isXlsx =
+                  att.name.toLowerCase().endsWith('.xlsx') ||
+                  att.mimeType.contains('spreadsheet') ||
+                  att.mimeType.contains('excel');
+              if (isXlsx) {
+                final wb = AiGridExcelParser.parseBytes(
+                  att.bytes!,
+                  fileName: att.name,
+                );
+                final sb = StringBuffer();
+                for (final s in wb.sheets) {
+                  sb.writeln(
+                    'Worksheet: "${s.name}" (${s.rowCount} rows, ${s.columnCount} columns)',
+                  );
+                  sb.writeln('Columns: ${s.headers.join(", ")}');
+                  if (s.previewRows.isNotEmpty) {
+                    sb.writeln('Sample Data:');
+                    for (final row in s.previewRows) {
+                      sb.writeln('  $row');
+                    }
+                  }
+                  sb.writeln();
+                }
+                text = sb.toString();
+              } else {
+                text = utf8.decode(att.bytes!);
+              }
             }
           } catch (_) {}
 
@@ -320,12 +352,14 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             );
           }
 
-          parts.add(DocumentPart(
-            bytes: att.bytes,
-            fileName: att.name,
-            mimeType: att.mimeType,
-            textContent: text,
-          ));
+          parts.add(
+            DocumentPart(
+              bytes: att.bytes,
+              fileName: att.name,
+              mimeType: att.mimeType,
+              textContent: text,
+            ),
+          );
         }
       }
     }
@@ -343,15 +377,10 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       key: 'ai_grid_agent',
       name: 'DataGrid Agent',
       llmConfig: config,
-      systemPrompt: widget.aiConfig?.systemPrompt ??
-          AiGridSkill.defaultSystemPrompt,
+      systemPrompt:
+          widget.aiConfig?.systemPrompt ?? AiGridSkill.defaultSystemPrompt,
       initialMessages: [userMsg],
-      prompts: [
-        SubPromptStep(
-          text: effectivePrompt,
-          stopAfterToolCall: false,
-        ),
-      ],
+      prompts: [SubPromptStep(text: effectivePrompt, stopAfterToolCall: false)],
       dartTools: tools,
       remoteServers: const [],
       localServers: const [],
@@ -365,38 +394,43 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       onToolResult: (toolName, params, result) {
         if (!mounted) return;
         setState(() {
-          _messages.add(_AssistantMessage(
-            title: 'Action: $toolName',
-            description: result.length > 250
-                ? '${result.substring(0, 250)}...'
-                : result,
-            isUser: false,
-          ));
+          _messages.add(
+            _AssistantMessage(
+              title: 'Action: $toolName',
+              description: result.length > 250
+                  ? '${result.substring(0, 250)}...'
+                  : result,
+              isUser: false,
+            ),
+          );
         });
         _scrollToBottom();
       },
       onAssistantResult: (p, response) {
         if (!mounted) return;
         setState(() {
-          _messages.add(_AssistantMessage(
-            description: response,
-            isUser: false,
-          ));
+          _messages.add(
+            _AssistantMessage(description: response, isUser: false),
+          );
         });
         _scrollToBottom();
       },
       onError: (err) {
         if (!mounted) return;
         final errStr = err.toString();
-        final isCors = errStr.contains('Failed to fetch') || errStr.contains('XMLHttpRequest');
+        final isCors =
+            errStr.contains('Failed to fetch') ||
+            errStr.contains('XMLHttpRequest');
         setState(() {
-          _messages.add(_AssistantMessage(
-            title: isCors ? 'Browser CORS Restriction' : 'Agent Error',
-            description: isCors
-                ? 'Direct browser call blocked by CORS.\nLaunch Chrome with --disable-web-security or configure a proxy.'
-                : errStr,
-            isUser: false,
-          ));
+          _messages.add(
+            _AssistantMessage(
+              title: isCors ? 'Browser CORS Restriction' : 'Agent Error',
+              description: isCors
+                  ? 'Direct browser call blocked by CORS.\nLaunch Chrome with --disable-web-security or configure a proxy.'
+                  : errStr,
+              isUser: false,
+            ),
+          );
         });
         _scrollToBottom();
       },
@@ -452,11 +486,13 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         }
       }
 
-      final bool isLow = lower.contains('low') ||
+      final bool isLow =
+          lower.contains('low') ||
           lower.contains('min') ||
           lower.contains('bottom') ||
           lower.contains('worst');
-      final bool isHigh = lower.contains('high') ||
+      final bool isHigh =
+          lower.contains('high') ||
           lower.contains('max') ||
           lower.contains('top') ||
           lower.contains('best');
@@ -497,7 +533,17 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             final w = word.replaceAll(RegExp(r'[^a-z0-9]'), '');
             if (w.length >= 3 &&
                 cellStr.contains(w) &&
-                !['select', 'all', 'tickets', 'rows', 'cells', 'the', 'and', 'for', targetCol.field.toLowerCase()].contains(w)) {
+                ![
+                  'select',
+                  'all',
+                  'tickets',
+                  'rows',
+                  'cells',
+                  'the',
+                  'and',
+                  'for',
+                  targetCol.field.toLowerCase(),
+                ].contains(w)) {
               matchedCategory = w;
               break;
             }
@@ -519,7 +565,8 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         final maxRows = widget.controller.rows.length;
         final extent = (selectCount < maxRows ? selectCount : maxRows) - 1;
         if (extent >= 0) {
-          final isTicketsOrRows = lower.contains('ticket') || lower.contains('row');
+          final isTicketsOrRows =
+              lower.contains('ticket') || lower.contains('row');
           final cols = widget.controller.columns;
           final startCol = isTicketsOrRows ? cols.first.field : targetCol.field;
           final endCol = isTicketsOrRows ? cols.last.field : targetCol.field;
@@ -556,7 +603,8 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
           _messages.add(
             _AssistantMessage(
               title: 'Cell Range Selection',
-              description: 'Selected all cells across the grid ($rowCount rows).',
+              description:
+                  'Selected all cells across the grid ($rowCount rows).',
               isUser: false,
             ),
           );
@@ -597,9 +645,11 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         }
       }
       targetCol ??= widget.controller.columns
-          .where((c) =>
-              c.type == AiGridColumnType.number ||
-              c.type == AiGridColumnType.currency)
+          .where(
+            (c) =>
+                c.type == AiGridColumnType.number ||
+                c.type == AiGridColumnType.currency,
+          )
           .firstOrNull;
 
       if (targetCol != null) {
@@ -686,8 +736,9 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     final colorScheme = theme.colorScheme;
 
     final panelBg = isDark ? colorScheme.surfaceContainerHigh : Colors.white;
-    final panelBorder =
-        isDark ? colorScheme.outlineVariant.withAlpha(90) : AiGridTheme.borderColor;
+    final panelBorder = isDark
+        ? colorScheme.outlineVariant.withAlpha(90)
+        : AiGridTheme.borderColor;
 
     final content = Column(
       children: [
@@ -703,10 +754,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     }
 
     if (widget.isFullScreen) {
-      return Container(
-        color: panelBg,
-        child: content,
-      );
+      return Container(color: panelBg, child: content);
     }
 
     return Container(
@@ -766,11 +814,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             ),
             const SizedBox(width: 8),
           ],
-          Icon(
-            Icons.auto_awesome,
-            size: 18,
-            color: colorScheme.primary,
-          ),
+          Icon(Icons.auto_awesome, size: 18, color: colorScheme.primary),
           const SizedBox(width: 8),
           Text(
             'AI Assistant',
@@ -811,7 +855,12 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             alignment: Alignment.centerRight,
             child: Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
-              padding: const EdgeInsets.only(left: 12, right: 6, top: 6, bottom: 6),
+              padding: const EdgeInsets.only(
+                left: 12,
+                right: 6,
+                top: 6,
+                bottom: 6,
+              ),
               decoration: BoxDecoration(
                 color: isDark
                     ? colorScheme.primaryContainer
@@ -843,10 +892,11 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                     icon: Icon(
                       Icons.copy_outlined,
                       size: 13,
-                      color: (isDark
-                              ? colorScheme.onPrimaryContainer
-                              : AiGridTheme.textColor)
-                          .withAlpha(150),
+                      color:
+                          (isDark
+                                  ? colorScheme.onPrimaryContainer
+                                  : AiGridTheme.textColor)
+                              .withAlpha(150),
                     ),
                     tooltip: 'Copy prompt',
                     onPressed: () => _copyToClipboard(context, userText),
@@ -973,11 +1023,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
               _buildChip(context, '📋 Paste Clipboard', _handleClipboardPaste),
             ],
             for (final prompt in suggested)
-              _buildChip(
-                context,
-                '✨ $prompt',
-                () => _sendPresetPrompt(prompt),
-              ),
+              _buildChip(context, '✨ $prompt', () => _sendPresetPrompt(prompt)),
           ],
         ),
       );
@@ -1020,7 +1066,9 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             final examples = <String>[];
             if (isDynamic) {
               examples.add('• "Create a table from the attached file"');
-              examples.add('• "Extract table from clipboard and name it sales"');
+              examples.add(
+                '• "Extract table from clipboard and name it sales"',
+              );
               examples.add('• "Fetch data from https://..."');
             }
             if (numCol != null) {
@@ -1149,7 +1197,11 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         children: [
           Row(
             children: [
-              Icon(Icons.attach_file, size: 12, color: theme.colorScheme.primary),
+              Icon(
+                Icons.attach_file,
+                size: 12,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(width: 4),
               Text(
                 'Attachments (${_attachments.length})',
@@ -1191,7 +1243,9 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                     borderRadius: BorderRadius.circular(6),
                     color: theme.colorScheme.surface,
                     border: Border.all(
-                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.5,
+                      ),
                     ),
                   ),
                   child: Stack(
@@ -1204,7 +1258,8 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                                 width: 60,
                                 height: 60,
                                 fit: BoxFit.cover,
-                                errorBuilder: (ctx, err, stack) => _buildDocIcon(att, theme),
+                                errorBuilder: (ctx, err, stack) =>
+                                    _buildDocIcon(att, theme),
                               )
                             : _buildDocIcon(att, theme),
                       ),
@@ -1212,7 +1267,8 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                         top: 2,
                         right: 2,
                         child: GestureDetector(
-                          onTap: () => setState(() => _attachments.removeAt(idx)),
+                          onTap: () =>
+                              setState(() => _attachments.removeAt(idx)),
                           child: Container(
                             width: 16,
                             height: 16,
@@ -1220,7 +1276,11 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                               color: Colors.black87,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.close, color: Colors.white, size: 10),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 10,
+                            ),
                           ),
                         ),
                       ),
@@ -1242,7 +1302,11 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.insert_drive_file_outlined, size: 20, color: theme.colorScheme.primary),
+            Icon(
+              Icons.insert_drive_file_outlined,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: 2),
             Text(
               att.name,
@@ -1306,21 +1370,30 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                   actions: <Type, Action<Intent>>{
                     PasteTextIntent: CallbackAction<PasteTextIntent>(
                       onInvoke: (intent) async {
-                        final payloads = await ClipboardContentService.readClipboard();
+                        final payloads =
+                            await ClipboardContentService.readClipboard();
                         final media = payloads.where((p) => p.isMedia).toList();
                         if (media.isNotEmpty) {
                           _handleClipboardPaste(media);
                           return null;
                         }
-                        final data = await Clipboard.getData(Clipboard.kTextPlain);
+                        final data = await Clipboard.getData(
+                          Clipboard.kTextPlain,
+                        );
                         if (data?.text != null) {
                           final cur = _textCtrl.text;
                           final sel = _textCtrl.selection;
                           if (sel.isValid) {
-                            final newText = cur.replaceRange(sel.start, sel.end, data!.text!);
+                            final newText = cur.replaceRange(
+                              sel.start,
+                              sel.end,
+                              data!.text!,
+                            );
                             _textCtrl.value = TextEditingValue(
                               text: newText,
-                              selection: TextSelection.collapsed(offset: sel.start + data.text!.length),
+                              selection: TextSelection.collapsed(
+                                offset: sel.start + data.text!.length,
+                              ),
                             );
                           } else {
                             _textCtrl.text = '$cur${data!.text}';
@@ -1333,7 +1406,10 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                   child: TextField(
                     controller: _textCtrl,
                     onSubmitted: (_) => _handleSend(),
-                    style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurface,
+                    ),
                     decoration: InputDecoration(
                       hintText: _isLoading
                           ? 'Assistant is working...'
@@ -1344,8 +1420,10 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
                       ),
                       border: InputBorder.none,
                       isDense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 8,
+                      ),
                     ),
                   ),
                 ),

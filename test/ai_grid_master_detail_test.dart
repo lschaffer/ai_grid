@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_grid/ai_grid.dart';
@@ -61,56 +62,74 @@ void main() {
       controller.dispose();
     });
 
-    test('enabling master-detail attaches options and handles initial expansion', () {
-      final dataSource = LocalAiGridDataSource(initialData: testData, columns: columns);
-      controller.setMasterDetailOptions(AiGridMasterDetailOptions(
-        detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
-        initiallyExpandedKeys: {'ORD-101'},
-      ));
+    test(
+      'enabling master-detail attaches options and handles initial expansion',
+      () {
+        final dataSource = LocalAiGridDataSource(
+          initialData: testData,
+          columns: columns,
+        );
+        controller.setMasterDetailOptions(
+          AiGridMasterDetailOptions(
+            detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
+            initiallyExpandedKeys: {'ORD-101'},
+          ),
+        );
 
-      controller.attach(
-        columns: columns,
-        dataSource: dataSource,
-      );
+        controller.attach(columns: columns, dataSource: dataSource);
 
-      expect(controller.isMasterDetailEnabled, true);
-      expect(controller.isRowExpanded('ORD-101'), true);
-      expect(controller.isRowExpanded('ORD-102'), false);
-      expect(controller.expandedDetailCount, 1);
-    });
+        expect(controller.isMasterDetailEnabled, true);
+        expect(controller.isRowExpanded('ORD-101'), true);
+        expect(controller.isRowExpanded('ORD-102'), false);
+        expect(controller.expandedDetailCount, 1);
+      },
+    );
 
-    test('expandRow, collapseRow and toggleRowDetail modify expansion state', () {
-      final dataSource = LocalAiGridDataSource(initialData: testData, columns: columns);
-      controller.setMasterDetailOptions(AiGridMasterDetailOptions(
-        detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
-      ));
-      controller.attach(columns: columns, dataSource: dataSource);
+    test(
+      'expandRow, collapseRow and toggleRowDetail modify expansion state',
+      () {
+        final dataSource = LocalAiGridDataSource(
+          initialData: testData,
+          columns: columns,
+        );
+        controller.setMasterDetailOptions(
+          AiGridMasterDetailOptions(
+            detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
+          ),
+        );
+        controller.attach(columns: columns, dataSource: dataSource);
 
-      expect(controller.isRowExpanded('ORD-101'), false);
+        expect(controller.isRowExpanded('ORD-101'), false);
 
-      // Expand
-      controller.expandRow('ORD-101');
-      expect(controller.isRowExpanded('ORD-101'), true);
-      expect(controller.expandedDetailKeys.contains('ORD-101'), true);
+        // Expand
+        controller.expandRow('ORD-101');
+        expect(controller.isRowExpanded('ORD-101'), true);
+        expect(controller.expandedDetailKeys.contains('ORD-101'), true);
 
-      // Toggle off
-      controller.toggleRowDetail('ORD-101');
-      expect(controller.isRowExpanded('ORD-101'), false);
+        // Toggle off
+        controller.toggleRowDetail('ORD-101');
+        expect(controller.isRowExpanded('ORD-101'), false);
 
-      // Toggle on
-      controller.toggleRowDetail('ORD-101');
-      expect(controller.isRowExpanded('ORD-101'), true);
+        // Toggle on
+        controller.toggleRowDetail('ORD-101');
+        expect(controller.isRowExpanded('ORD-101'), true);
 
-      // Collapse
-      controller.collapseRow('ORD-101');
-      expect(controller.isRowExpanded('ORD-101'), false);
-    });
+        // Collapse
+        controller.collapseRow('ORD-101');
+        expect(controller.isRowExpanded('ORD-101'), false);
+      },
+    );
 
     test('expandRowAt and toggleRowDetailAt work by view index', () {
-      final dataSource = LocalAiGridDataSource(initialData: testData, columns: columns);
-      controller.setMasterDetailOptions(AiGridMasterDetailOptions(
-        detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
-      ));
+      final dataSource = LocalAiGridDataSource(
+        initialData: testData,
+        columns: columns,
+      );
+      controller.setMasterDetailOptions(
+        AiGridMasterDetailOptions(
+          detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
+        ),
+      );
       controller.attach(columns: columns, dataSource: dataSource);
 
       expect(controller.isRowExpandedAt(0), false);
@@ -125,10 +144,15 @@ void main() {
     });
 
     test('expandAllDetails and collapseAllDetails operate across all rows', () {
-      final dataSource = LocalAiGridDataSource(initialData: testData, columns: columns);
-      controller.setMasterDetailOptions(AiGridMasterDetailOptions(
-        detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
-      ));
+      final dataSource = LocalAiGridDataSource(
+        initialData: testData,
+        columns: columns,
+      );
+      controller.setMasterDetailOptions(
+        AiGridMasterDetailOptions(
+          detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
+        ),
+      );
       controller.attach(columns: columns, dataSource: dataSource);
 
       controller.expandAllDetails();
@@ -143,11 +167,16 @@ void main() {
     });
 
     test('accordion mode collapses other rows when expanding a new row', () {
-      final dataSource = LocalAiGridDataSource(initialData: testData, columns: columns);
-      controller.setMasterDetailOptions(AiGridMasterDetailOptions(
-        detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
-        autoCollapseOthers: true,
-      ));
+      final dataSource = LocalAiGridDataSource(
+        initialData: testData,
+        columns: columns,
+      );
+      controller.setMasterDetailOptions(
+        AiGridMasterDetailOptions(
+          detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
+          autoCollapseOthers: true,
+        ),
+      );
       controller.attach(columns: columns, dataSource: dataSource);
 
       controller.expandRow('ORD-101');
@@ -162,20 +191,35 @@ void main() {
 
     test('onExpansionChanged callback is notified on state changes', () {
       final notifications = <Map<String, dynamic>>[];
-      final dataSource = LocalAiGridDataSource(initialData: testData, columns: columns);
-      controller.setMasterDetailOptions(AiGridMasterDetailOptions(
-        detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
-        onExpansionChanged: (key, isExpanded) {
-          notifications.add({'key': key, 'expanded': isExpanded});
-        },
-      ));
+      final dataSource = LocalAiGridDataSource(
+        initialData: testData,
+        columns: columns,
+      );
+      controller.setMasterDetailOptions(
+        AiGridMasterDetailOptions(
+          detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
+          onExpansionChanged: (key, isExpanded) {
+            notifications.add({'key': key, 'expanded': isExpanded});
+          },
+        ),
+      );
       controller.attach(columns: columns, dataSource: dataSource);
 
       controller.expandRow('ORD-101');
-      expect(notifications.any((n) => n['key'] == 'ORD-101' && n['expanded'] == true), true);
+      expect(
+        notifications.any(
+          (n) => n['key'] == 'ORD-101' && n['expanded'] == true,
+        ),
+        true,
+      );
 
       controller.collapseRow('ORD-101');
-      expect(notifications.any((n) => n['key'] == 'ORD-101' && n['expanded'] == false), true);
+      expect(
+        notifications.any(
+          (n) => n['key'] == 'ORD-101' && n['expanded'] == false,
+        ),
+        true,
+      );
     });
   });
 
@@ -196,10 +240,15 @@ void main() {
         {'id': 'ORD-102', 'customer': 'Globex Inc', 'total': 890.0},
         {'id': 'ORD-103', 'customer': 'Initech LLC', 'total': 120.0},
       ];
-      final dataSource = LocalAiGridDataSource(initialData: testData, columns: columns);
-      controller.setMasterDetailOptions(AiGridMasterDetailOptions(
-        detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
-      ));
+      final dataSource = LocalAiGridDataSource(
+        initialData: testData,
+        columns: columns,
+      );
+      controller.setMasterDetailOptions(
+        AiGridMasterDetailOptions(
+          detailBuilder: (context, row, index) => Text('Row ${row['id']}'),
+        ),
+      );
       controller.attach(columns: columns, dataSource: dataSource);
     });
 
@@ -225,23 +274,26 @@ void main() {
       expect(controller.isRowExpanded('ORD-101'), false);
     });
 
-    test('GridExpandAllDetailsTool and GridCollapseAllDetailsTool via MCP', () async {
-      final expandTool = GridExpandAllDetailsTool(controller);
-      final collapseTool = GridCollapseAllDetailsTool(controller);
-      final statusTool = GridGetDetailStatusTool(controller);
+    test(
+      'GridExpandAllDetailsTool and GridCollapseAllDetailsTool via MCP',
+      () async {
+        final expandTool = GridExpandAllDetailsTool(controller);
+        final collapseTool = GridCollapseAllDetailsTool(controller);
+        final statusTool = GridGetDetailStatusTool(controller);
 
-      final expRes = await expandTool.execute({});
-      expect(expRes.isError, false);
-      expect(controller.expandedDetailCount, 3);
+        final expRes = await expandTool.execute({});
+        expect(expRes.isError, false);
+        expect(controller.expandedDetailCount, 3);
 
-      final statusRes = await statusTool.execute({});
-      final statusJson = jsonDecode(statusRes.content.first.text!);
-      expect(statusJson['enabled'], true);
-      expect(statusJson['expandedCount'], 3);
+        final statusRes = await statusTool.execute({});
+        final statusJson = jsonDecode(statusRes.content.first.text!);
+        expect(statusJson['enabled'], true);
+        expect(statusJson['expandedCount'], 3);
 
-      final collRes = await collapseTool.execute({});
-      expect(collRes.isError, false);
-      expect(controller.expandedDetailCount, 0);
-    });
+        final collRes = await collapseTool.execute({});
+        expect(collRes.isError, false);
+        expect(controller.expandedDetailCount, 0);
+      },
+    );
   });
 }

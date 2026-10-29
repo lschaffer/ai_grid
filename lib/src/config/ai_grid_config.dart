@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
-import 'env_reader_stub.dart'
-    if (dart.library.io) 'env_reader_io.dart';
+
+import 'env_reader_stub.dart' if (dart.library.io) 'env_reader_io.dart';
+
 import 'package:dart_mcp_core/dart_mcp_core.dart';
 
 /// Loads environment variables from `.env` files or rootBundle.
@@ -124,8 +125,6 @@ class AiGridConfig {
   /// Automatically creates an [AiGridConfig] by reading the `.env` file.
   static Future<AiGridConfig> fromEnv({String? envPath}) async {
     await AiGridEnvLoader.load(path: envPath);
-    return AiGridConfig(
-      llmConfig: AiGridEnvLoader.createLlmConfigFromEnv(),
-    );
+    return AiGridConfig(llmConfig: AiGridEnvLoader.createLlmConfigFromEnv());
   }
 }

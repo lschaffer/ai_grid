@@ -29,7 +29,8 @@ class AiGridConditionalFormat {
   final Color? backgroundColor;
   final Color? textColor;
   final FontWeight? fontWeight;
-  final String? operator; // '>', '<', '>=', '<=', '==', '!=', 'contains', 'between'
+  final String?
+  operator; // '>', '<', '>=', '<=', '==', '!=', 'contains', 'between'
   final dynamic targetValue;
   final dynamic secondaryValue;
   final bool applyToRow;
@@ -176,10 +177,9 @@ class AiGridConditionalFormat {
         return rawValue.toString().toLowerCase() !=
             targetValue.toString().toLowerCase();
       case 'contains':
-        return rawValue
-            .toString()
-            .toLowerCase()
-            .contains(targetValue.toString().toLowerCase());
+        return rawValue.toString().toLowerCase().contains(
+          targetValue.toString().toLowerCase(),
+        );
       case 'between':
         final secondNum = _toNum(secondaryValue);
         if (numVal != null && targetNum != null && secondNum != null) {
@@ -220,31 +220,35 @@ class AiGridConditionalFormat {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'field': field,
-        'type': type.name,
-        if (positiveColor != null)
-          'positiveColor': '#${positiveColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
-        if (negativeColor != null)
-          'negativeColor': '#${negativeColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
-        if (min != null) 'min': min,
-        if (max != null) 'max': max,
-        'showText': showText,
-        if (backgroundColor != null)
-          'backgroundColor': '#${backgroundColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
-        if (textColor != null)
-          'textColor': '#${textColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
-        if (operator != null) 'operator': operator,
-        if (targetValue != null) 'targetValue': targetValue,
-        if (secondaryValue != null) 'secondaryValue': secondaryValue,
-        'applyToRow': applyToRow,
-        if (minColor != null)
-          'minColor': '#${minColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
-        if (midColor != null)
-          'midColor': '#${midColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
-        if (maxColor != null)
-          'maxColor': '#${maxColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
-      };
+    'id': id,
+    'field': field,
+    'type': type.name,
+    if (positiveColor != null)
+      'positiveColor':
+          '#${positiveColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
+    if (negativeColor != null)
+      'negativeColor':
+          '#${negativeColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
+    if (min != null) 'min': min,
+    if (max != null) 'max': max,
+    'showText': showText,
+    if (backgroundColor != null)
+      'backgroundColor':
+          '#${backgroundColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
+    if (textColor != null)
+      'textColor':
+          '#${textColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
+    if (operator != null) 'operator': operator,
+    if (targetValue != null) 'targetValue': targetValue,
+    if (secondaryValue != null) 'secondaryValue': secondaryValue,
+    'applyToRow': applyToRow,
+    if (minColor != null)
+      'minColor': '#${minColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
+    if (midColor != null)
+      'midColor': '#${midColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
+    if (maxColor != null)
+      'maxColor': '#${maxColor!.toARGB32().toRadixString(16).padLeft(8, '0')}',
+  };
 
   factory AiGridConditionalFormat.fromJson(Map<String, dynamic> json) {
     Color? parseColor(dynamic c) {

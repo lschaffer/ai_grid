@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import 'ai_grid_column.dart';
 
 /// Abstract contract for data sources feeding [AiGrid].

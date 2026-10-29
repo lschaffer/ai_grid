@@ -110,21 +110,23 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
       columns: columns,
     );
 
-    _controller.setMasterDetailOptions(AiGridMasterDetailOptions(
-      enabled: true,
-      detailRowHeight: _detailRowHeight,
-      autoCollapseOthers: _accordionMode,
-      rowKey: (row) => row['id'] ?? row,
-      initiallyExpandedKeys: {'ORD-2026-901'},
-      detailBuilder: (context, row, rowIndex) {
-        return _MasterDetailPanel(
-          key: ValueKey('detail_panel_${row['id']}'),
-          order: row,
-          rowIndex: rowIndex,
-          isDarkMode: widget.isDarkMode,
-        );
-      },
-    ));
+    _controller.setMasterDetailOptions(
+      AiGridMasterDetailOptions(
+        enabled: true,
+        detailRowHeight: _detailRowHeight,
+        autoCollapseOthers: _accordionMode,
+        rowKey: (row) => row['id'] ?? row,
+        initiallyExpandedKeys: {'ORD-2026-901'},
+        detailBuilder: (context, row, rowIndex) {
+          return _MasterDetailPanel(
+            key: ValueKey('detail_panel_${row['id']}'),
+            order: row,
+            rowIndex: rowIndex,
+            isDarkMode: widget.isDarkMode,
+          );
+        },
+      ),
+    );
 
     _controller.addListener(_onControllerUpdate);
   }
@@ -148,9 +150,7 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
     setState(() {
       _accordionMode = value;
       _controller.setMasterDetailOptions(
-        _controller.masterDetailOptions?.copyWith(
-          autoCollapseOthers: value,
-        ),
+        _controller.masterDetailOptions?.copyWith(autoCollapseOthers: value),
       );
     });
   }
@@ -159,15 +159,16 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
     setState(() {
       _detailRowHeight = height;
       _controller.setMasterDetailOptions(
-        _controller.masterDetailOptions?.copyWith(
-          detailRowHeight: height,
-        ),
+        _controller.masterDetailOptions?.copyWith(detailRowHeight: height),
       );
     });
   }
 
   static Widget _buildStatusCell(
-      BuildContext context, Map<String, dynamic> row, int rowIndex) {
+    BuildContext context,
+    Map<String, dynamic> row,
+    int rowIndex,
+  ) {
     final status = row['status']?.toString() ?? 'Pending';
     Color bg;
     Color fg;
@@ -230,7 +231,10 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
   }
 
   static Widget _buildPriorityCell(
-      BuildContext context, Map<String, dynamic> row, int rowIndex) {
+    BuildContext context,
+    Map<String, dynamic> row,
+    int rowIndex,
+  ) {
     final priority = row['priority']?.toString() ?? 'Standard';
     Color color;
 
@@ -255,10 +259,7 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
             Container(
               width: 7,
               height: 7,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 5),
             Flexible(
@@ -313,7 +314,9 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
                 children: [
                   CircleAvatar(
                     radius: 16,
-                    backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
+                    backgroundColor: colorScheme.primary.withValues(
+                      alpha: 0.15,
+                    ),
                     child: Icon(
                       Icons.unfold_more_rounded,
                       size: 18,
@@ -340,7 +343,9 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.green.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
@@ -379,10 +384,12 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
                             : Icons.keyboard_arrow_down_rounded,
                         size: 20,
                       ),
-                      tooltip:
-                          _isHeaderExpanded ? 'Collapse info' : 'Expand info',
-                      onPressed: () =>
-                          setState(() => _isHeaderExpanded = !_isHeaderExpanded),
+                      tooltip: _isHeaderExpanded
+                          ? 'Collapse info'
+                          : 'Expand info',
+                      onPressed: () => setState(
+                        () => _isHeaderExpanded = !_isHeaderExpanded,
+                      ),
                     ),
                 ],
               ),
@@ -428,8 +435,7 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
                     ),
                     const SizedBox(width: 4),
                     Tooltip(
-                      message:
-                          'When enabled, expanding a row automatically collapses previously expanded rows.',
+                      message: 'When enabled, expanding a row automatically collapses previously expanded rows.',
                       child: Icon(
                         Icons.info_outline_rounded,
                         size: 14,
@@ -447,18 +453,28 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
                   label: const Text('Expand All'),
                   style: OutlinedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     textStyle: const TextStyle(fontSize: 12),
                   ),
-                  onPressed: _accordionMode ? null : () => _controller.expandAllDetails(),
+                  onPressed: _accordionMode
+                      ? null
+                      : () => _controller.expandAllDetails(),
                 ),
 
                 FilledButton.tonalIcon(
                   icon: const Icon(Icons.unfold_less_rounded, size: 15),
-                  label: Text('Collapse All${expandedCount > 0 ? " ($expandedCount)" : ""}'),
+                  label: Text(
+                    'Collapse All${expandedCount > 0 ? " ($expandedCount)" : ""}',
+                  ),
                   style: FilledButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     textStyle: const TextStyle(fontSize: 12),
                   ),
                   onPressed: expandedCount > 0
@@ -474,10 +490,7 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
                   children: [
                     Text(
                       'Panel Height:',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: theme.hintColor,
-                      ),
+                      style: TextStyle(fontSize: 11.5, color: theme.hintColor),
                     ),
                     const SizedBox(width: 8),
                     SegmentedButton<double>(
@@ -825,7 +838,8 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
       ),
     ];
 
-    final items = (widget.order['items'] as List<dynamic>?)
+    final items =
+        (widget.order['items'] as List<dynamic>?)
             ?.map((e) => Map<String, dynamic>.from(e as Map))
             .toList() ??
         const [];
@@ -839,7 +853,8 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
   void didUpdateWidget(covariant _MasterDetailPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.order != oldWidget.order) {
-      final items = (widget.order['items'] as List<dynamic>?)
+      final items =
+          (widget.order['items'] as List<dynamic>?)
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??
           const [];
@@ -859,7 +874,8 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final order = widget.order;
-    final items = (order['items'] as List<dynamic>?)
+    final items =
+        (order['items'] as List<dynamic>?)
             ?.map((e) => Map<String, dynamic>.from(e as Map))
             .toList() ??
         const [];
@@ -905,8 +921,9 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
                     indicatorWeight: 2.5,
                     indicatorColor: colorScheme.primary,
                     labelColor: colorScheme.primary,
-                    unselectedLabelColor:
-                        widget.isDarkMode ? Colors.white60 : Colors.black54,
+                    unselectedLabelColor: widget.isDarkMode
+                        ? Colors.white60
+                        : Colors.black54,
                     labelStyle: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.bold,
@@ -947,7 +964,9 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: widget.isDarkMode ? Colors.white70 : Colors.black87,
+                      color: widget.isDarkMode
+                          ? Colors.white70
+                          : Colors.black87,
                     ),
                   ),
                 ],
@@ -978,7 +997,9 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
 
   Widget _buildChildItemsGrid(BuildContext context) {
     if (_childDataSource.totalRowCount == 0) {
-      return const Center(child: Text('No line items recorded for this order.'));
+      return const Center(
+        child: Text('No line items recorded for this order.'),
+      );
     }
 
     return Padding(
@@ -1007,29 +1028,35 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
   }
 
   Widget _buildShippingTimeline(
-      BuildContext context, Map<String, dynamic> order) {
+    BuildContext context,
+    Map<String, dynamic> order,
+  ) {
     final tracking = order['tracking']?.toString() ?? 'N/A';
     final carrier = order['carrier']?.toString() ?? 'Carrier';
     final address = order['address']?.toString() ?? 'Address not specified';
     final status = order['status']?.toString() ?? 'Pending';
 
     final steps = [
-      {'title': 'Order Placed', 'subtitle': '${order['date']} 09:14 AM', 'done': true},
+      {
+        'title': 'Order Placed',
+        'subtitle': '${order['date']} 09:14 AM',
+        'done': true,
+      },
       {'title': 'Payment Verified', 'subtitle': 'Funds Cleared', 'done': true},
       {
         'title': 'Packed & Dispatched',
         'subtitle': 'Hub Facility',
-        'done': status != 'Pending'
+        'done': status != 'Pending',
       },
       {
         'title': 'In Transit via $carrier',
         'subtitle': 'Tracking: $tracking',
-        'done': status == 'In Transit' || status == 'Delivered'
+        'done': status == 'In Transit' || status == 'Delivered',
       },
       {
         'title': 'Delivered to Customer',
         'subtitle': address,
-        'done': status == 'Delivered'
+        'done': status == 'Delivered',
       },
     ];
 
@@ -1101,14 +1128,17 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
                               fontWeight: FontWeight.bold,
                               color: isDone
                                   ? (widget.isDarkMode
-                                      ? Colors.white
-                                      : Colors.black87)
+                                        ? Colors.white
+                                        : Colors.black87)
                                   : Colors.grey,
                             ),
                           ),
                           Text(
                             step['subtitle'] as String,
-                            style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: Colors.grey,
+                            ),
                           ),
                         ],
                       ),
@@ -1124,7 +1154,9 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
   }
 
   Widget _buildCustomerProfile(
-      BuildContext context, Map<String, dynamic> order) {
+    BuildContext context,
+    Map<String, dynamic> order,
+  ) {
     final customer = order['customer']?.toString() ?? 'Customer';
     final contact = order['contact']?.toString() ?? 'Representative';
     final email = order['email']?.toString() ?? 'N/A';
@@ -1156,7 +1188,10 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
               children: [
                 Text(
                   customer,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1171,7 +1206,10 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
                     _buildInfoChip(Icons.email_outlined, email),
                     _buildInfoChip(Icons.phone_outlined, phone),
                     _buildInfoChip(Icons.location_on_outlined, address),
-                    _buildInfoChip(Icons.receipt_long_outlined, 'Terms: $terms'),
+                    _buildInfoChip(
+                      Icons.receipt_long_outlined,
+                      'Terms: $terms',
+                    ),
                   ],
                 ),
               ],
@@ -1186,7 +1224,9 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: widget.isDarkMode ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+        color: widget.isDarkMode
+            ? Colors.white10
+            : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -1194,10 +1234,7 @@ class _MasterDetailPanelState extends State<_MasterDetailPanel>
         children: [
           Icon(icon, size: 12, color: Colors.grey),
           const SizedBox(width: 4),
-          Text(
-            text,
-            style: const TextStyle(fontSize: 11),
-          ),
+          Text(text, style: const TextStyle(fontSize: 11)),
         ],
       ),
     );

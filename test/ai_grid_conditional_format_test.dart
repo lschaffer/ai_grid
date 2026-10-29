@@ -37,8 +37,7 @@ void main() {
       );
 
       final highlightJson = highlight.toJson();
-      final restoredHighlight =
-          AiGridConditionalFormat.fromJson(highlightJson);
+      final restoredHighlight = AiGridConditionalFormat.fromJson(highlightJson);
       expect(restoredHighlight.field, 'profit');
       expect(restoredHighlight.operator, '<');
       expect(restoredHighlight.applyToRow, true);
@@ -85,9 +84,15 @@ void main() {
       final columns = [
         const AiGridColumn(field: 'id', title: 'ID'),
         const AiGridColumn(
-            field: 'sales', title: 'Sales', type: AiGridColumnType.number),
+          field: 'sales',
+          title: 'Sales',
+          type: AiGridColumnType.number,
+        ),
         const AiGridColumn(
-            field: 'profit', title: 'Profit', type: AiGridColumnType.number),
+          field: 'profit',
+          title: 'Profit',
+          type: AiGridColumnType.number,
+        ),
       ];
 
       final rows = [
@@ -162,7 +167,9 @@ void main() {
       expect(res1.isError, isFalse);
       expect(controller.conditionalFormats.length, 1);
       expect(
-          controller.conditionalFormats.first.type, AiGridFormatType.dataBar);
+        controller.conditionalFormats.first.type,
+        AiGridFormatType.dataBar,
+      );
 
       // Apply highlight via MCP
       final res2 = await setTool.execute({

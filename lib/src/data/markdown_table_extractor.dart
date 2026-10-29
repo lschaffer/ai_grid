@@ -67,10 +67,7 @@ class MarkdownTableExtractor {
       );
     }
 
-    return MarkdownTableResult(
-      columns: columns,
-      rows: rows,
-    );
+    return MarkdownTableResult(columns: columns, rows: rows);
   }
 
   static List<String> _splitRow(String line) {
@@ -97,7 +94,8 @@ class MarkdownTableExtractor {
     if (trimmed.toLowerCase() == 'false') return false;
 
     // Check currency ($1,234.50 or €50.00)
-    final currencyMatch = RegExp(r'^[\$\€\£\¥]\s*([\d,]+(?:\.\d+)?)$').firstMatch(trimmed);
+    final currencyMatch = RegExp(r'^[\$\€\£\¥]\s*([\d,]+(?:\.\d+)?)$')
+        .firstMatch(trimmed);
     if (currencyMatch != null) {
       final clean = currencyMatch.group(1)!.replaceAll(',', '');
       final numVal = double.tryParse(clean);
@@ -129,7 +127,8 @@ class MarkdownTableExtractor {
         numCount++;
       } else if (v is bool) {
         boolCount++;
-      } else if (DateTime.tryParse(v.toString()) != null && v.toString().length >= 8) {
+      } else if (DateTime.tryParse(v.toString()) != null &&
+          v.toString().length >= 8) {
         dateCount++;
       }
     }
@@ -147,8 +146,5 @@ class MarkdownTableResult {
   final List<AiGridDynamicColumnModel> columns;
   final List<Map<String, dynamic>> rows;
 
-  const MarkdownTableResult({
-    required this.columns,
-    required this.rows,
-  });
+  const MarkdownTableResult({required this.columns, required this.rows});
 }

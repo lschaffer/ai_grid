@@ -282,6 +282,9 @@ controller.clearPivot();
 | `grid_delete_datasource` | `name` | Deletes a stored dynamic dataset. |
 | `grid_fetch_web_data` | `url` | Fetches JSON or HTML tables from web endpoints. |
 | `grid_export_datasource_yaml` | `name` | Exports dataset as portable YAML model/data bundle. |
+| `grid_import_excel` | `filePath`, `sheetName`, `base64`, `inspectOnly` | Imports Excel workbook (.xlsx), inspects worksheets, and loads table. |
+| `grid_audit_data` | *(none)* | Audits dataset quality, detecting duplicates, missing values, dirty numbers, mixed dates, whitespace, and IQR outliers; returns 0-100 score. |
+| `grid_apply_data_cleanse` | `action` (`clean_all`, `remove_duplicates`, `clean_numbers`, `standardize_dates`, `trim_whitespace`, `impute_missing`, `cap_outliers`), `field`, `impute_strategy` | Executes automated data cleaning remediations across the active dataset. |
 | `grid_set_conditional_format` | `field`, `type` (`dataBar`, `highlight`, `colorScale`), `operator`, `targetValue`, `backgroundColor`, `textColor` | Applies in-cell visual analytics or row alerts. |
 | `grid_clear_conditional_formats` | `field` (optional) | Clears active conditional formats. |
 | `grid_get_selected_range` | *(none)* | Returns rectangular range coordinates, dimensions, and computed stats (count, sum, avg, min, max). |

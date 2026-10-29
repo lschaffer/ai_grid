@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:dart_mcp_core/dart_mcp_core.dart';
+
 import 'ai_grid_smart_column.dart';
 
 /// Execution runner that evaluates AI Smart Columns using LLMs or local fallbacks.
@@ -94,14 +96,11 @@ class AiGridSmartColumnRunner {
         key: 'smart_column_agent',
         name: 'Smart Column Agent',
         llmConfig: llmConfig,
-        systemPrompt:
-            'You are a high-speed tabular AI assistant synthesizing column values. Output only a raw JSON array of strings without markdown fences.',
+        systemPrompt: 'You are a high-speed tabular AI assistant synthesizing column values. Output only a raw JSON array of strings without markdown fences.',
         initialMessages: [
           ChatMessage.user(promptText, parts: [TextPart(promptText)]),
         ],
-        prompts: [
-          SubPromptStep(text: promptText, stopAfterToolCall: false),
-        ],
+        prompts: [SubPromptStep(text: promptText, stopAfterToolCall: false)],
         dartTools: const [],
         remoteServers: const [],
         localServers: const [],
@@ -122,13 +121,20 @@ class AiGridSmartColumnRunner {
         try {
           var clean = responseText!.trim();
           if (clean.startsWith('```json')) {
-            clean = clean.replaceAll('```json', '').replaceAll('```', '').trim();
+            clean = clean
+                .replaceAll('```json', '')
+                .replaceAll('```', '')
+                .trim();
           } else if (clean.startsWith('```')) {
             clean = clean.replaceAll('```', '').trim();
           }
           final decoded = jsonDecode(clean);
           if (decoded is List) {
-            for (var i = 0; i < chunkIndices.length && i < decoded.length; i++) {
+            for (
+              var i = 0;
+              i < chunkIndices.length && i < decoded.length;
+              i++
+            ) {
               out[chunkIndices[i]] = decoded[i]?.toString();
             }
           }
@@ -140,10 +146,14 @@ class AiGridSmartColumnRunner {
 
   /// Intelligent local heuristic fallback for common NLP prompt categories.
   static String heuristicFallback(
-      AiGridSmartColumn column, Map<String, dynamic> row) {
+    AiGridSmartColumn column,
+    Map<String, dynamic> row,
+  ) {
     final lowerPrompt = column.promptTemplate.toLowerCase();
-    final combinedRowText =
-        row.values.map((v) => v?.toString() ?? '').join(' ').toLowerCase();
+    final combinedRowText = row.values
+        .map((v) => v?.toString() ?? '')
+        .join(' ')
+        .toLowerCase();
 
     // 1. Sentiment analysis
     if (lowerPrompt.contains('sentiment')) {
@@ -192,8 +202,9 @@ class AiGridSmartColumnRunner {
           combinedRowText.contains('blocker') ||
           combinedRowText.contains('data loss')) {
         return column.options?.firstWhere(
-                (o) => o.contains('1') || o.toLowerCase().contains('critical'),
-                orElse: () => 'P1 (Critical)') ??
+              (o) => o.contains('1') || o.toLowerCase().contains('critical'),
+              orElse: () => 'P1 (Critical)',
+            ) ??
             'P1 (Critical)';
       }
       if (combinedRowText.contains('error') ||
@@ -201,8 +212,9 @@ class AiGridSmartColumnRunner {
           combinedRowText.contains('urgent') ||
           combinedRowText.contains('fail')) {
         return column.options?.firstWhere(
-                (o) => o.contains('2') || o.toLowerCase().contains('high'),
-                orElse: () => 'P2 (High)') ??
+              (o) => o.contains('2') || o.toLowerCase().contains('high'),
+              orElse: () => 'P2 (High)',
+            ) ??
             'P2 (High)';
       }
       if (combinedRowText.contains('slow') ||
@@ -210,13 +222,15 @@ class AiGridSmartColumnRunner {
           combinedRowText.contains('question') ||
           combinedRowText.contains('feature')) {
         return column.options?.firstWhere(
-                (o) => o.contains('3') || o.toLowerCase().contains('med'),
-                orElse: () => 'P3 (Medium)') ??
+              (o) => o.contains('3') || o.toLowerCase().contains('med'),
+              orElse: () => 'P3 (Medium)',
+            ) ??
             'P3 (Medium)';
       }
       return column.options?.firstWhere(
-              (o) => o.contains('4') || o.toLowerCase().contains('low'),
-              orElse: () => 'P4 (Low)') ??
+            (o) => o.contains('4') || o.toLowerCase().contains('low'),
+            orElse: () => 'P4 (Low)',
+          ) ??
           'P4 (Low)';
     }
 
