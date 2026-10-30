@@ -6,11 +6,13 @@ import 'package:ai_grid/ai_grid.dart';
 class SmartColumnsExamplePage extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+  final Set<AiGridFeatureSkill>? activeSkills;
 
   const SmartColumnsExamplePage({
     super.key,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.activeSkills,
   });
 
   @override
@@ -658,6 +660,7 @@ class _SmartColumnsExamplePageState extends State<SmartColumnsExamplePage> {
                   controller: _controller,
                   aiConfig: _aiConfig,
                   enableAiAssistant: true,
+                  enabledSkills: widget.activeSkills,
                   autoSave: false,
                 ),
               ),

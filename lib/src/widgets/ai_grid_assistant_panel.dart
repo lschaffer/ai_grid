@@ -15,8 +15,8 @@ import '../controllers/ai_grid_controller.dart';
 import '../data/clipboard_content_service.dart';
 import '../data/pdf_table_extractor.dart';
 import '../data/excel_table_parser.dart';
-import '../mcp/ai_grid_tools.dart';
 import '../models/ai_grid_column.dart';
+import '../models/ai_grid_feature_skill.dart';
 import '../theme/ai_grid_theme.dart';
 
 /// Floating AI Assistant panel providing interactive conversation,
@@ -85,6 +85,21 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
   void initState() {
     super.initState();
     _initDefaultSuggestions();
+    widget.controller.pendingAiPrompt.addListener(_onPendingAiPromptChanged);
+    if (widget.controller.pendingAiPrompt.value != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _onPendingAiPromptChanged();
+      });
+    }
+  }
+
+  void _onPendingAiPromptChanged() {
+    final prompt = widget.controller.pendingAiPrompt.value;
+    if (prompt != null && prompt.trim().isNotEmpty) {
+      _textCtrl.text = prompt;
+      widget.controller.clearPendingAiPrompt();
+      _handleSend();
+    }
   }
 
   bool get _isDynamicMode =>
@@ -123,6 +138,7 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
 
   @override
   void dispose() {
+    widget.controller.pendingAiPrompt.removeListener(_onPendingAiPromptChanged);
     _scrollController.dispose();
     _textCtrl.dispose();
     super.dispose();
@@ -372,13 +388,18 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
       attachments: attachments,
     );
 
-    final tools = AiGridSkill.createTools(widget.controller);
+    final enableDynamicToggling =
+        widget.aiConfig?.enableDynamicSkillToggling ?? true;
+    final tools = widget.controller.getActiveTools(
+      enableDynamicSkillToggling: enableDynamicToggling,
+    );
     final agent = Agent(
       key: 'ai_grid_agent',
       name: 'DataGrid Agent',
       llmConfig: config,
       systemPrompt:
-          widget.aiConfig?.systemPrompt ?? AiGridSkill.defaultSystemPrompt,
+          widget.aiConfig?.systemPrompt ??
+          widget.controller.getActiveSystemPrompt(),
       initialMessages: [userMsg],
       prompts: [SubPromptStep(text: effectivePrompt, stopAfterToolCall: false)],
       dartTools: tools,
@@ -743,6 +764,10 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
     final content = Column(
       children: [
         if (!widget.embeddedInWindow) _buildHeader(context),
+        ListenableBuilder(
+          listenable: widget.controller,
+          builder: (context, _) => _buildSkillsDock(context),
+        ),
         Expanded(child: _buildMessageList(context)),
         _buildSuggestionChips(context),
         _buildInputBox(context),
@@ -834,6 +859,128 @@ class _AiGridAssistantPanelState extends State<AiGridAssistantPanel> {
             color: colorScheme.onSurfaceVariant,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSkillsDock(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+    final activeSkills = widget.controller.activeSkills;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+            : const Color(0xFFF1F5F9),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark
+                ? colorScheme.outlineVariant.withAlpha(40)
+                : theme.dividerColor.withValues(alpha: 0.2),
+          ),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.extension_outlined,
+                  size: 13,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Skills:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+            ),
+            for (final skill in AiGridFeatureSkill.values) ...[
+              () {
+                final isActive = activeSkills.contains(skill);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Tooltip(
+                    message: skill.isAlwaysOn
+                        ? '${skill.displayName} (Always Active)'
+                        : (isActive
+                            ? 'Click to deactivate ${skill.displayName}'
+                            : 'Click to activate ${skill.displayName}'),
+                    child: InkWell(
+                      onTap: skill.isAlwaysOn
+                          ? null
+                          : () => widget.controller.toggleSkill(skill),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? colorScheme.primary.withValues(
+                                  alpha: isDark ? 0.25 : 0.12,
+                                )
+                              : (isDark
+                                  ? Colors.white10
+                                  : Colors.black.withValues(alpha: 0.04)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isActive
+                                ? colorScheme.primary.withValues(alpha: 0.6)
+                                : (isDark ? Colors.white12 : Colors.black12),
+                            width: isActive ? 1.0 : 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isActive)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 3),
+                                child: Icon(
+                                  Icons.check,
+                                  size: 10,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                            Text(
+                              skill.displayName,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: isActive
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: isActive
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant.withValues(
+                                        alpha: 0.8,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }(),
+            ],
+          ],
+        ),
       ),
     );
   }

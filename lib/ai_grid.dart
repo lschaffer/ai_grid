@@ -34,6 +34,11 @@ export 'src/widgets/ai_grid_excel_dialogs.dart';
 export 'src/models/ai_grid_data_auditor.dart';
 export 'src/data/ai_grid_data_cleaner.dart';
 export 'src/widgets/ai_grid_data_auditor_dialog.dart';
+export 'src/models/ai_grid_view_mode.dart';
+export 'src/models/ai_grid_context_action.dart';
+export 'src/models/ai_grid_feature_skill.dart';
+export 'src/widgets/ai_grid_context_menu.dart';
+export 'src/widgets/ai_grid_card_view.dart';
 export 'src/mcp/ai_grid_tools.dart';
 export 'src/config/ai_grid_settings_storage.dart';
 

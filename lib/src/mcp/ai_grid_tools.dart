@@ -17,6 +17,8 @@ import '../models/ai_grid_dynamic_datasource.dart';
 import '../models/ai_grid_pivot.dart';
 import '../models/ai_grid_smart_column.dart';
 import '../models/ai_grid_data_auditor.dart';
+import '../models/ai_grid_view_mode.dart';
+import '../models/ai_grid_feature_skill.dart';
 
 /// Exposes all local tools and skill manifest for [AiGrid] control via MCP.
 class AiGridSkill {
@@ -26,82 +28,263 @@ class AiGridSkill {
   static const String skillDescription =
       'Controls an interactive AI DataGrid: inspect schema, filter (supports multi-column AND), calculate exact metrics without hallucinations, sort, group, search, show/hide columns, create dynamic grids from files or web GET, and reset tabular data.';
 
-  /// Creates all MCP tools bound to the provided [controller].
-  static List<McpLocalTool> createTools(AiGridController controller) {
-    return [
-      GridGetSchemaTool(controller),
-      GridGetStateTool(controller),
-      GridGetSampleTool(controller),
-      GridCalculateTool(controller),
-      GridSetFilterTool(controller),
-      GridClearFiltersTool(controller),
-      GridSearchTool(controller),
-      GridSortTool(controller),
-      GridGroupTool(controller),
-      GridSetColumnVisibilityTool(controller),
-      GridResetTool(controller),
-      ExportTool(controller),
-      GridExportTool(controller),
-      GridGoToPageTool(controller),
-      GridGetPaginationTool(controller),
-      GridExportSettingsTool(controller),
-      GridRestoreSettingsTool(controller),
-      GridCreatePivotTableTool(controller),
-      GridResetPivotTableTool(controller),
-      GridCreateDynamicDatasourceTool(controller),
-      GridListDatasourcesTool(controller),
-      GridLoadDatasourceTool(controller),
-      GridDeleteDatasourceTool(controller),
-      GridFetchWebDataTool(controller),
-      GridExportDatasourceYamlTool(controller),
-      GridSetConditionalFormatTool(controller),
-      GridClearConditionalFormatsTool(controller),
-      GridGetSelectedRangeTool(controller),
-      GridSelectRangeTool(controller),
-      GridAddSmartColumnTool(controller),
-      GridRunSmartColumnsTool(controller),
-      GridToggleRowDetailTool(controller),
-      GridExpandAllDetailsTool(controller),
-      GridCollapseAllDetailsTool(controller),
-      GridGetDetailStatusTool(controller),
-      GridImportExcelTool(controller),
-      GridAuditDataTool(controller),
-      GridApplyDataCleanseTool(controller),
-    ];
+  /// Returns modular [SkillDefinition]s mapped by [AiGridFeatureSkill].
+  static Map<AiGridFeatureSkill, SkillDefinition> getSkillDefinitions(
+    AiGridController controller,
+  ) {
+    return {
+      AiGridFeatureSkill.core: SkillDefinition(
+        name: AiGridFeatureSkill.core.id,
+        description: AiGridFeatureSkill.core.description,
+        isAlwaysOn: true,
+        systemPrompt: _coreSystemPrompt,
+        tools: [
+          GridGetSchemaTool(controller),
+          GridGetStateTool(controller),
+          GridGetSampleTool(controller),
+          GridCalculateTool(controller),
+          GridSetFilterTool(controller),
+          GridClearFiltersTool(controller),
+          GridSearchTool(controller),
+          GridSortTool(controller),
+          GridGroupTool(controller),
+          GridSetColumnVisibilityTool(controller),
+          GridResetTool(controller),
+          ExportTool(controller),
+          GridExportTool(controller),
+          GridGoToPageTool(controller),
+          GridGetPaginationTool(controller),
+          GridExportSettingsTool(controller),
+          GridRestoreSettingsTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.pivot: SkillDefinition(
+        name: AiGridFeatureSkill.pivot.id,
+        description: AiGridFeatureSkill.pivot.description,
+        isAlwaysOn: false,
+        systemPrompt: _pivotSystemPrompt,
+        tools: [
+          GridCreatePivotTableTool(controller),
+          GridResetPivotTableTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.dynamicGrid: SkillDefinition(
+        name: AiGridFeatureSkill.dynamicGrid.id,
+        description: AiGridFeatureSkill.dynamicGrid.description,
+        isAlwaysOn: false,
+        systemPrompt: _dynamicGridSystemPrompt,
+        tools: [
+          GridCreateDynamicDatasourceTool(controller),
+          GridListDatasourcesTool(controller),
+          GridLoadDatasourceTool(controller),
+          GridDeleteDatasourceTool(controller),
+          GridFetchWebDataTool(controller),
+          GridExportDatasourceYamlTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.conditionalFormatting: SkillDefinition(
+        name: AiGridFeatureSkill.conditionalFormatting.id,
+        description: AiGridFeatureSkill.conditionalFormatting.description,
+        isAlwaysOn: false,
+        systemPrompt: _conditionalFormattingSystemPrompt,
+        tools: [
+          GridSetConditionalFormatTool(controller),
+          GridClearConditionalFormatsTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.rangeSelection: SkillDefinition(
+        name: AiGridFeatureSkill.rangeSelection.id,
+        description: AiGridFeatureSkill.rangeSelection.description,
+        isAlwaysOn: false,
+        systemPrompt: _rangeSelectionSystemPrompt,
+        tools: [
+          GridGetSelectedRangeTool(controller),
+          GridSelectRangeTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.smartColumns: SkillDefinition(
+        name: AiGridFeatureSkill.smartColumns.id,
+        description: AiGridFeatureSkill.smartColumns.description,
+        isAlwaysOn: false,
+        systemPrompt: _smartColumnsSystemPrompt,
+        tools: [
+          GridAddSmartColumnTool(controller),
+          GridRunSmartColumnsTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.masterDetail: SkillDefinition(
+        name: AiGridFeatureSkill.masterDetail.id,
+        description: AiGridFeatureSkill.masterDetail.description,
+        isAlwaysOn: false,
+        systemPrompt: _masterDetailSystemPrompt,
+        tools: [
+          GridToggleRowDetailTool(controller),
+          GridExpandAllDetailsTool(controller),
+          GridCollapseAllDetailsTool(controller),
+          GridGetDetailStatusTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.excelImport: SkillDefinition(
+        name: AiGridFeatureSkill.excelImport.id,
+        description: AiGridFeatureSkill.excelImport.description,
+        isAlwaysOn: false,
+        systemPrompt: _excelImportSystemPrompt,
+        tools: [
+          GridImportExcelTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.dataAuditor: SkillDefinition(
+        name: AiGridFeatureSkill.dataAuditor.id,
+        description: AiGridFeatureSkill.dataAuditor.description,
+        isAlwaysOn: false,
+        systemPrompt: _dataAuditorSystemPrompt,
+        tools: [
+          GridAuditDataTool(controller),
+          GridApplyDataCleanseTool(controller),
+        ],
+      ),
+      AiGridFeatureSkill.cardView: SkillDefinition(
+        name: AiGridFeatureSkill.cardView.id,
+        description: AiGridFeatureSkill.cardView.description,
+        isAlwaysOn: false,
+        systemPrompt: _cardViewSystemPrompt,
+        tools: [
+          GridSetViewModeTool(controller),
+          GridExecuteContextActionTool(controller),
+        ],
+      ),
+    };
   }
 
-  static const String defaultSystemPrompt = '''
-You are an expert data analyst assistant embedded directly in an interactive DataGrid.
-Use the available tools to help the user explore, filter, sort, group, show or hide columns, calculate metrics, and analyze tabular data.
-Always start by checking the schema or current state if you need context on column names and values.
+  /// Creates MCP tools bound to the provided [controller], respecting [activeSkills].
+  ///
+  /// If [activeSkills] is null, defaults to [controller.activeSkills].
+  /// When [enableDynamicSkillToggling] is true, appends [ActivateSkillsTool]
+  /// and [DeactivateSkillsTool] so the agent can autonomously activate
+  /// capabilities on-demand.
+  static List<McpLocalTool> createTools(
+    AiGridController controller, {
+    Set<AiGridFeatureSkill>? activeSkills,
+    bool enableDynamicSkillToggling = true,
+  }) {
+    final effectiveSkills = activeSkills ?? controller.activeSkills;
+    final definitions = getSkillDefinitions(controller);
 
-IMPORTANT RULES FOR CALCULATIONS:
+    final tools = <McpLocalTool>[];
+
+    // Always include core tools
+    final coreDef = definitions[AiGridFeatureSkill.core];
+    if (coreDef != null) {
+      tools.addAll(coreDef.tools);
+    }
+
+    // Add tools for active feature skills
+    for (final skill in effectiveSkills) {
+      if (skill == AiGridFeatureSkill.core) continue;
+      final def = definitions[skill];
+      if (def != null) {
+        tools.addAll(def.tools);
+      }
+    }
+
+    // Dynamic skill toggling tools
+    if (enableDynamicSkillToggling) {
+      final availableSkills = AiGridFeatureSkill.values
+          .where((s) => !effectiveSkills.contains(s))
+          .map((s) => s.id)
+          .toList();
+
+      tools.add(
+        ActivateSkillsTool(
+          availableSkills: availableSkills,
+          onActivate: (skillNames) async {
+            return controller.activateSkillsByName(skillNames);
+          },
+        ),
+      );
+
+      tools.add(
+        DeactivateSkillsTool(
+          onDeactivate: (skillNames) async {
+            return controller.deactivateSkillsByName(skillNames);
+          },
+        ),
+      );
+    }
+
+    return tools;
+  }
+
+  /// Dynamically assembles the system prompt from only active skills.
+  static String getSystemPrompt({
+    Set<AiGridFeatureSkill>? activeSkills,
+    bool includeSkillGuide = true,
+  }) {
+    final effectiveSkills = activeSkills ?? Set.from(AiGridFeatureSkill.values);
+    final buffer = StringBuffer();
+
+    buffer.writeln('You are an expert data analyst assistant embedded directly in an interactive DataGrid.');
+    buffer.writeln('Use the available tools to help the user explore, filter, sort, group, show or hide columns, calculate metrics, and analyze tabular data.');
+    buffer.writeln('Always start by checking the schema or current state if you need context on column names and values.');
+    buffer.writeln();
+
+    // Core prompt
+    buffer.writeln(_coreSystemPrompt);
+
+    // Feature skill prompts
+    if (effectiveSkills.contains(AiGridFeatureSkill.pivot)) {
+      buffer.writeln(_pivotSystemPrompt);
+    }
+    if (effectiveSkills.contains(AiGridFeatureSkill.dynamicGrid)) {
+      buffer.writeln(_dynamicGridSystemPrompt);
+    }
+    if (effectiveSkills.contains(AiGridFeatureSkill.conditionalFormatting)) {
+      buffer.writeln(_conditionalFormattingSystemPrompt);
+    }
+    if (effectiveSkills.contains(AiGridFeatureSkill.rangeSelection)) {
+      buffer.writeln(_rangeSelectionSystemPrompt);
+    }
+    if (effectiveSkills.contains(AiGridFeatureSkill.smartColumns)) {
+      buffer.writeln(_smartColumnsSystemPrompt);
+    }
+    if (effectiveSkills.contains(AiGridFeatureSkill.masterDetail)) {
+      buffer.writeln(_masterDetailSystemPrompt);
+    }
+    if (effectiveSkills.contains(AiGridFeatureSkill.excelImport)) {
+      buffer.writeln(_excelImportSystemPrompt);
+    }
+    if (effectiveSkills.contains(AiGridFeatureSkill.dataAuditor)) {
+      buffer.writeln(_dataAuditorSystemPrompt);
+    }
+    if (effectiveSkills.contains(AiGridFeatureSkill.cardView)) {
+      buffer.writeln(_cardViewSystemPrompt);
+    }
+
+    if (includeSkillGuide) {
+      final activeList = effectiveSkills.map((s) => '`${s.id}` (${s.displayName})').join(', ');
+      final inactive = AiGridFeatureSkill.values.where((s) => !effectiveSkills.contains(s)).toList();
+      final inactiveList = inactive.isEmpty
+          ? 'none (all active)'
+          : inactive.map((s) => '`${s.id}` (${s.displayName})').join(', ');
+
+      buffer.writeln('''
+DYNAMIC SKILL ACTIVATION:
+You have access to modular feature skills that can be toggled on-demand:
+- Active skills: $activeList
+- Inactive skills available to activate: $inactiveList
+If the user asks for a capability belonging to an inactive skill (e.g. pivot tables, Excel import, data auditor, card view, smart columns), you can dynamically activate it using `activate_skills(skills: ["<skill_id>"])`.
+When done or to reduce context usage, you can deactivate skills using `deactivate_skills(skills: ["<skill_id>"])`.
+''');
+    }
+
+    buffer.writeln('Confirm the actions and calculations clearly and concisely to the user. Do not append extra explanatory notes like "(active filters joined by AND)" or "(joined by AND)".');
+
+    return buffer.toString();
+  }
+
+  static const String _coreSystemPrompt = '''
+CORE DATAGRID CONTROLS:
 • When the user asks to calculate, average, mean, sum, total, minimum, maximum, count, or median (e.g. "calculate avg sale amount", "what is the total profit", "calculate average discount by category"), ALWAYS use the `grid_calculate` tool. DO NOT calculate numbers in your head or hallucinate math. The grid engine calculates exact values in Dart.
-
-IMPORTANT RULES FOR AI SMART / SYNTHESIZED COLUMNS:
-• When the user asks to add or create a column that analyzes, classifies, scores, summarizes, or translates existing row data (e.g. "add a sentiment column based on feedback", "create an urgency column from P1 to P4 based on issue", "add a column summarizing each row", "translate comments to Spanish"):
-  ALWAYS use `grid_add_smart_column`!
-  - `field`: clean column identifier (e.g. "sentiment", "urgency", "summary", "translated_notes")
-  - `title`: descriptive column header title (e.g. "AI Sentiment", "Urgency")
-  - `promptTemplate`: the instruction with `{field_name}` placeholders (e.g. "Classify sentiment of '{feedback}' as Positive, Neutral, or Negative")
-  - `options`: optional list of allowed category strings if constrained (e.g. ["Positive", "Neutral", "Negative"])
-  - `autoRun`: true to start evaluation immediately
-• When the user asks to "run smart columns", "evaluate AI columns", "re-run smart column analysis", or "synthesize values":
-  Use `grid_run_smart_columns`.
-
-IMPORTANT RULES FOR CELL SELECTION VS FILTERING:
-• CRITICAL: "SELECT", "SELECT CELLS", "HIGHLIGHT CELLS", "RANGE SELECTION" mean selecting interactive cells on the canvas using `grid_select_range`.
-  DO NOT use `grid_set_filter` when the user asks to "select" or "highlight" cells! Filtering hides rows from view, whereas selecting highlights cells on the canvas, opens the selection summary in the status bar, and enables Excel copy/paste.
-• When the user asks to "select low margin cells", "select lowest margin", "select high margin cells", "select highest profit", "select sales cells", "select negative values":
-  ALWAYS use `grid_select_range` with semantic arguments:
-  - `field`: The column name (e.g. "margin", "profit", "sales")
-  - `condition`: "lowest", "highest", "lessThan", "greaterThan", or "negative"
-  - `targetValue`: Numeric threshold if specified (e.g. 0.20 or 0)
-  - `count`: Number of rows to select (e.g. 3, 5, or omitted for defaults)
-• When the user specifies rectangular cell coordinates or column ranges (e.g. "select rows 0 to 3 for Q1 to Q2 revenue", "select all cells"):
-  Use `grid_select_range` with `startRow`, `startColumn`, `endRow`, `endColumn`.
-• When the user asks for "selected cells summary" or "what is the sum/avg of selected cells":
-  Use `grid_get_selected_range` to inspect active selection stats.
 
 IMPORTANT RULES FOR FILTERS:
 • When the user specifies multiple filter conditions on DIFFERENT columns (e.g. "filter region South and Category Furniture"), use `grid_set_filter` with the `filters` array to apply ALL conditions joined by AND.
@@ -115,7 +298,7 @@ IMPORTANT RULES FOR SORTING:
 IMPORTANT RULES FOR EXPORTING:
 • When the user asks to export, download, or save table or grid data (e.g. "export table", "export data", "export grid", "export to excel", "export to xlsx", "download data", "save table"):
   ALWAYS call the `export` tool.
-  This triggers the platform "Save As..." dialog (on Web, Desktop, and Mobile) so the user can select their output directory and enter their desired filename, exporting cleanly to Excel (.xlsx) using FitGrid's native XLSX engine.
+  This triggers the platform "Save As..." dialog so the user can select their output directory and enter their desired filename, exporting cleanly to Excel (.xlsx) using FitGrid's native XLSX engine.
 • For legacy or programmatic raw CSV/JSON downloads, `grid_export` is also available.
 
 IMPORTANT RULES FOR COLUMN VISIBILITY:
@@ -123,17 +306,21 @@ IMPORTANT RULES FOR COLUMN VISIBILITY:
   Use `grid_set_column_visibility` with `showOnly: ["X", "Y", "Z"]`. This will automatically HIDE all other columns and display only the requested ones!
 • When the user asks to hide specific columns (e.g. "hide column X"), use `hideColumns: ["X"]` or `column: "X", visible: false`.
 • When the user asks to restore or show all columns, use `grid_reset`.
+''';
 
-IMPORTANT RULES FOR PIVOT TABLES:
+  static const String _pivotSystemPrompt = '''
+PIVOT MATRIX & CHARTS:
 • When the user asks to create, build, or convert into a pivot table (e.g. "create a pivot table - rows (order id, order date), columns country, city, segment, data (sales - type: sum, discount - type avg)" or "pivot by category with sum of profit"):
   ALWAYS use the `grid_create_pivot_table` tool!
   - Map requested row dimensions to `rows: ["..."]`
   - Map requested column dimensions to `columns: ["..."]`
   - Map numeric metrics to `data: [{"column": "sales", "aggregation": "sum"}, {"column": "discount", "aggregation": "average"}]`
-  - Set `showChart: true` to auto-create a chart beside the table.
+  - Set `showChart: true` to auto-create an interactive chart beside the table.
 • When the user asks to exit, close, or switch back from pivot mode to the normal table (e.g. "switch back to normal table mode", "exit pivot"), use `grid_reset_pivot_table`.
+''';
 
-IMPORTANT RULES FOR DYNAMIC DATAGRIDS & ATTACHMENTS:
+  static const String _dynamicGridSystemPrompt = '''
+DYNAMIC DATAGRIDS & INGESTION:
 • When the user attaches a file, document, PDF, or image/screenshot and asks to create a grid/table from it (e.g. "create datagrid from attached file", "extract table from picture/pdf and create editable grid, name is monthly sales"):
   1. Inspect the attached document or image to find tabular data.
   2. Determine column names and detect appropriate types ('text', 'number', 'currency', 'date', 'boolean').
@@ -146,10 +333,67 @@ IMPORTANT RULES FOR DYNAMIC DATAGRIDS & ATTACHMENTS:
 • When the user asks to fetch data from a web URL (e.g. "fetch webpage from https://... and extract data into grid"):
   Use `grid_fetch_web_data` with the url. If table data is extracted, it will automatically register it as a read-only dynamic DataGrid.
 • To list or switch between saved dynamic datasets, use `grid_list_datasources` and `grid_load_datasource`.
-• When the user asks to import, inspect, or load an Excel (.xlsx) workbook (e.g. "import excel file", "load sales.xlsx"):
-  Use `grid_import_excel`! To check sheet names first without loading, set `inspectOnly: true`. To load a specific sheet, specify `sheetName`.
+• To export datasource schema to YAML, use `grid_export_datasource_yaml`.
+''';
 
-IMPORTANT RULES FOR DATA QUALITY AUDITING & CLEANING:
+  static const String _conditionalFormattingSystemPrompt = '''
+CONDITIONAL FORMATTING:
+• Use `grid_set_conditional_format` to create visual rules:
+  - `type`: "dataBar", "highlight", or "colorScale"
+  - `field`: Target column field name
+  - For data bars: specify `color` (hex string, e.g. "#107C41")
+  - For highlight: specify `operator` ("greaterThan", "lessThan", "equals", "between", "contains") and `value`, `color`, `textColor`
+  - For colorScale: specify 2 or 3 colors for min, mid, and max
+• Use `grid_clear_conditional_formats` to remove all or specific formatting rules.
+''';
+
+  static const String _rangeSelectionSystemPrompt = '''
+CELL SELECTION & RANGE TOOLS:
+• CRITICAL: "SELECT", "SELECT CELLS", "HIGHLIGHT CELLS", "RANGE SELECTION" mean selecting interactive cells on the canvas using `grid_select_range`.
+  DO NOT use `grid_set_filter` when the user asks to "select" or "highlight" cells! Filtering hides rows from view, whereas selecting highlights cells on the canvas, opens the selection summary in the status bar, and enables Excel copy/paste.
+• When the user asks to "select low margin cells", "select lowest margin", "select high margin cells", "select highest profit", "select sales cells", "select negative values":
+  ALWAYS use `grid_select_range` with semantic arguments:
+  - `field`: The column name (e.g. "margin", "profit", "sales")
+  - `condition`: "lowest", "highest", "lessThan", "greaterThan", or "negative"
+  - `targetValue`: Numeric threshold if specified (e.g. 0.20 or 0)
+  - `count`: Number of rows to select (e.g. 3, 5, or omitted for defaults)
+• When the user specifies rectangular cell coordinates or column ranges (e.g. "select rows 0 to 3 for Q1 to Q2 revenue", "select all cells"):
+  Use `grid_select_range` with `startRow`, `startColumn`, `endRow`, `endColumn`.
+• When the user asks for "selected cells summary" or "what is the sum/avg of selected cells":
+  Use `grid_get_selected_range` to inspect active selection stats.
+''';
+
+  static const String _smartColumnsSystemPrompt = '''
+AI SMART / SYNTHESIZED COLUMNS:
+• When the user asks to add or create a column that analyzes, classifies, scores, summarizes, or translates existing row data (e.g. "add a sentiment column based on feedback", "create an urgency column from P1 to P4 based on issue", "add a column summarizing each row", "translate comments to Spanish"):
+  ALWAYS use `grid_add_smart_column`!
+  - `field`: clean column identifier (e.g. "sentiment", "urgency", "summary", "translated_notes")
+  - `title`: descriptive column header title (e.g. "AI Sentiment", "Urgency")
+  - `promptTemplate`: the instruction with `{field_name}` placeholders (e.g. "Classify sentiment of '{feedback}' as Positive, Neutral, or Negative")
+  - `options`: optional list of allowed category strings if constrained (e.g. ["Positive", "Neutral", "Negative"])
+  - `autoRun`: true to start evaluation immediately
+• When the user asks to "run smart columns", "evaluate AI columns", "re-run smart column analysis", or "synthesize values":
+  Use `grid_run_smart_columns`.
+''';
+
+  static const String _masterDetailSystemPrompt = '''
+MASTER-DETAIL CHILD ROWS:
+• Use `grid_toggle_row_detail` with `rowIndex` to expand or collapse child details for an individual row.
+• Use `grid_expand_all_details` to expand all row details across the grid.
+• Use `grid_collapse_all_details` to collapse all open row details.
+• Use `grid_get_detail_status` to inspect which rows currently have open detail views.
+''';
+
+  static const String _excelImportSystemPrompt = '''
+EXCEL WORKBOOK IMPORT:
+• When the user asks to import, inspect, or load an Excel (.xlsx/.xls) workbook (e.g. "import excel file", "load sales.xlsx"):
+  ALWAYS use `grid_import_excel`!
+  - To check sheet names first without loading, set `inspectOnly: true`.
+  - To load a specific sheet, specify `sheetName`.
+''';
+
+  static const String _dataAuditorSystemPrompt = '''
+DATA QUALITY AUDITING & CLEANING:
 • When the user asks to "audit data", "check data health", "find duplicates", "find dirty numbers", "detect outliers", "inspect quality", or "check data hygiene":
   ALWAYS use `grid_audit_data`.
   This analyzes the dataset and returns an overall health score (0-100), issue counts, affected rows, and sample dirty values.
@@ -157,9 +401,18 @@ IMPORTANT RULES FOR DATA QUALITY AUDITING & CLEANING:
   ALWAYS use `grid_apply_data_cleanse`.
   - Use `action: "clean_all"` when asked to clean everything or fix all anomalies.
   - Or use specific actions: "remove_duplicates", "clean_numbers", "standardize_dates", "trim_whitespace", "impute_missing", "cap_outliers".
-
-Confirm the actions and calculations clearly and concisely to the user. Do not append extra explanatory notes like "(active filters joined by AND)" or "(joined by AND)".
 ''';
+
+  static const String _cardViewSystemPrompt = '''
+VIEW MODES & CONTEXTUAL ACTIONS:
+• When the user asks to change or toggle the view mode (e.g. "switch to card view", "show as cards", "mobile view", "switch to grid", "table view"):
+  ALWAYS use `grid_set_view_mode` with `view_mode`: "grid", "card", or "toggle".
+• When the user asks to trigger a contextual AI action on a specific record (e.g. "ask AI about order ORD-102", "draft email from row 3", "explain sales value in row 2", "filter similar records"):
+  Use `grid_execute_context_action` with `action` ("ask_ai", "draft_message", "explain_value", "filter_similar", "copy_cell", "copy_row") and `row_index`.
+''';
+
+  /// Default backwards-compatible system prompt assembling all skills.
+  static String get defaultSystemPrompt => getSystemPrompt();
 
   /// Creates a SkillManifest representing the AI Grid skill.
   static SkillManifest createSkillManifest(AiGridController controller) {
@@ -2991,5 +3244,175 @@ class GridApplyDataCleanseTool extends McpLocalTool {
 
     final res = controller.cleanData(remediation);
     return MCPToolResult.text(jsonEncode(res.toJson()));
+  }
+}
+
+/// MCP tool to switch layout view mode between standard DataGrid and mobile Card feed.
+class GridSetViewModeTool extends McpLocalTool {
+  final AiGridController controller;
+
+  GridSetViewModeTool(this.controller);
+
+  @override
+  String get name => 'grid_set_view_mode';
+
+  @override
+  String get description =>
+      'Switches the grid layout presentation mode between standard DataGrid ("grid") and mobile-responsive Card feed ("card").';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+    'type': 'object',
+    'properties': {
+      'mode': {
+        'type': 'string',
+        'enum': ['grid', 'card'],
+        'description': 'Target view mode ("grid" or "card").',
+      },
+    },
+    'required': ['mode'],
+  };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final modeStr = arguments['mode']?.toString().toLowerCase().trim();
+    if (modeStr == 'card') {
+      controller.setViewMode(AiGridViewMode.card);
+      return MCPToolResult.text('Switched view mode to mobile Card feed.');
+    } else if (modeStr == 'grid') {
+      controller.setViewMode(AiGridViewMode.grid);
+      return MCPToolResult.text('Switched view mode to DataGrid table.');
+    }
+    return MCPToolResult.error(
+      'Invalid view mode "$modeStr". Expected "grid" or "card".',
+    );
+  }
+}
+
+/// MCP tool to trigger contextual row/cell actions (AI summary, message draft, outlier explanation, filtering).
+class GridExecuteContextActionTool extends McpLocalTool {
+  final AiGridController controller;
+
+  GridExecuteContextActionTool(this.controller);
+
+  @override
+  String get name => 'grid_execute_context_action';
+
+  @override
+  String get description =>
+      'Triggers a contextual AI or data action for a specific row/cell, such as asking AI about the record, drafting an email/message, explaining an outlier value, or filtering similar records.';
+
+  @override
+  Map<String, dynamic> get inputSchema => {
+    'type': 'object',
+    'properties': {
+      'action': {
+        'type': 'string',
+        'enum': [
+          'ask_ai',
+          'draft_message',
+          'explain_value',
+          'filter_similar',
+          'copy_cell',
+          'copy_row',
+          'custom',
+        ],
+        'description': 'Action to perform.',
+      },
+      'row_index': {
+        'type': 'integer',
+        'description':
+            'Zero-based index of the target row in the active dataset.',
+      },
+      'field': {
+        'type': 'string',
+        'description': 'Target column field (required for explain_value, filter_similar, copy_cell).',
+      },
+      'custom_action_id': {
+        'type': 'string',
+        'description': 'Custom action ID when action is "custom".',
+      },
+    },
+    'required': ['action', 'row_index'],
+  };
+
+  @override
+  Future<MCPToolResult> execute(Map<String, dynamic> arguments) async {
+    final action = arguments['action']?.toString().toLowerCase().trim();
+    final rowIndex = arguments['row_index'] as int?;
+    final field = arguments['field']?.toString();
+
+    if (rowIndex == null ||
+        rowIndex < 0 ||
+        rowIndex >= controller.rows.length) {
+      return MCPToolResult.error(
+        'Invalid row_index: $rowIndex. Active row count is ${controller.rows.length}.',
+      );
+    }
+
+    final row = controller.rows[rowIndex];
+
+    switch (action) {
+      case 'ask_ai':
+        controller.askAiAboutRow(row);
+        return MCPToolResult.text(
+          'Seeded AI prompt inquiring about record #$rowIndex into assistant.',
+        );
+
+      case 'draft_message':
+        controller.draftMessageFromRow(row);
+        return MCPToolResult.text(
+          'Seeded AI prompt drafting a communication from record #$rowIndex into assistant.',
+        );
+
+      case 'explain_value':
+        if (field == null || field.isEmpty) {
+          return MCPToolResult.error(
+            'Action "explain_value" requires a "field" argument.',
+          );
+        }
+        controller.explainCellValue(row, field);
+        return MCPToolResult.text(
+          'Seeded AI prompt explaining field "$field" for record #$rowIndex into assistant.',
+        );
+
+      case 'filter_similar':
+        if (field == null || field.isEmpty) {
+          return MCPToolResult.error(
+            'Action "filter_similar" requires a "field" argument.',
+          );
+        }
+        final val = row[field];
+        controller.filterSimilar(field: field, value: val);
+        return MCPToolResult.text('Applied filter on "$field" equals "$val".');
+
+      case 'copy_cell':
+        if (field == null || field.isEmpty) {
+          return MCPToolResult.error(
+            'Action "copy_cell" requires a "field" argument.',
+          );
+        }
+        final val = row[field]?.toString() ?? '';
+        return MCPToolResult.text('Cell value: $val');
+
+      case 'copy_row':
+        return MCPToolResult.text(jsonEncode(row));
+
+      case 'custom':
+        final customId = arguments['custom_action_id']?.toString();
+        final customAction = controller.contextMenuConfig.customActions
+            .where((a) => a.id == customId)
+            .firstOrNull;
+        if (customAction == null) {
+          return MCPToolResult.error(
+            'Custom action with id "$customId" not found.',
+          );
+        }
+        // Note: custom actions requiring BuildContext are invoked headless here if supported
+        return MCPToolResult.text('Custom action "$customId" located.');
+
+      default:
+        return MCPToolResult.error('Unrecognized action: $action');
+    }
   }
 }

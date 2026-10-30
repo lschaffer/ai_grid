@@ -12,11 +12,13 @@ import 'package:ai_grid/ai_grid.dart';
 class DataAuditorExamplePage extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+  final Set<AiGridFeatureSkill>? activeSkills;
 
   const DataAuditorExamplePage({
     super.key,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.activeSkills,
   });
 
   @override
@@ -27,7 +29,7 @@ class _DataAuditorExamplePageState extends State<DataAuditorExamplePage> {
   late AiGridController _controller;
   LocalAiGridDataSource? _dataSource;
   AiGridAuditReport? _currentReport;
-  bool _isBannerExpanded = true;
+  bool _isBannerExpanded = false;
 
   @override
   void initState() {
@@ -244,6 +246,7 @@ class _DataAuditorExamplePageState extends State<DataAuditorExamplePage> {
                     dynamicGrid: true,
                     enableAiAssistant: true,
                     showToolbar: true,
+                    enabledSkills: widget.activeSkills,
                     editingOptions: const AiGridEditingOptions(
                       enabled: true,
                       mode: AiGridEditMode.row,
@@ -292,21 +295,26 @@ class _DataAuditorExamplePageState extends State<DataAuditorExamplePage> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
-                    child: Row(
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Feature 6: AI Data Auditor & Cleaner',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13.5,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(width: 8),
-                        Text(
-                          '• Anomaly detection, missing value imputation, type hygiene & 1-click remediation',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
+                        if (_isBannerExpanded) ...[
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Anomaly detection, missing value imputation, type hygiene & 1-click remediation',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),

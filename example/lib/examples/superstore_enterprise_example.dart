@@ -9,11 +9,13 @@ import '../dynamic_ai_grid_example.dart';
 class SuperstoreGridPage extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+  final Set<AiGridFeatureSkill>? activeSkills;
 
   const SuperstoreGridPage({
     super.key,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.activeSkills,
   });
 
   @override
@@ -1472,6 +1474,7 @@ class _SuperstoreGridPageState extends State<SuperstoreGridPage> {
                 controller: _controller,
                 aiConfig: _aiConfig,
                 editingOptions: _controller.editingOptions,
+                enabledSkills: widget.activeSkills,
                 enableAiAssistant: true,
                 enablePagination: false,
                 autoSave: true,

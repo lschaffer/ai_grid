@@ -59,11 +59,13 @@ class _DynamicAiGridExampleAppState extends State<DynamicAiGridExampleApp> {
 class DynamicGridHomePage extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+  final Set<AiGridFeatureSkill>? activeSkills;
 
   const DynamicGridHomePage({
     super.key,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.activeSkills,
   });
 
   @override
@@ -310,6 +312,7 @@ class _DynamicGridHomePageState extends State<DynamicGridHomePage> {
               dynamicGrid: true,
               enableAiAssistant: true,
               showToolbar: true,
+              enabledSkills: widget.activeSkills,
               editingOptions: AiGridEditingOptions(
                 enabled: true,
                 mode: AiGridEditMode.row,

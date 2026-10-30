@@ -7,11 +7,13 @@ import 'package:ai_grid/ai_grid.dart';
 class MasterDetailExamplePage extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+  final Set<AiGridFeatureSkill>? activeSkills;
 
   const MasterDetailExamplePage({
     super.key,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.activeSkills,
   });
 
   @override
@@ -521,6 +523,7 @@ class _MasterDetailExamplePageState extends State<MasterDetailExamplePage> {
               controller: _controller,
               aiConfig: _aiConfig,
               showToolbar: true,
+              enabledSkills: widget.activeSkills,
               enableAiAssistant: true,
               enablePagination: false,
               cellSelection: false,

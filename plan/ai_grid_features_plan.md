@@ -257,7 +257,7 @@ enum ExampleShowcase {
 | **Feature 3** | **Master-Detail Child Rows & Nested Grids** | ✅ **Completed** | `v0.8.1` |
 | **Feature 4** | **Cell Range Selection & Bidirectional Copy/Paste** | ✅ **Completed** | `v0.6.0` |
 | **Feature 5** | **Pure-Dart Excel (.xlsx) Import** | ✅ **Completed** | `v0.10.0` |
-| **Feature 6** | **AI Data Auditor & Cleaner** | ⏳ Planned | `v0.10.0` |
-| **Feature 7** | **Mobile Card / Feed Responsive Mode** | ⏳ Planned | `v0.11.0` |
-| **Feature 8** | **Contextual Row/Cell AI Actions** | ⏳ Planned | `v0.12.0` |
+| **Feature 6** | **AI Data Auditor & Cleaner** | ✅ **Completed** | `v0.11.0` |
+| **Feature 7** | **Mobile Card / Feed Responsive Mode** | ✅ **Completed** | `v0.12.0` |
+| **Feature 8** | **Contextual Row/Cell AI Actions** | ✅ **Completed** | `v0.12.0` |
 | **Bonus** | **Dynamic Ingestion (CSV, TSV, PDF, Web GET, Clip)** | ✅ **Completed** | `v0.4.0` |

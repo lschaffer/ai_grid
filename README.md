@@ -259,25 +259,59 @@ Diagnose data hygiene issues, profile anomalies, and execute automated 1-click c
   * Programmatic methods: `controller.auditData()`, `controller.cleanData(remediation)`, `controller.cleanAllData()`, and `controller.showDataAuditorDialog(context)`.
   * Dedicated MCP Tools: `grid_audit_data` and `grid_apply_data_cleanse`.
 
-### 12. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
+### 13. 📱 Mobile "Card / Feed" Responsive View Toggle
+Switch between full-featured 60 FPS canvas DataGrid and touch-friendly mobile cards with a single tap:
+* **Presentation Modes (`AiGridViewMode`)**:
+  * `AiGridViewMode.grid`: Standard canvas DataGrid.
+  * `AiGridViewMode.card`: Touch-first card feed layout (`AiGridCardView`).
+* **Rich Card Customization (`AiGridCardViewOptions`)**:
+  * Custom `primaryField` title, `subtitleField`, status `badgeField`, and avatar.
+  * Two-column key-value metrics grid with automatic number/currency/date formatting.
+  * Embedded Master-Detail child row expansion directly beneath cards.
+* **Touch Gestures (Swipe Actions)**:
+  * Swipe right to edit row (`controller.startEditingRow`).
+  * Swipe left to delete row with confirmation dialog (`controller.deleteRow`).
+* **Persistent & Synchronized**:
+  * Global search, column filters, and sorting apply identically across both views.
+  * View mode persists automatically via `controller.exportSettings()` and `restoreSettings()`.
+* **Dedicated MCP Tool**:
+  * `grid_set_view_mode`: Switch presentation between `"grid"` and `"card"`.
+
+### 14. ⚡ Contextual Row/Cell AI Actions & Quick Exploration
+Right-click on desktop or long-press on mobile touch screens to trigger instant AI synthesis and tabular exploration:
+* **Built-in AI Record Actions (`AiGridContextMenu`)**:
+  * **Ask AI About Record**: Seeds a comprehensive analytical prompt analyzing the record's status, metrics, and anomalies into the assistant.
+  * **Draft Message / Email**: Automatically drafts a professional communication summarizing the selected record.
+  * **Explain Value / Outlier**: Compares the specific clicked cell value against historical dataset distributions.
+* **1-Click "Filter Similar Records"**:
+  * Instantly filters the grid to records sharing the exact value of the right-clicked cell.
+* **Clipboard Integration**:
+  * Copy individual cell values or entire record JSON objects in 1 click.
+* **Custom Developer Actions (`AiGridContextAction`)**:
+  * Register custom domain actions with custom icons, labels, and asynchronous callbacks.
+  * Control visibility conditionally via `isVisible(row, columnField)`.
+* **Dedicated MCP Tool**:
+  * `grid_execute_context_action`: Triggers contextual actions programmatically from AI agents.
+
+### 15. 📄 Pagination & Partial Data Load (Client-Side & Server-Side)
 * **Client-Side Pagination**: Simple opt-in via `enablePagination: true` and `pageSize: 25`, rendering an interactive page-navigation footer with total row counts and page controls.
 * **Server-Side Partial Data Load (`LazyAiGridDataSource`)**:
   * Only requests and loads the slice of records for the active page from your backend or REST/GraphQL API.
   * Dynamically passes current page, page size, active column sorting, and active filter criteria to your `fetch` callback.
 
-### 12. 🌐 WebAssembly (WASM) Compatible
+### 16. 🌐 WebAssembly (WASM) Compatible
 * Fully verified with Flutter WebAssembly (`dart2wasm`).
 * Zero direct dependencies on legacy `dart:html`.
 * Native filesystem operations are cleanly isolated behind conditional imports, ensuring zero runtime or compile-time breakages in browser WASM environments.
 
-### 13. 🎨 Modern Adaptive Theming
+### 17. 🎨 Modern Adaptive Theming
 * Harmonious styling that automatically reflects the parent application's Material 3 `ThemeData` across Light and Dark modes.
 
 ---
 
 ## 🛠️ MCP Tool Reference
 
-`ai_grid` exposes 27 specialized MCP tools through `AiGridSkill`:
+`ai_grid` exposes 29 specialized MCP tools through `AiGridSkill`:
 
 | Tool Name | Description |
 | :--- | :--- |
@@ -310,6 +344,8 @@ Diagnose data hygiene issues, profile anomalies, and execute automated 1-click c
 | `grid_import_excel` | Inspects workbook sheet structures or imports a targeted Excel (.xlsx) worksheet. |
 | `grid_audit_data` | Performs automated data quality audit (duplicates, missing values, dirty numbers, mixed dates, whitespace, IQR outliers) returning overall health score (0-100). |
 | `grid_apply_data_cleanse` | Executes automated data cleaning transformations (clean_all, remove_duplicates, clean_numbers, standardize_dates, trim_whitespace, impute_missing, cap_outliers). |
+| `grid_set_view_mode` | Switches grid layout presentation mode between DataGrid ("grid") and mobile Card feed ("card"). |
+| `grid_execute_context_action` | Triggers contextual row/cell actions (ask AI, draft message, explain outlier, filter similar records, copy). |
 | `grid_reset` | Resets grouping, filters, sorting, search, and restores all column visibility. |
 
 ---
@@ -322,8 +358,8 @@ Add `ai_grid` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ai_grid: ^0.4.0
-  material_ui: ^1.4.0
+  ai_grid: ^0.12.0
+  material_ui: ^1.8.0
 ```
 
 *(Note for local development: If using local checkouts, path dependencies can be specified via dependency overrides).*

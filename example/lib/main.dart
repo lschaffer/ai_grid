@@ -9,6 +9,8 @@ import 'examples/smart_columns_example.dart';
 import 'examples/master_detail_example.dart';
 import 'examples/excel_import_example.dart';
 import 'examples/data_auditor_example.dart';
+import 'examples/mobile_card_view_example.dart';
+import 'examples/contextual_ai_example.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,14 +82,14 @@ enum ShowcaseDemo {
     title: 'Feature 7: Mobile Card / Feed View',
     subtitle: '1-tap responsive switch between grid and feed card view',
     icon: Icons.view_agenda_rounded,
-    badge: 'Planned',
+    badge: 'NEW',
   ),
   contextualAi(
     id: 'contextual_ai',
     title: 'Feature 8: Contextual Row/Cell AI Actions',
     subtitle: 'Right-click quick actions: analyze, explain, draft message',
     icon: Icons.menu_open_rounded,
-    badge: 'Planned',
+    badge: 'NEW',
   );
 
   final String id;
@@ -103,6 +105,31 @@ enum ShowcaseDemo {
     required this.icon,
     required this.badge,
   });
+
+  /// The primary [AiGridFeatureSkill] associated with this showcase example.
+  AiGridFeatureSkill get primarySkill {
+    switch (this) {
+      case ShowcaseDemo.superstore:
+        return AiGridFeatureSkill.pivot;
+      case ShowcaseDemo.smartColumns:
+        return AiGridFeatureSkill.smartColumns;
+      case ShowcaseDemo.conditionalFormatting:
+        return AiGridFeatureSkill.conditionalFormatting;
+      case ShowcaseDemo.rangeSelection:
+        return AiGridFeatureSkill.rangeSelection;
+      case ShowcaseDemo.dynamicGrid:
+        return AiGridFeatureSkill.dynamicGrid;
+      case ShowcaseDemo.masterDetail:
+        return AiGridFeatureSkill.masterDetail;
+      case ShowcaseDemo.excelImport:
+        return AiGridFeatureSkill.excelImport;
+      case ShowcaseDemo.dataAuditor:
+        return AiGridFeatureSkill.dataAuditor;
+      case ShowcaseDemo.mobileCardView:
+      case ShowcaseDemo.contextualAi:
+        return AiGridFeatureSkill.cardView;
+    }
+  }
 }
 
 class AiGridShowcaseApp extends StatefulWidget {
@@ -115,6 +142,10 @@ class AiGridShowcaseApp extends StatefulWidget {
 class _AiGridShowcaseAppState extends State<AiGridShowcaseApp> {
   ThemeMode _themeMode = ThemeMode.light;
   ShowcaseDemo _currentDemo = ShowcaseDemo.conditionalFormatting;
+  Set<AiGridFeatureSkill> _activeSkills = {
+    AiGridFeatureSkill.core,
+    AiGridFeatureSkill.conditionalFormatting,
+  };
 
   void _toggleTheme() {
     setState(() {
@@ -127,6 +158,28 @@ class _AiGridShowcaseAppState extends State<AiGridShowcaseApp> {
   void _selectDemo(ShowcaseDemo demo) {
     setState(() {
       _currentDemo = demo;
+      // Selecting an example activates that skill and deactivates the others
+      _activeSkills = {
+        AiGridFeatureSkill.core,
+        demo.primarySkill,
+      };
+    });
+  }
+
+  void _toggleSkill(AiGridFeatureSkill skill) {
+    if (skill.isAlwaysOn) return;
+    setState(() {
+      if (_activeSkills.contains(skill)) {
+        _activeSkills.remove(skill);
+      } else {
+        _activeSkills.add(skill);
+      }
+    });
+  }
+
+  void _activateAllSkills() {
+    setState(() {
+      _activeSkills = Set.from(AiGridFeatureSkill.values);
     });
   }
 
@@ -155,6 +208,9 @@ class _AiGridShowcaseAppState extends State<AiGridShowcaseApp> {
         onSelectDemo: _selectDemo,
         isDarkMode: _themeMode == ThemeMode.dark,
         onToggleTheme: _toggleTheme,
+        activeSkills: _activeSkills,
+        onToggleSkill: _toggleSkill,
+        onActivateAllSkills: _activateAllSkills,
       ),
     );
   }
@@ -165,6 +221,9 @@ class ShowcaseGalleryShell extends StatelessWidget {
   final ValueChanged<ShowcaseDemo> onSelectDemo;
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+  final Set<AiGridFeatureSkill> activeSkills;
+  final ValueChanged<AiGridFeatureSkill> onToggleSkill;
+  final VoidCallback onActivateAllSkills;
 
   const ShowcaseGalleryShell({
     super.key,
@@ -172,6 +231,9 @@ class ShowcaseGalleryShell extends StatelessWidget {
     required this.onSelectDemo,
     required this.isDarkMode,
     required this.onToggleTheme,
+    required this.activeSkills,
+    required this.onToggleSkill,
+    required this.onActivateAllSkills,
   });
 
   void _openFullScreenFeatureList(BuildContext context) {
@@ -362,7 +424,153 @@ class ShowcaseGalleryShell extends StatelessWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: _buildCurrentDemoView(context),
+      body: Column(
+        children: [
+          _buildSkillsStatusBar(context),
+          Expanded(child: _buildCurrentDemoView(context)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkillsStatusBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = isDarkMode || theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+            : const Color(0xFFF1F5F9),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark
+                ? colorScheme.outlineVariant.withAlpha(40)
+                : theme.dividerColor.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.bolt_rounded, size: 16, color: colorScheme.primary),
+              const SizedBox(width: 4),
+              Text(
+                'Skills (${activeSkills.length}/${AiGridFeatureSkill.values.length}):',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final skill in AiGridFeatureSkill.values) ...[
+                    () {
+                      final isActive = activeSkills.contains(skill);
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Tooltip(
+                          message: skill.isAlwaysOn
+                              ? '${skill.displayName}: Core skill is always active.'
+                              : (isActive
+                                  ? '${skill.displayName}: Active in session & MCP agent. Click to deactivate.'
+                                  : '${skill.displayName}: Inactive. Click to activate this skill.'),
+                          child: InkWell(
+                            onTap: skill.isAlwaysOn
+                                ? null
+                                : () => onToggleSkill(skill),
+                            borderRadius: BorderRadius.circular(14),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? colorScheme.primary.withValues(
+                                        alpha: isDark ? 0.25 : 0.12,
+                                      )
+                                    : (isDark
+                                        ? Colors.white10
+                                        : Colors.black.withValues(alpha: 0.04)),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isActive
+                                      ? colorScheme.primary.withValues(
+                                          alpha: 0.7,
+                                        )
+                                      : (isDark
+                                          ? Colors.white12
+                                          : Colors.black12),
+                                  width: isActive ? 1.2 : 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isActive
+                                        ? (skill.isAlwaysOn
+                                            ? Icons.lock_outline
+                                            : Icons.check_circle_rounded)
+                                        : Icons.add_circle_outline_rounded,
+                                    size: 12,
+                                    color: isActive
+                                        ? colorScheme.primary
+                                        : colorScheme.outline,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    skill.displayName,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: isActive
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      color: isActive
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant
+                                              .withValues(alpha: 0.75),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }(),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.select_all_rounded, size: 14),
+            label: const Text('All On', style: TextStyle(fontSize: 11)),
+            onPressed: onActivateAllSkills,
+          ),
+        ],
+      ),
     );
   }
 
@@ -370,184 +578,75 @@ class ShowcaseGalleryShell extends StatelessWidget {
     switch (currentDemo) {
       case ShowcaseDemo.superstore:
         return SuperstoreGridPage(
+          key: ValueKey('demo_superstore_${activeSkills.length}'),
           isDarkMode: isDarkMode,
           onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
         );
       case ShowcaseDemo.conditionalFormatting:
         return ConditionalFormattingExamplePage(
+          key: ValueKey('demo_conditional_${activeSkills.length}'),
           isDarkMode: isDarkMode,
           onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
         );
       case ShowcaseDemo.dynamicGrid:
         return DynamicGridHomePage(
+          key: ValueKey('demo_dynamic_${activeSkills.length}'),
           isDarkMode: isDarkMode,
           onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
         );
       case ShowcaseDemo.rangeSelection:
         return RangeSelectionExamplePage(
+          key: ValueKey('demo_range_${activeSkills.length}'),
           isDarkMode: isDarkMode,
           onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
         );
       case ShowcaseDemo.smartColumns:
         return SmartColumnsExamplePage(
+          key: ValueKey('demo_smart_${activeSkills.length}'),
           isDarkMode: isDarkMode,
           onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
         );
       case ShowcaseDemo.masterDetail:
         return MasterDetailExamplePage(
+          key: ValueKey('demo_master_${activeSkills.length}'),
           isDarkMode: isDarkMode,
           onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
         );
       case ShowcaseDemo.excelImport:
         return ExcelImportExamplePage(
+          key: ValueKey('demo_excel_${activeSkills.length}'),
           isDarkMode: isDarkMode,
           onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
         );
       case ShowcaseDemo.dataAuditor:
         return DataAuditorExamplePage(
+          key: ValueKey('demo_auditor_${activeSkills.length}'),
           isDarkMode: isDarkMode,
           onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
         );
       case ShowcaseDemo.mobileCardView:
+        return MobileCardViewExamplePage(
+          key: ValueKey('demo_card_${activeSkills.length}'),
+          isDarkMode: isDarkMode,
+          onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
+        );
       case ShowcaseDemo.contextualAi:
-        return _buildFeatureRoadmapCard(context, currentDemo);
+        return ContextualAiExamplePage(
+          key: ValueKey('demo_contextual_${activeSkills.length}'),
+          isDarkMode: isDarkMode,
+          onToggleTheme: onToggleTheme,
+          activeSkills: activeSkills,
+        );
     }
-  }
-
-  Widget _buildFeatureRoadmapCard(BuildContext context, ShowcaseDemo demo) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 580),
-        child: Card(
-          margin: const EdgeInsets.all(24),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: colorScheme.primary.withValues(
-                        alpha: 0.15,
-                      ),
-                      child: Icon(
-                        demo.icon,
-                        size: 28,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            demo.title,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Approved in Roadmap (Features 1–8)',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.amber.shade900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  demo.subtitle,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: isDarkMode ? Colors.white70 : Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 16),
-                Text(
-                  'Planned Architecture & Highlights:',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _buildBullet(
-                  context,
-                  'Full specification defined in ai_grid_features_plan.md',
-                ),
-                _buildBullet(
-                  context,
-                  'Dedicated MCP tools for AI natural language orchestration',
-                ),
-                _buildBullet(
-                  context,
-                  'Direct 60 FPS canvas painting with zero widget overhead',
-                ),
-                _buildBullet(context, 'WASM and Material 3 adaptive design'),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                      label: const Text('Back to Feature 2 Demo'),
-                      onPressed: () =>
-                          onSelectDemo(ShowcaseDemo.conditionalFormatting),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBullet(BuildContext context, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.check_circle_outline_rounded,
-            size: 16,
-            color: Colors.green,
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
-        ],
-      ),
-    );
   }
 }
 

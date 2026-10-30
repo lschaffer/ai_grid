@@ -6,11 +6,13 @@ import 'package:ai_grid/ai_grid.dart';
 class RangeSelectionExamplePage extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+  final Set<AiGridFeatureSkill>? activeSkills;
 
   const RangeSelectionExamplePage({
     super.key,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.activeSkills,
   });
 
   @override
@@ -415,6 +417,7 @@ class _RangeSelectionExamplePageState extends State<RangeSelectionExamplePage> {
                   enablePaste: true,
                   showSelectionStatusBar: true,
                   enableAiAssistant: true,
+                  enabledSkills: widget.activeSkills,
                   autoSave: false,
                 ),
               ),

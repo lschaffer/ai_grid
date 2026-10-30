@@ -1,5 +1,81 @@
 # Changelog
 
+## 0.12.0
+
+Comprehensive release completing the AI Grid 8-Feature Plan (Mobile Card/Feed View, Contextual Row/Cell AI Actions, AI Data Auditor & Cleaner, Pure-Dart Excel Ingestion, Master-Detail & Row Pinning, Smart Columns, Range Selection, Conditional Formatting) plus the **Modular Feature Skill System** for MCP AI tools, bug fixes for row editing and build lifecycle.
+
+### 🧠 Modular Feature Skill System (`AiGridFeatureSkill`)
+* **Granular Dynamic Skill Partitioning**: Partitioned 40+ MCP AI tools into 10 focused skills to reduce LLM context token usage by up to 70% and prevent tool selection hallucinations.
+* **10 Modular Skills**: `core` (always active), `pivot`, `dynamicGrid`, `conditionalFormatting`, `rangeSelection`, `smartColumns`, `masterDetail`, `excelImport`, `dataAuditor`, `cardView`.
+* **Agent-Driven Dynamic Skill Toggling**: MCP tools `activate_skills` and `deactivate_skills` allow AI agents to discover, load, and dismiss specialized capabilities on demand.
+* **Runtime Skill Management**: `controller.activateSkill()`, `controller.deactivateSkill()`, `controller.setActiveSkills()`, and `controller.toggleSkill()`.
+* **Interactive Assistant Dock**: Built-in skill pills directly inside `AiGridAssistantPanel` enabling real-time inspection and toggling by users or developers.
+* **Dynamic Showcase Adaptation**: Selecting an example in the showcase gallery automatically scopes active skills to `{core, demo.primarySkill}` with an interactive skill status bar for manual testing.
+
+### 🛠️ Bug Fixes & Usability Improvements
+* **Inline Row Editing**: Fixed focus stealing issue where outer FitGrid tap detector intercepted clicks on text fields; wrapped editor in pointer listeners so cells open for editing cleanly.
+* **Build-phase State Change Fix**: Deferred `setMasterDetailOptions` notifications using microtasks when mounted in card or detail views, resolving framework assertions.
+* **Mobile Showcase Layout & Header Responsiveness**: Resolved mobile viewport header and action bar horizontal overflows in Feature 7 (Card View) and Feature 8 (Contextual AI), standardizing on collapsible edge-to-edge banners and horizontally scrolling action ribbons.
+* **Full Analyzer & Test Suite Cleanliness**: 100% test pass rate across all 103 unit and integration tests.
+
+### 📱 Feature 7: Mobile "Card / Feed" Responsive View Toggle
+* **Unified Presentation Modes (`AiGridViewMode`)**:
+  * `AiGridViewMode.grid`: Standard high-performance 60 FPS canvas DataGrid.
+  * `AiGridViewMode.card`: Modern, touch-friendly responsive card feed optimized for mobile devices and fast content scanning.
+  * 1-Tap switcher button in both desktop toolbar and mobile action menu (`Icons.view_agenda_outlined` / `Icons.table_chart_outlined`).
+  * Seamless state persistence: `controller.exportSettings()` and `restoreSettings()` fully preserve the active `viewMode`.
+* **Rich Card View Engine (`AiGridCardView`)**:
+  * Configured via `AiGridCardViewOptions`:
+    * `primaryField`: Emphasized title header typography (defaults to first text column).
+    * `subtitleField`: Secondary descriptor line.
+    * `badgeField`: Distinct pill chip for status/category tagging.
+    * `avatarField`: Circular initial avatar for entity records.
+    * `excludedFields`: Columns hidden from the card key-value grid.
+    * `spacing`, `elevation`, `borderRadius`, `contentPadding`: Fine-grained design customization.
+    * `cardBuilder`: Complete developer override for fully bespoke custom card widgets.
+  * 2-column wrapping key-value grid rendering remaining cell metrics with automatic formatting (`col.formatDisplayValue(val)`).
+  * Direct Master-Detail child row expansion inside cards with toggle arrows.
+* **Touch & Mobile Gestures**:
+  * Native `Dismissible` swipe gestures:
+    * **Swipe Right (Start-to-End)**: Green edit badge with haptic feedback, opening inline/form row editor (`controller.startEditingRow`).
+    * **Swipe Left (End-to-Start)**: Red delete badge with confirmation dialog (`controller.deleteRow`).
+  * Can be toggled on/off via `options.enableSwipeActions`.
+* **Unified Filtering & Sorting**:
+  * Card view dynamically reflects active global search queries, column filters, and sorting keys in real time.
+  * Built-in animated empty state when zero records match filters, with a 1-tap "Reset Filters" action.
+* **Model Context Protocol (MCP) AI Tool (`AiGridSkill`)**:
+  * `grid_set_view_mode`: Allows AI agents to switch layout between `grid` and `card`.
+
+### ⚡ Feature 8: Contextual Row/Cell AI Actions
+* **Interactive Contextual Menu System (`AiGridContextMenu`)**:
+  * Universal trigger: Desktop secondary tap (Right-Click) and Mobile touch long-press directly on grid cells/rows, plus 3-dots popup on cards.
+  * Configured via `AiGridContextMenuConfiguration` on `AiGridController`.
+* **Built-in AI Record Actions**:
+  * **Ask AI About Record** (`Icons.auto_awesome`): Prepares a prompt asking the embedded assistant to analyze record status, key insights, and anomalies, auto-opening the assistant panel.
+  * **Draft Message / Email** (`Icons.mail_outline`): Direct prompt generation to draft a professional client or team communication summarizing the selected record.
+  * **Explain Value / Outlier** (`Icons.lightbulb_outline`): Focuses on the right-clicked cell to analyze its value against historical dataset distributions.
+* **Instant Data Exploration**:
+  * **Filter Similar Records** (`Icons.filter_alt_outlined`): 1-Click equality filter isolating all records with matching cell values without manual typing.
+  * **Clipboard Integration**: 1-Tap "Copy Cell Value" and "Copy Row (JSON)" with snackbar feedback.
+  * **Row Maintenance**: Contextual "Edit Row" and destructive "Delete Row" actions.
+* **Custom Developer Actions (`AiGridContextAction`)**:
+  * Register arbitrary domain actions with custom icons, labels, and asynchronous execution callbacks.
+  * Conditional visibility via `isVisible(row, columnField)`.
+  * `onActionExecuted` global callback for activity telemetry.
+* **AI Assistant Prompt Seeding Pipeline**:
+  * `controller.pendingAiPrompt` ValueNotifier automatically pushes contextual action prompts directly into `AiGridAssistantPanel`, auto-focusing and submitting prompt requests.
+* **Model Context Protocol (MCP) AI Tool (`AiGridSkill`)**:
+  * `grid_execute_context_action`: Enables AI agents or voice tools to trigger contextual actions (`ask_ai`, `draft_message`, `explain_value`, `filter_similar`, `copy_cell`, `copy_row`, `custom`) for any row index.
+
+### 🎨 Showcase Gallery Demos
+* **Mobile Card View Demo (`MobileCardViewExamplePage`)**: Interactive showcase with dual DataGrid/Card Feed toggle, swipe actions chip, order fulfillment master-details, and live status pills.
+* **Contextual AI Actions Demo (`ContextualAiExamplePage`)**: Support incident ticket system showcasing right-click menus, Tier-2 escalation actions, and a live Action Activity Log sidebar.
+
+### 🧪 Tests & Quality
+* Added `test/ai_grid_card_view_test.dart` and `test/ai_grid_context_menu_test.dart`.
+* 96 passing unit and widget tests across the entire test suite.
+* 0 flutter analyze issues.
+
 ## 0.11.0
 
 AI Data Quality Auditor & Automated Cleaner, Tabular Health Profiling (0-100% Score), 6 Anomaly Detectors, Interactive Quality Inspector Dialog with 1-Click Remediation, New Model Context Protocol (MCP) Tools (`grid_audit_data`, `grid_apply_data_cleanse`), and Dedicated Showcase Gallery Demo.

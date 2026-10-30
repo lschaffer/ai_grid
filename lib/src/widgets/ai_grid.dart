@@ -15,6 +15,11 @@ import '../models/ai_grid_master_detail.dart';
 import '../models/ai_grid_data_source.dart';
 import '../models/ai_grid_editing_options.dart';
 import '../theme/ai_grid_theme.dart';
+import '../models/ai_grid_view_mode.dart';
+import '../models/ai_grid_context_action.dart';
+import '../models/ai_grid_feature_skill.dart';
+import 'ai_grid_card_view.dart';
+import 'ai_grid_context_menu.dart';
 import 'ai_grid_assistant_panel.dart';
 import 'ai_grid_group_panel.dart';
 import 'ai_grid_toolbar.dart';
@@ -100,7 +105,24 @@ class AiGrid extends StatefulWidget {
     this.showSelectionStatusBar = false,
     this.masterDetailOptions,
     this.detailRowBuilder,
+    this.viewMode,
+    this.cardViewOptions,
+    this.contextMenuConfiguration,
+    this.enabledSkills,
   });
+
+  /// Optional set of feature skills enabled for this DataGrid.
+  /// If omitted, all skills are active. [AiGridFeatureSkill.core] is always active.
+  final Set<AiGridFeatureSkill>? enabledSkills;
+
+  /// Layout presentation mode: [AiGridViewMode.grid] (DataGrid) or [AiGridViewMode.card] (responsive card feed).
+  final AiGridViewMode? viewMode;
+
+  /// Customization options for the responsive card feed view.
+  final AiGridCardViewOptions? cardViewOptions;
+
+  /// Configuration for right-click and long-press contextual menus.
+  final AiGridContextMenuConfiguration? contextMenuConfiguration;
 
   /// Optional master-detail configuration for expandable child rows and nested tables.
   final AiGridMasterDetailOptions? masterDetailOptions;
@@ -187,12 +209,21 @@ class _AiGridState extends State<AiGrid> {
       _controller = AiGridController();
       _internalController = true;
     }
+    if (widget.viewMode != null) {
+      _controller.setViewMode(widget.viewMode!, notify: false);
+    }
+    if (widget.contextMenuConfiguration != null) {
+      _controller.setContextMenuConfig(
+        widget.contextMenuConfiguration!,
+        notify: false,
+      );
+    }
     if (widget.editingOptions != null) {
       _controller.setEditingOptions(widget.editingOptions!, notify: false);
     }
     if (widget.conditionalFormats != null) {
       for (final fmt in widget.conditionalFormats!) {
-        _controller.addConditionalFormat(fmt);
+        _controller.addConditionalFormat(fmt, notify: false);
       }
     }
     final initialMasterDetail =
@@ -201,7 +232,13 @@ class _AiGridState extends State<AiGrid> {
             ? AiGridMasterDetailOptions(detailBuilder: widget.detailRowBuilder!)
             : null);
     if (initialMasterDetail != null) {
-      _controller.setMasterDetailOptions(initialMasterDetail);
+      _controller.setMasterDetailOptions(initialMasterDetail, notify: false);
+    }
+
+    final initialSkills =
+        widget.enabledSkills ?? widget.aiConfig?.enabledSkills;
+    if (initialSkills != null) {
+      _controller.setActiveSkills(initialSkills, notify: false);
     }
 
     _lastEditMode = _controller.editingOptions.mode;
@@ -336,8 +373,22 @@ class _AiGridState extends State<AiGrid> {
                 )
               : null);
       if (updatedMasterDetail != _controller.masterDetailOptions) {
-        _controller.setMasterDetailOptions(updatedMasterDetail);
+        _controller.setMasterDetailOptions(updatedMasterDetail, notify: false);
       }
+    }
+    if (widget.viewMode != null && widget.viewMode != oldWidget.viewMode) {
+      _controller.setViewMode(widget.viewMode!, notify: false);
+    }
+    if (widget.contextMenuConfiguration != null &&
+        widget.contextMenuConfiguration != oldWidget.contextMenuConfiguration) {
+      _controller.setContextMenuConfig(
+        widget.contextMenuConfiguration!,
+        notify: false,
+      );
+    }
+    if (widget.enabledSkills != null &&
+        widget.enabledSkills != oldWidget.enabledSkills) {
+      _controller.setActiveSkills(widget.enabledSkills!, notify: false);
     }
   }
 
@@ -777,32 +828,36 @@ class _AiGridState extends State<AiGrid> {
                     )
                   : const Color(0xFFFBFDFF));
 
-        Widget styledCell = Focus(
-          child: Builder(
-            builder: (focusCtx) {
-              final isFocused = Focus.of(focusCtx).hasFocus;
-              final borderSideColor = error != null
-                  ? Colors.redAccent
-                  : isFocused
-                  ? theme.colorScheme.primary
-                  : (isDark ? Colors.white24 : Colors.grey.shade300);
+        Widget styledCell = Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: (_) {},
+          child: Focus(
+            child: Builder(
+              builder: (focusCtx) {
+                final isFocused = Focus.of(focusCtx).hasFocus;
+                final borderSideColor = error != null
+                    ? Colors.redAccent
+                    : isFocused
+                    ? theme.colorScheme.primary
+                    : (isDark ? Colors.white24 : Colors.grey.shade300);
 
-              return Container(
-                width: double.infinity,
-                height: double.infinity,
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: cellBackground,
-                  border: Border.all(
-                    color: borderSideColor,
-                    width: error != null || isFocused ? 1.5 : 1.0,
+                return Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: cellBackground,
+                    border: Border.all(
+                      color: borderSideColor,
+                      width: error != null || isFocused ? 1.5 : 1.0,
+                    ),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: editor,
-              );
-            },
+                  child: editor,
+                );
+              },
+            ),
           ),
         );
 
@@ -1224,9 +1279,11 @@ class _AiGridState extends State<AiGrid> {
                   ),
           )
         else ...[
-          AiGridGroupPanel(controller: _controller),
-          Expanded(child: _buildGrid(context, gridTheme)),
-          _buildSelectionStatusBar(context),
+          if (_controller.viewMode != AiGridViewMode.card)
+            AiGridGroupPanel(controller: _controller),
+          Expanded(child: _buildBody(context, gridTheme, isDark)),
+          if (_controller.viewMode != AiGridViewMode.card)
+            _buildSelectionStatusBar(context),
         ],
       ],
     );
@@ -1306,12 +1363,28 @@ class _AiGridState extends State<AiGrid> {
               onRefresh: _loadData,
               dynamicGrid: widget.dynamicGrid,
             ),
-          AiGridGroupPanel(controller: _controller),
-          Expanded(child: _buildGrid(context, gridTheme)),
-          _buildSelectionStatusBar(context),
+          if (_controller.viewMode != AiGridViewMode.card)
+            AiGridGroupPanel(controller: _controller),
+          Expanded(child: _buildBody(context, gridTheme, isDark)),
+          if (_controller.viewMode != AiGridViewMode.card)
+            _buildSelectionStatusBar(context),
         ],
       ),
     );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    FitGridThemeData gridTheme,
+    bool isDark,
+  ) {
+    if (_controller.viewMode == AiGridViewMode.card) {
+      return AiGridCardView(
+        controller: _controller,
+        options: widget.cardViewOptions ?? const AiGridCardViewOptions(),
+      );
+    }
+    return _buildGrid(context, gridTheme);
   }
 
   Widget _buildSelectionStatusBar(BuildContext context) {
@@ -1507,6 +1580,23 @@ class _AiGridState extends State<AiGrid> {
       showFilterRow:
           !_controller.isPivotActive && _controller.showColumnFilterRow,
       showColumnMenu: true,
+      contextMenuBuilder: _controller.contextMenuConfig.enabled
+          ? (context, target) {
+              final row = target.row;
+              if (row == null) return target.defaultItems;
+              return AiGridContextMenu.buildMenuItems(
+                context: context,
+                controller: _controller,
+                row: row,
+                rowIndex: target.rowIndex,
+                columnField: target.columnId,
+                cellValue: target.columnId != null
+                    ? row[target.columnId]
+                    : null,
+                defaultItems: target.defaultItems,
+              );
+            }
+          : null,
       columnMenuBuilder: (context, column, defaults) =>
           _buildColumnMenu(context, column, defaults),
       reorderableColumns: true,

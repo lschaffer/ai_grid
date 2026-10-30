@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'env_reader_stub.dart' if (dart.library.io) 'env_reader_io.dart';
 
 import 'package:dart_mcp_core/dart_mcp_core.dart';
+import '../models/ai_grid_feature_skill.dart';
 
 /// Loads environment variables from `.env` files or rootBundle.
 class AiGridEnvLoader {
@@ -91,12 +92,22 @@ class AiGridConfig {
   /// Optional contextual sample prompts shown as quick-action suggestion chips in the AI Assistant panel.
   final List<String>? suggestedPrompts;
 
+  /// Optional set of feature skills enabled for this DataGrid.
+  /// If omitted, all skills are active. [AiGridFeatureSkill.core] is always active.
+  final Set<AiGridFeatureSkill>? enabledSkills;
+
+  /// Whether the AI agent is allowed to dynamically activate and deactivate feature skills
+  /// at runtime via MCP tools `activate_skills` and `deactivate_skills`.
+  final bool enableDynamicSkillToggling;
+
   const AiGridConfig({
     this.llmConfig,
     this.enableAiAssistant = true,
     this.hideAiAssistantIfNoLlm = false,
     this.systemPrompt,
     this.suggestedPrompts,
+    this.enabledSkills,
+    this.enableDynamicSkillToggling = true,
   });
 
   /// Creates a copy of this [AiGridConfig] with specific fields replaced.
@@ -106,6 +117,8 @@ class AiGridConfig {
     bool? hideAiAssistantIfNoLlm,
     String? systemPrompt,
     List<String>? suggestedPrompts,
+    Set<AiGridFeatureSkill>? enabledSkills,
+    bool? enableDynamicSkillToggling,
   }) {
     return AiGridConfig(
       llmConfig: llmConfig ?? this.llmConfig,
@@ -114,6 +127,9 @@ class AiGridConfig {
           hideAiAssistantIfNoLlm ?? this.hideAiAssistantIfNoLlm,
       systemPrompt: systemPrompt ?? this.systemPrompt,
       suggestedPrompts: suggestedPrompts ?? this.suggestedPrompts,
+      enabledSkills: enabledSkills ?? this.enabledSkills,
+      enableDynamicSkillToggling:
+          enableDynamicSkillToggling ?? this.enableDynamicSkillToggling,
     );
   }
 

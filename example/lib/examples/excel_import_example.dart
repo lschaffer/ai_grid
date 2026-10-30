@@ -6,11 +6,13 @@ import 'package:ai_grid/ai_grid.dart';
 class ExcelImportExamplePage extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onToggleTheme;
+  final Set<AiGridFeatureSkill>? activeSkills;
 
   const ExcelImportExamplePage({
     super.key,
     required this.isDarkMode,
     required this.onToggleTheme,
+    this.activeSkills,
   });
 
   @override
@@ -164,6 +166,7 @@ class _ExcelImportExamplePageState extends State<ExcelImportExamplePage> {
                     dynamicGrid: true,
                     enableAiAssistant: true,
                     showToolbar: true,
+                    enabledSkills: widget.activeSkills,
                     editingOptions: const AiGridEditingOptions(
                       enabled: true,
                       mode: AiGridEditMode.row,

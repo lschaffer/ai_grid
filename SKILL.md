@@ -1,7 +1,7 @@
 ---
 name: ai-grid
 description: Comprehensive developer and coding agent guide for the ai_grid Flutter DataGrid package. Use when integrating, configuring, or extending high-performance canvas tables with DevExtreme-style editing (cell, row, modal form), dynamic Pivot Grids with banded split headers, hierarchical tree grouping, moveable split-panel charts, Excel export, and native Model Context Protocol (MCP) AI tools.
-version: 0.8.0
+version: 0.12.0
 author: lschaffer
 tags:
   - flutter
@@ -291,6 +291,12 @@ controller.clearPivot();
 | `grid_select_range` | `startRow`, `startColumn`, `endRow`, `endColumn` | Programmatically selects a rectangular cell range. |
 | `grid_add_smart_column` | `field`, `title`, `promptTemplate`, `options`, `autoRun` | Adds an AI prompt-synthesized column to the grid. |
 | `grid_run_smart_columns` | `field` (optional), `force` (bool) | Triggers LLM batch synthesis for smart columns. |
+| `grid_toggle_row_detail` | `row_index` or `row_key` | Expands or collapses the master-detail panel for a row. |
+| `grid_expand_all_details` | *(none)* | Expands all master-detail child rows. |
+| `grid_collapse_all_details` | *(none)* | Collapses all master-detail child rows. |
+| `grid_get_detail_status` | *(none)* | Returns master-detail expansion status and open row keys. |
+| `grid_set_view_mode` | `mode` (`grid`, `card`) | Switches presentation between canvas DataGrid and mobile Card feed. |
+| `grid_execute_context_action` | `action` (`ask_ai`, `draft_message`, `explain_value`, `filter_similar`, `copy_cell`, `copy_row`, `custom`), `row_index`, `field` | Executes a contextual row/cell action. |
 
 ---
 
@@ -481,7 +487,52 @@ AiGrid(
 
 ---
 
-## 14. Coding Guidelines for AI Agents
+## 15. Modular Feature Skills & Dynamic MCP Tool Toggling
+
+`ai_grid` features 40+ specialized MCP tools. To optimize context windows, minimize LLM token overhead, and prevent tool hallucinations, `ai_grid` includes a **Modular Feature Skill System** (`AiGridFeatureSkill`).
+
+### Available Feature Skills
+| Feature Skill | ID | Description & Tool Coverage |
+| :--- | :--- | :--- |
+| **Core** | `core` | Always active. Table schema, math calculation, sort, filter, grouping, search, export (`grid_get_schema`, `grid_calculate_data`, `grid_sort_column`, `grid_filter_column`, `grid_group_by`, etc.). |
+| **Pivot Grid** | `pivot` | Cross-tabulation, aggregation summaries, split headers, interactive charts (`grid_create_pivot`, `grid_reset_pivot`, `grid_set_pivot_chart`). |
+| **Dynamic Grid** | `dynamicGrid` | Ingestion from clipboard, files, or web GET, YAML model schemas, datasource switching. |
+| **Conditional Formatting** | `conditionalFormatting` | Dynamic cell color scales, data bars, icon sets, threshold highlighting (`grid_apply_formatting_rule`, `grid_clear_formatting`). |
+| **Range Selection & Series** | `rangeSelection` | Rectangular multi-cell selection, copy-paste ranges, arithmetic & date series fill (`grid_select_range`, `grid_fill_series`). |
+| **Smart Columns** | `smartColumns` | Computed expressions, AI column derivation, synthetic metric fields (`grid_create_calculated_column`, `grid_derive_column`). |
+| **Master-Detail & Pinning** | `masterDetail` | Hierarchical nested child tables, row expansion, pinned top/bottom rows (`grid_toggle_detail_row`, `grid_pin_row`). |
+| **Excel Ingestion** | `excelImport` | Pure-Dart `.xlsx` spreadsheet parsing and multi-sheet ingestion (`grid_import_excel_file`). |
+| **Data Auditor & Cleaner** | `dataAuditor` | Anomaly profiling, outlier detection, 1-click hygiene remediation (`grid_audit_data`, `grid_apply_data_cleanse`). |
+| **Mobile Card View** | `cardView` | Responsive card/feed presentation mode, swipe gestures, contextual actions (`grid_set_view_mode`, `grid_execute_context_action`). |
+
+### Dynamic Agent Skill Toggling
+Agents can dynamically inspect, activate, and deactivate skills at runtime:
+```json
+// Agent activates data auditor and excel skills:
+{
+  "name": "activate_skills",
+  "arguments": {
+    "skills": ["dataAuditor", "excelImport"]
+  }
+}
+```
+
+### Programmatic Skill Control
+Developers can initialize or dynamically toggle active skills:
+```dart
+// Restrict initial active skills on controller:
+final controller = AiGridController(
+  initialActiveSkills: {AiGridFeatureSkill.core, AiGridFeatureSkill.pivot},
+);
+
+// Toggle skills at runtime:
+controller.activateSkill(AiGridFeatureSkill.conditionalFormatting);
+controller.deactivateSkill(AiGridFeatureSkill.dynamicGrid);
+```
+
+---
+
+## 16. Coding Guidelines for AI Agents
 
 1. **Package Imports**: Always import `package:material_ui/material_ui.dart` instead of `flutter/material.dart`.
 2. **Never Call `setState` in Builds**: Always schedule state updates after frames or attach listeners inside `initState`/`dispose`.

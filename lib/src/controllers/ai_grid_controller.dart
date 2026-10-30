@@ -30,6 +30,11 @@ import '../widgets/ai_grid_excel_dialogs.dart';
 import '../models/ai_grid_data_auditor.dart';
 import '../data/ai_grid_data_cleaner.dart';
 import '../widgets/ai_grid_data_auditor_dialog.dart';
+import '../models/ai_grid_view_mode.dart';
+import '../models/ai_grid_context_action.dart';
+import '../models/ai_grid_feature_skill.dart';
+import '../mcp/ai_grid_tools.dart';
+import 'package:dart_mcp_core/dart_mcp_core.dart';
 
 import 'package:file_picker/file_picker.dart';
 
@@ -39,6 +44,112 @@ class AiGridController extends ChangeNotifier {
   FitGridController<Map<String, dynamic>>? _fitController;
   AiGridDataSource? _dataSource;
   List<AiGridColumn> _columns = [];
+  Set<AiGridFeatureSkill> _activeSkills = Set.from(AiGridFeatureSkill.values);
+
+  /// Current set of active feature skills.
+  Set<AiGridFeatureSkill> get activeSkills => Set.unmodifiable(_activeSkills);
+
+  /// Checks whether the specified [skill] is currently active.
+  bool isSkillActive(AiGridFeatureSkill skill) => _activeSkills.contains(skill);
+
+  /// Activates a specific feature [skill].
+  void activateSkill(AiGridFeatureSkill skill, {bool notify = true}) {
+    if (_activeSkills.contains(skill)) return;
+    _activeSkills.add(skill);
+    if (notify) notifyListeners();
+  }
+
+  /// Deactivates a specific feature [skill]. Cannot deactivate core skill.
+  void deactivateSkill(AiGridFeatureSkill skill, {bool notify = true}) {
+    if (skill.isAlwaysOn || !_activeSkills.contains(skill)) return;
+    _activeSkills.remove(skill);
+    if (notify) notifyListeners();
+  }
+
+  /// Toggles a specific feature [skill].
+  void toggleSkill(AiGridFeatureSkill skill, {bool notify = true}) {
+    if (isSkillActive(skill)) {
+      deactivateSkill(skill, notify: notify);
+    } else {
+      activateSkill(skill, notify: notify);
+    }
+  }
+
+  /// Activates multiple feature skills.
+  void activateSkills(Iterable<AiGridFeatureSkill> skills, {bool notify = true}) {
+    bool changed = false;
+    for (final s in skills) {
+      if (_activeSkills.add(s)) changed = true;
+    }
+    if (changed && notify) notifyListeners();
+  }
+
+  /// Deactivates multiple feature skills (excluding core).
+  void deactivateSkills(Iterable<AiGridFeatureSkill> skills, {bool notify = true}) {
+    bool changed = false;
+    for (final s in skills) {
+      if (!s.isAlwaysOn && _activeSkills.remove(s)) changed = true;
+    }
+    if (changed && notify) notifyListeners();
+  }
+
+  /// Sets the active feature skills to exactly [skills] (always including [AiGridFeatureSkill.core]).
+  void setActiveSkills(Iterable<AiGridFeatureSkill> skills, {bool notify = true}) {
+    final next = Set<AiGridFeatureSkill>.from(skills)..add(AiGridFeatureSkill.core);
+    if (setEquals(_activeSkills, next)) return;
+    _activeSkills = next;
+    if (notify) notifyListeners();
+  }
+
+  /// Helper for MCP tool `activate_skills`.
+  String activateSkillsByName(List<String> names) {
+    final activated = <String>[];
+    for (final name in names) {
+      final skill = AiGridFeatureSkill.fromId(name);
+      if (skill != null && !_activeSkills.contains(skill)) {
+        _activeSkills.add(skill);
+        activated.add(skill.displayName);
+      }
+    }
+    if (activated.isNotEmpty) {
+      notifyListeners();
+      return 'Successfully activated skills: ${activated.join(", ")}. Their specialized tools and instructions are now available.';
+    }
+    return 'No new skills activated. (Already active or unrecognized names).';
+  }
+
+  /// Helper for MCP tool `deactivate_skills`.
+  String deactivateSkillsByName(List<String> names) {
+    final deactivated = <String>[];
+    for (final name in names) {
+      final skill = AiGridFeatureSkill.fromId(name);
+      if (skill != null && !skill.isAlwaysOn && _activeSkills.contains(skill)) {
+        _activeSkills.remove(skill);
+        deactivated.add(skill.displayName);
+      }
+    }
+    if (deactivated.isNotEmpty) {
+      notifyListeners();
+      return 'Successfully deactivated skills: ${deactivated.join(", ")}.';
+    }
+    return 'No skills deactivated. (Cannot deactivate core or names were not active).';
+  }
+
+  /// Returns tools for currently active skills.
+  List<McpLocalTool> getActiveTools({bool enableDynamicSkillToggling = true}) =>
+      AiGridSkill.createTools(
+        this,
+        activeSkills: _activeSkills,
+        enableDynamicSkillToggling: enableDynamicSkillToggling,
+      );
+
+  /// Returns system prompt for currently active skills.
+  String getActiveSystemPrompt({bool includeSkillGuide = true}) =>
+      AiGridSkill.getSystemPrompt(
+        activeSkills: _activeSkills,
+        includeSkillGuide: includeSkillGuide,
+      );
+
   AiGridDynamicDescriptor? _activeDynamicDatasource;
   AiGridExcelWorkbook? _activeExcelWorkbook;
 
@@ -59,6 +170,112 @@ class AiGridController extends ChangeNotifier {
   bool _showGroupPanel = true;
   bool _showAiAssistant = false;
   bool _isApplyingFilters = false;
+  AiGridViewMode _viewMode = AiGridViewMode.grid;
+
+  /// Current layout mode: [AiGridViewMode.grid] (DataGrid) or [AiGridViewMode.card] (responsive card feed).
+  AiGridViewMode get viewMode => _viewMode;
+
+  /// Sets the active view mode (grid or card).
+  void setViewMode(AiGridViewMode mode, {bool notify = true}) {
+    if (_viewMode == mode) return;
+    _viewMode = mode;
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  /// Toggles between grid and card view modes.
+  void toggleViewMode() {
+    setViewMode(
+      _viewMode == AiGridViewMode.grid
+          ? AiGridViewMode.card
+          : AiGridViewMode.grid,
+    );
+  }
+
+  AiGridContextMenuConfiguration _contextMenuConfig =
+      const AiGridContextMenuConfiguration();
+
+  /// Configuration for right-click and long-press contextual menus.
+  AiGridContextMenuConfiguration get contextMenuConfig => _contextMenuConfig;
+
+  /// Sets the contextual menu configuration.
+  void setContextMenuConfig(
+    AiGridContextMenuConfiguration config, {
+    bool notify = true,
+  }) {
+    _contextMenuConfig = config;
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  final ValueNotifier<String?> _pendingAiPrompt = ValueNotifier<String?>(null);
+
+  /// Listenable for pending AI prompts seeded by contextual actions.
+  ValueListenable<String?> get pendingAiPrompt => _pendingAiPrompt;
+
+  /// Seeds an AI prompt into the assistant context, optionally opening the assistant window.
+  void seedAiPrompt(String prompt, {bool openAssistant = true}) {
+    _pendingAiPrompt.value = prompt;
+    if (openAssistant) {
+      setAiAssistantVisible(true);
+    }
+    notifyListeners();
+  }
+
+  /// Clears any pending seeded AI prompt.
+  void clearPendingAiPrompt() {
+    _pendingAiPrompt.value = null;
+  }
+
+  /// Filters the grid to records matching [value] in [field].
+  void filterSimilar({required String field, required dynamic value}) {
+    setFilter(field, operator: 'equals', value: value);
+  }
+
+  /// Initiates an AI inquiry about a specific [row] record.
+  void askAiAboutRow(Map<String, dynamic> row, {BuildContext? context}) {
+    final title =
+        row['name'] ??
+        row['title'] ??
+        row['Order ID'] ??
+        row['order_id'] ??
+        row['id'] ??
+        'record';
+    final prompt =
+        'Please analyze this record ($title) and highlight key insights, status, and anomalies:\n${jsonEncode(row)}';
+    seedAiPrompt(prompt, openAssistant: true);
+  }
+
+  /// Synthesizes a drafted email or message based on [row].
+  void draftMessageFromRow(Map<String, dynamic> row, {BuildContext? context}) {
+    final title =
+        row['name'] ??
+        row['title'] ??
+        row['Order ID'] ??
+        row['order_id'] ??
+        row['id'] ??
+        'record';
+    final prompt =
+        'Draft a professional communication/email summarizing this record ($title):\n${jsonEncode(row)}';
+    seedAiPrompt(prompt, openAssistant: true);
+  }
+
+  /// Asks AI to explain a specific cell value or anomaly.
+  void explainCellValue(
+    Map<String, dynamic> row,
+    String columnField, {
+    BuildContext? context,
+  }) {
+    final val = row[columnField];
+    final colTitle =
+        _columns.where((c) => c.field == columnField).firstOrNull?.title ??
+        columnField;
+    final prompt =
+        'Explain why $colTitle has value "$val" in record and compare against dataset patterns:\n${jsonEncode(row)}';
+    seedAiPrompt(prompt, openAssistant: true);
+  }
 
   AiGridEditingOptions _editingOptions = const AiGridEditingOptions();
   int? _editingRowIndex;
@@ -164,11 +381,16 @@ class AiGridController extends ChangeNotifier {
       List.unmodifiable(_conditionalFormats);
 
   /// Adds or updates a conditional formatting rule and updates the grid.
-  void addConditionalFormat(AiGridConditionalFormat format) {
+  void addConditionalFormat(
+    AiGridConditionalFormat format, {
+    bool notify = true,
+  }) {
     _conditionalFormats.removeWhere((f) => f.id == format.id);
     _conditionalFormats.add(format);
     _syncEffectiveColumns();
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   /// Removes a conditional formatting rule by [id].
@@ -589,6 +811,9 @@ class AiGridController extends ChangeNotifier {
   }
 
   /// Starts editing an existing row at [rowIndex] in row or form mode.
+  /// Starts inline or form editing for the row at [rowIndex].
+  void startEditingRow(int rowIndex) => startEdit(rowIndex);
+
   void startEdit(int rowIndex) {
     if (_activeDynamicDatasource?.isReadonly == true) return;
     if (_fitController == null) return;
@@ -1648,7 +1873,10 @@ class AiGridController extends ChangeNotifier {
   AiGridMasterDetailOptions? get masterDetailOptions => _masterDetailOptions;
 
   /// Sets master-detail options and synchronizes initial expansion state.
-  void setMasterDetailOptions(AiGridMasterDetailOptions? options) {
+  void setMasterDetailOptions(
+    AiGridMasterDetailOptions? options, {
+    bool notify = true,
+  }) {
     if (_masterDetailOptions == options) return;
     _masterDetailOptions = options;
     if (options != null &&
@@ -1659,7 +1887,9 @@ class AiGridController extends ChangeNotifier {
       }
       _previousExpandedKeys = Set<Object>.of(_fitController!.details.expanded);
     }
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   /// Whether the master-detail child row expansion is active and enabled.
@@ -1766,6 +1996,7 @@ class AiGridController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _pendingAiPrompt.dispose();
     _fitController?.data.removeListener(_onFitControllerChanged);
     _fitController?.columns.removeListener(_onFitControllerChanged);
     _fitController?.filter.removeListener(_onFitFilterChanged);
@@ -2580,6 +2811,9 @@ class AiGridController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Alias for [search].
+  void setSearchQuery(String query) => search(query);
+
   /// Clears global search.
   void clearSearch() {
     search('');
@@ -2828,6 +3062,7 @@ class AiGridController extends ChangeNotifier {
 
     return {
       ...fitState,
+      'viewMode': _viewMode.name,
       'groupColumns': List<String>.from(activeGrouping),
       'showColumnFilterRow': _showColumnFilterRow,
       'showGroupPanel': _showGroupPanel,
@@ -2976,6 +3211,13 @@ class AiGridController extends ChangeNotifier {
     }
 
     // 4. UI toggles
+    if (settings.containsKey('viewMode')) {
+      final modeStr = settings['viewMode']?.toString();
+      _viewMode = AiGridViewMode.values.firstWhere(
+        (m) => m.name == modeStr,
+        orElse: () => AiGridViewMode.grid,
+      );
+    }
     if (settings.containsKey('showColumnFilterRow')) {
       _showColumnFilterRow = settings['showColumnFilterRow'] == true;
     }

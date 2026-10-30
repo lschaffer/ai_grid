@@ -11,6 +11,7 @@ import '../data/delimited_table_parser.dart';
 import '../data/markdown_table_extractor.dart';
 import '../models/ai_grid_dynamic_datasource.dart';
 import '../models/ai_grid_editing_options.dart';
+import '../models/ai_grid_view_mode.dart';
 import '../theme/ai_grid_theme.dart';
 import 'ai_grid_datasource_dialogs.dart';
 import 'ai_grid_pivot_chooser_dialog.dart';
@@ -402,6 +403,9 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
               case 'group':
                 widget.controller.toggleGroupPanel();
                 break;
+              case 'view_mode':
+                widget.controller.toggleViewMode();
+                break;
               case 'filter':
                 widget.controller.toggleColumnFilterRow();
                 break;
@@ -459,6 +463,29 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
                     widget.controller.showGroupPanel
                         ? 'Hide Group Panel'
                         : 'Show Group Panel',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'view_mode',
+              child: Row(
+                children: [
+                  Icon(
+                    widget.controller.viewMode == AiGridViewMode.card
+                        ? Icons.table_chart_outlined
+                        : Icons.view_agenda_outlined,
+                    size: 18,
+                    color: widget.controller.viewMode == AiGridViewMode.card
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    widget.controller.viewMode == AiGridViewMode.card
+                        ? 'Switch to Grid View'
+                        : 'Switch to Card Feed',
                     style: const TextStyle(fontSize: 13),
                   ),
                 ],
@@ -628,6 +655,21 @@ class _AiGridToolbarState extends State<AiGridToolbar> {
           ),
           tooltip: 'Toggle Filter Row',
           onPressed: widget.controller.toggleColumnFilterRow,
+        ),
+        IconButton(
+          icon: Icon(
+            widget.controller.viewMode == AiGridViewMode.card
+                ? Icons.table_chart_outlined
+                : Icons.view_agenda_outlined,
+            size: 20,
+            color: widget.controller.viewMode == AiGridViewMode.card
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
+          ),
+          tooltip: widget.controller.viewMode == AiGridViewMode.card
+              ? 'Switch to Grid View'
+              : 'Switch to Card / Feed View',
+          onPressed: widget.controller.toggleViewMode,
         ),
         IconButton(
           icon: Icon(
