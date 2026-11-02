@@ -8,7 +8,7 @@ import '../config/ai_grid_config.dart';
 import '../mcp/ai_grid_tools.dart';
 import '../config/ai_grid_settings_storage.dart';
 import '../controllers/ai_grid_controller.dart';
-import '../fitgrid/fitgrid_table.dart';
+import 'package:fitgrid_plus/fitgrid_plus.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_conditional_format.dart';
 import '../models/ai_grid_master_detail.dart';

@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 
-import '../fitgrid/fitgrid_table.dart';
+import 'package:fitgrid_plus/fitgrid_plus.dart';
 import 'ai_grid_editing_options.dart';
 
 /// Data type of an AiGrid column.

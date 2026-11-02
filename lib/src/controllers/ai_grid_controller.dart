@@ -8,7 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../fitgrid/fitgrid_table.dart';
+import 'package:fitgrid_plus/fitgrid_plus.dart';
 import '../models/ai_grid_column.dart';
 import '../models/ai_grid_conditional_format.dart';
 import '../models/ai_grid_range_summary.dart';

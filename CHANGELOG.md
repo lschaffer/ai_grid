@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0
+
+### ⚠️ BREAKING CHANGE: Modularized Core DataGrid Engine into `fitgrid_plus`
+* **Independent Core Engine**: The internal `src/fitgrid` canvas table engine has been completely extracted and modularized into the standalone, high-performance package [`fitgrid_plus`](https://pub.dev/packages/fitgrid_plus).
+* **Zero Overhead Separation**: Developers who only need high-performance virtualized canvas data tables, DevExtreme-style editing, banded pivot grids, and Excel import/export without AI or MCP dependencies can now use `fitgrid_plus` directly.
+* **`ai_grid` as Intelligent AI Layer**: `ai_grid` now depends on `fitgrid_plus` and re-exports its core canvas APIs (`FitGrid`, `FitGridController`, `FitGridColumn`, etc.) while focusing purely on Model Context Protocol (MCP) tool integration, native AI assistant controls, and smart columns.
+* **Flutter & Material UI Compatibility**: Minimum Flutter SDK requirement updated to `>=3.47.0` with `material_ui: ^1.8.0`.
+
 ## 0.12.0
 
 Comprehensive release completing the AI Grid 8-Feature Plan (Mobile Card/Feed View, Contextual Row/Cell AI Actions, AI Data Auditor & Cleaner, Pure-Dart Excel Ingestion, Master-Detail & Row Pinning, Smart Columns, Range Selection, Conditional Formatting) plus the **Modular Feature Skill System** for MCP AI tools, bug fixes for row editing and build lifecycle.

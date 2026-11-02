@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
-import '../fitgrid/fitgrid_table.dart';
+import 'package:fitgrid_plus/fitgrid_plus.dart';
 import 'ai_grid_column.dart';
 
 /// Status of AI generation for an individual smart cell.

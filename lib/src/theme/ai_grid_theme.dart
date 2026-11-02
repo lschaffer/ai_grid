@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../fitgrid/fitgrid_table.dart';
+import 'package:fitgrid_plus/fitgrid_plus.dart';
 
 /// Provides theme configurations for [AiGrid].
 ///

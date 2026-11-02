@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../fitgrid/fitgrid_table.dart';
+import 'package:fitgrid_plus/fitgrid_plus.dart';
 
 /// Aggregation functions supported in Pivot mode.
 enum AiGridPivotAggregation {

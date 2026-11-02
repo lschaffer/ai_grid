@@ -1,4 +1,12 @@
-export 'src/fitgrid/fitgrid_table.dart';
+export 'package:fitgrid_plus/fitgrid_plus.dart'
+    hide
+        ClipboardContentType,
+        ClipboardPayload,
+        ClipboardContentService,
+        DelimitedTableParser,
+        DelimitedTableResult,
+        MarkdownTableExtractor,
+        MarkdownTableResult;
 export 'src/models/ai_grid_column.dart';
 export 'src/models/ai_grid_smart_column.dart';
 export 'src/models/ai_grid_smart_column_runner.dart';
