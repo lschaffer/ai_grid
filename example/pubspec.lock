@@ -219,9 +219,10 @@ packages:
   fitgrid_plus:
     dependency: transitive
     description:
-      path: "../../fitgrid_plus"
-      relative: true
-    source: path
+      name: fitgrid_plus
+      sha256: "60d9e0b62b70f8b5376d525c8c5dfa61120a94b24eec20f029004e236cf2a0c9"
+      url: "https://pub.dev"
+    source: hosted
     version: "0.1.0"
   fixnum:
     dependency: transitive
@@ -383,10 +384,10 @@ packages:
     dependency: "direct main"
     description:
       name: material_ui
-      sha256: e4031746f96c8316864d9b92bce375f1320a36ed56e166307e1e1bda9d90b4ab
+      sha256: feb289df1e5f9ed9522f9fe3d909432a7f7bc76943f16abad09f80a16cd25196
       url: "https://pub.dev"
     source: hosted
-    version: "1.8.0"
+    version: "1.9.0"
   meta:
     dependency: transitive
     description:

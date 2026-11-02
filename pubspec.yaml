@@ -17,8 +17,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  fitgrid_plus:
-    path: ../fitgrid_plus
+  fitgrid_plus: ^0.1.0
+    # path: ../fitgrid_plus
   material_ui: ^1.8.0
   intl: ^0.20.2
   dart_mcp_core: ^1.4.0
