@@ -332,3 +332,4 @@ FitGridPlus(
 3. **Controller Lifecycle**: Always dispose `FitGridPlusController` in `State.dispose()`.
 4. **Column Naming**: Keep `field` alphanumeric without special punctuation (e.g. `order_id`, `customerName`).
 5. **Readonly Datasets**: When creating read-only showcase or dynamic tables, set `allowEditing: false` on `FitGridPlusEditingOptions` to suppress all inline editors and action buttons.
+
