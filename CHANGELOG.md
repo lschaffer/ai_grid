@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.13.1
+
+* **Upstream Engine Alignment**: Upgraded core DataGrid dependency to [`fitgrid_plus: ^0.1.1`](https://pub.dev/packages/fitgrid_plus) incorporating:
+  * Dynamic data ingestion support (CSV, TSV, Markdown tables, YAML).
+  * Dynamic pagination toggle fix allowing paging to be disabled/enabled seamlessly.
+  * Horizontal scrollbar visibility and keyboard tab navigation in row edit mode.
+  * Web dropdown picker stability and overlay cleanup on Flutter Web.
+  * Responsive layout wrapping on smaller viewports.
+* **Dependency Upgrades**:
+  * Updated `material_ui` to `^1.9.0`.
+  * Updated `dart_mcp_core` to `^1.5.7`.
+* **Testing & Quality**: 100% test pass rate across all 103 unit and integration tests with zero analyzer warnings.
+
 ## 0.13.0
 
 ### ⚠️ BREAKING CHANGE: Modularized Core DataGrid Engine into `fitgrid_plus`
